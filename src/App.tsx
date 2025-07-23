@@ -13,6 +13,7 @@ import Tasks from "./pages/Tasks";
 import Calendar from "./pages/Calendar";
 import Focus from "./pages/Focus";
 import Profile from "./pages/Profile";
+import UserManagement from "./pages/UserManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,11 @@ const App = () => (
             <Route path="/profile" element={
               <ProtectedRoute>
                 <Layout><Profile /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/users" element={
+              <ProtectedRoute>
+                <Layout><UserManagement /></Layout>
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />

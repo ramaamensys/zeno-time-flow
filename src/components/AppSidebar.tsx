@@ -6,6 +6,7 @@ import {
   Calendar,
   Timer,
   User,
+  Users,
 } from "lucide-react";
 
 import {
@@ -26,6 +27,7 @@ const items = [
   { title: "Calendar", url: "/calendar", icon: Calendar },
   { title: "Focus", url: "/focus", icon: Timer },
   { title: "Profile", url: "/profile", icon: User },
+  { title: "Users", url: "/users", icon: Users },
 ];
 
 export function AppSidebar() {
