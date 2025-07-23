@@ -14,16 +14,291 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      calendar_events: {
+        Row: {
+          all_day: boolean | null
+          created_at: string
+          description: string | null
+          end_time: string
+          event_type: string | null
+          id: string
+          recurrence_rule: string | null
+          start_time: string
+          task_id: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          all_day?: boolean | null
+          created_at?: string
+          description?: string | null
+          end_time: string
+          event_type?: string | null
+          id?: string
+          recurrence_rule?: string | null
+          start_time: string
+          task_id?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          all_day?: boolean | null
+          created_at?: string
+          description?: string | null
+          end_time?: string
+          event_type?: string | null
+          id?: string
+          recurrence_rule?: string | null
+          start_time?: string
+          task_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      focus_sessions: {
+        Row: {
+          calendar_event_id: string | null
+          created_at: string
+          duration: number | null
+          end_time: string | null
+          id: string
+          interruptions: number | null
+          notes: string | null
+          productivity_score: number | null
+          start_time: string
+          task_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          calendar_event_id?: string | null
+          created_at?: string
+          duration?: number | null
+          end_time?: string | null
+          id?: string
+          interruptions?: number | null
+          notes?: string | null
+          productivity_score?: number | null
+          start_time: string
+          task_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          calendar_event_id?: string | null
+          created_at?: string
+          duration?: number | null
+          end_time?: string | null
+          id?: string
+          interruptions?: number | null
+          notes?: string | null
+          productivity_score?: number | null
+          start_time?: string
+          task_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "focus_sessions_calendar_event_id_fkey"
+            columns: ["calendar_event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "focus_sessions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          actual_duration: number | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          estimated_duration: number | null
+          id: string
+          priority: string | null
+          status: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          actual_duration?: number | null
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          estimated_duration?: number | null
+          id?: string
+          priority?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          actual_duration?: number | null
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          estimated_duration?: number | null
+          id?: string
+          priority?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      time_tracking: {
+        Row: {
+          activity_type: string | null
+          created_at: string
+          description: string | null
+          duration: number | null
+          end_time: string | null
+          focus_session_id: string | null
+          id: string
+          start_time: string
+          task_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activity_type?: string | null
+          created_at?: string
+          description?: string | null
+          duration?: number | null
+          end_time?: string | null
+          focus_session_id?: string | null
+          id?: string
+          start_time: string
+          task_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activity_type?: string | null
+          created_at?: string
+          description?: string | null
+          duration?: number | null
+          end_time?: string | null
+          focus_session_id?: string | null
+          id?: string
+          start_time?: string
+          task_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_tracking_focus_session_id_fkey"
+            columns: ["focus_session_id"]
+            isOneToOne: false
+            referencedRelation: "focus_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_tracking_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_role: {
+        Args: {
+          _user_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "super_admin" | "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +425,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["super_admin", "admin", "user"],
+    },
   },
 } as const
