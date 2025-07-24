@@ -1,0 +1,101 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { Resend } from "npm:resend@2.0.0";
+
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+interface WelcomeEmailRequest {
+  email: string;
+  full_name: string;
+  role: string;
+  password: string;
+}
+
+const handler = async (req: Request): Promise<Response> => {
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { email, full_name, role, password }: WelcomeEmailRequest = await req.json();
+
+    console.log(`Sending welcome email to: ${email}`);
+
+    const emailResponse = await resend.emails.send({
+      from: "TeamSync <onboarding@resend.dev>",
+      to: [email],
+      subject: "Welcome to TeamSync - Your Account is Ready!",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to TeamSync!</h1>
+          </div>
+          
+          <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #333; margin-top: 0;">Hello ${full_name || 'there'}!</h2>
+            
+            <p style="color: #555; line-height: 1.6;">
+              Your account has been created successfully. You can now access TeamSync with the following credentials:
+            </p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
+              <p style="margin: 0; color: #333;"><strong>Email:</strong> ${email}</p>
+              <p style="margin: 10px 0 0 0; color: #333;"><strong>Temporary Password:</strong> ${password}</p>
+              <p style="margin: 10px 0 0 0; color: #333;"><strong>Role:</strong> ${role.replace('_', ' ').toUpperCase()}</p>
+            </div>
+            
+            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+              <p style="margin: 0; color: #856404; font-size: 14px;">
+                <strong>Important:</strong> Please change your password after your first login for security purposes.
+              </p>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.lovable.app') || 'https://your-app.lovable.app'}/auth" 
+                 style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                Login to TeamSync
+              </a>
+            </div>
+            
+            <p style="color: #666; font-size: 14px; text-align: center; margin-top: 30px;">
+              If you have any questions, please don't hesitate to contact our support team.
+            </p>
+            
+            <hr style="border: none; height: 1px; background: #ddd; margin: 30px 0;">
+            
+            <p style="color: #999; font-size: 12px; text-align: center; margin: 0;">
+              This email was sent automatically from TeamSync. Please do not reply to this email.
+            </p>
+          </div>
+        </div>
+      `,
+    });
+
+    console.log("Welcome email sent successfully:", emailResponse);
+
+    return new Response(JSON.stringify({ success: true, emailResponse }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        ...corsHeaders,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error in send-welcome-email function:", error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      }
+    );
+  }
+};
+
+serve(handler);

@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Users, Plus } from "lucide-react";
+import { Loader2, Users, Plus, Edit, Trash2 } from "lucide-react";
 
 interface UserProfile {
   id: string;
@@ -55,6 +55,8 @@ export default function UserManagement() {
     password: "",
     role: "user" as "user" | "admin" | "super_admin"
   });
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -184,9 +186,25 @@ export default function UserManagement() {
         }
       }
 
+      // Send welcome email
+      try {
+        await supabase.functions.invoke('send-welcome-email', {
+          body: {
+            email: newUser.email,
+            full_name: newUser.full_name,
+            role: newUser.role,
+            password: newUser.password
+          }
+        });
+        console.log('Welcome email sent successfully');
+      } catch (emailError) {
+        console.error('Failed to send welcome email:', emailError);
+        // Don't fail user creation if email fails
+      }
+
       toast({
         title: "Success",
-        description: "User created successfully",
+        description: "User created successfully and welcome email sent",
       });
 
       setIsDialogOpen(false);
@@ -201,6 +219,76 @@ export default function UserManagement() {
       });
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const editUser = async () => {
+    if (!editingUser) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          full_name: editingUser.full_name,
+          email: editingUser.email
+        })
+        .eq('user_id', editingUser.user_id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "User updated successfully",
+      });
+
+      setIsEditDialogOpen(false);
+      setEditingUser(null);
+      await loadUsers();
+    } catch (error: any) {
+      console.error('Error updating user:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteUser = async (userId: string, userEmail: string) => {
+    if (!confirm(`Are you sure you want to delete user ${userEmail}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      // First delete from user_roles
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+
+      if (roleError) throw roleError;
+
+      // Then delete from profiles
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('user_id', userId);
+
+      if (profileError) throw profileError;
+
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      });
+
+      await loadUsers();
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
     }
   };
 
@@ -330,6 +418,53 @@ export default function UserManagement() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* Edit User Dialog */}
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Edit User</DialogTitle>
+                  <DialogDescription>
+                    Update user information.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit_email" className="text-right">
+                      Email
+                    </Label>
+                    <Input
+                      id="edit_email"
+                      type="email"
+                      value={editingUser?.email || ""}
+                      onChange={(e) => setEditingUser(editingUser ? { ...editingUser, email: e.target.value } : null)}
+                      className="col-span-3"
+                      placeholder="user@example.com"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit_full_name" className="text-right">
+                      Full Name
+                    </Label>
+                    <Input
+                      id="edit_full_name"
+                      value={editingUser?.full_name || ""}
+                      onChange={(e) => setEditingUser(editingUser ? { ...editingUser, full_name: e.target.value } : null)}
+                      className="col-span-3"
+                      placeholder="John Doe"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="submit"
+                    onClick={editUser}
+                  >
+                    Update User
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -358,26 +493,47 @@ export default function UserManagement() {
                   <TableCell>
                     {new Date(userProfile.created_at).toLocaleDateString()}
                   </TableCell>
-                  <TableCell>
-                    {userProfile.user_id !== user?.id && (
-                      <Select
-                        value={userProfile.role}
-                        onValueChange={(value) => updateUserRole(userProfile.user_id, value as 'user' | 'admin' | 'super_admin')}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="user">User</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="super_admin">Super Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                    {userProfile.user_id === user?.id && (
-                      <span className="text-sm text-muted-foreground">You</span>
-                    )}
-                  </TableCell>
+                   <TableCell>
+                     <div className="flex items-center gap-2">
+                       {userProfile.user_id !== user?.id && (
+                         <>
+                           <Select
+                             value={userProfile.role}
+                             onValueChange={(value) => updateUserRole(userProfile.user_id, value as 'user' | 'admin' | 'super_admin')}
+                           >
+                             <SelectTrigger className="w-32">
+                               <SelectValue />
+                             </SelectTrigger>
+                             <SelectContent>
+                               <SelectItem value="user">User</SelectItem>
+                               <SelectItem value="admin">Admin</SelectItem>
+                               <SelectItem value="super_admin">Super Admin</SelectItem>
+                             </SelectContent>
+                           </Select>
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => {
+                               setEditingUser(userProfile);
+                               setIsEditDialogOpen(true);
+                             }}
+                           >
+                             <Edit className="h-4 w-4" />
+                           </Button>
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => deleteUser(userProfile.user_id, userProfile.email)}
+                           >
+                             <Trash2 className="h-4 w-4" />
+                           </Button>
+                         </>
+                       )}
+                       {userProfile.user_id === user?.id && (
+                         <span className="text-sm text-muted-foreground">You</span>
+                       )}
+                     </div>
+                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
