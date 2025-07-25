@@ -15,6 +15,8 @@ import Calendar from "./pages/Calendar";
 import Focus from "./pages/Focus";
 import Profile from "./pages/Profile";
 import UserManagement from "./pages/UserManagement";
+import Planner from "./pages/Planner";
+import Habits from "./pages/Habits";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +40,16 @@ const App = () => (
             <Route path="/tasks" element={
               <ProtectedRoute>
                 <Layout><Tasks /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/planner" element={
+              <ProtectedRoute>
+                <Layout><Planner /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/habits" element={
+              <ProtectedRoute>
+                <Layout><Habits /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/calendar" element={

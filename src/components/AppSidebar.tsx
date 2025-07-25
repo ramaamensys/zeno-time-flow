@@ -7,6 +7,8 @@ import {
   Timer,
   User,
   Users,
+  ClipboardList,
+  BarChart3,
 } from "lucide-react";
 
 import {
@@ -24,6 +26,8 @@ import {
 const items = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Tasks", url: "/tasks", icon: CheckSquare },
+  { title: "Planner", url: "/planner", icon: ClipboardList },
+  { title: "Habits", url: "/habits", icon: BarChart3 },
   { title: "Calendar", url: "/calendar", icon: Calendar },
   { title: "Focus", url: "/focus", icon: Timer },
   { title: "Profile", url: "/profile", icon: User },
