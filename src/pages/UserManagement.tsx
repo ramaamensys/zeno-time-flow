@@ -186,7 +186,8 @@ export default function UserManagement() {
         }
       }
 
-      // Send welcome email
+      // Send welcome email (optional)
+      let emailSent = false;
       try {
         await supabase.functions.invoke('send-welcome-email', {
           body: {
@@ -196,6 +197,7 @@ export default function UserManagement() {
             password: newUser.password
           }
         });
+        emailSent = true;
         console.log('Welcome email sent successfully');
       } catch (emailError) {
         console.error('Failed to send welcome email:', emailError);
@@ -204,7 +206,9 @@ export default function UserManagement() {
 
       toast({
         title: "Success",
-        description: "User created successfully and welcome email sent",
+        description: emailSent 
+          ? "User created successfully and welcome email sent"
+          : "User created successfully (email sending failed - please share credentials manually)",
       });
 
       setIsDialogOpen(false);
