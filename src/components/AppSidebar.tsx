@@ -24,14 +24,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const items = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Tasks", url: "/tasks", icon: CheckSquare },
-  { title: "Planner", url: "/planner", icon: ClipboardList },
-  { title: "Habits", url: "/habits", icon: BarChart3 },
   { title: "Calendar", url: "/calendar", icon: Calendar },
-  { title: "Focus", url: "/focus", icon: Timer },
-  { title: "Profile", url: "/profile", icon: User },
-  { title: "Users", url: "/users", icon: Users },
 ];
 
 export function AppSidebar() {

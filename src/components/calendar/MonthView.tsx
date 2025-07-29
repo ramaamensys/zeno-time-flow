@@ -10,16 +10,20 @@ interface CalendarEvent {
   end_time: string;
   all_day: boolean;
   event_type: string;
+  priority: string;
   created_at: string;
+  user_id: string;
 }
 
 interface MonthViewProps {
   currentDate: Date;
   events: CalendarEvent[];
   onDateClick: (date: Date) => void;
+  onEditEvent?: (event: CalendarEvent) => void;
+  onDeleteEvent?: (eventId: string) => void;
 }
 
-export const MonthView = ({ currentDate, events, onDateClick }: MonthViewProps) => {
+export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDeleteEvent }: MonthViewProps) => {
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const calendarStart = startOfWeek(monthStart);
@@ -37,13 +41,22 @@ export const MonthView = ({ currentDate, events, onDateClick }: MonthViewProps) 
     });
   };
 
-  const getEventTypeColor = (type: string) => {
-    switch (type) {
-      case "meeting": return "bg-blue-500";
-      case "task": return "bg-green-500";
-      case "personal": return "bg-purple-500";
+  const getPriorityColor = (priority: string, isOverdue: boolean) => {
+    if (isOverdue) return "bg-red-600";
+    
+    switch (priority) {
+      case "urgent": return "bg-red-500";
+      case "high": return "bg-orange-500";
+      case "medium": return "bg-blue-500";
+      case "low": return "bg-green-500";
       default: return "bg-gray-500";
     }
+  };
+
+  const isEventOverdue = (event: CalendarEvent) => {
+    const now = new Date();
+    const eventDate = new Date(event.start_time);
+    return eventDate < now && !event.all_day;
   };
 
   return (
@@ -79,18 +92,29 @@ export const MonthView = ({ currentDate, events, onDateClick }: MonthViewProps) 
             </div>
             
             <div className="space-y-1">
-              {dayEvents.slice(0, 3).map((event) => (
-                <div
-                  key={event.id}
-                  className={cn(
-                    "text-xs p-1 rounded text-white truncate",
-                    getEventTypeColor(event.event_type)
-                  )}
-                  title={event.title}
-                >
-                  {event.title}
-                </div>
-              ))}
+              {dayEvents.slice(0, 3).map((event) => {
+                const isOverdue = isEventOverdue(event);
+                return (
+                  <div
+                    key={event.id}
+                    className={cn(
+                      "text-xs p-1 rounded text-white truncate cursor-pointer hover:opacity-80",
+                      getPriorityColor(event.priority, isOverdue)
+                    )}
+                    title={`${event.title} (${event.priority} priority)${isOverdue ? ' - OVERDUE' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditEvent?.(event);
+                    }}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteEvent?.(event.id);
+                    }}
+                  >
+                    {event.title}
+                  </div>
+                );
+              })}
               {dayEvents.length > 3 && (
                 <div className="text-xs text-muted-foreground">
                   +{dayEvents.length - 3} more

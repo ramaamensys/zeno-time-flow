@@ -22,7 +22,9 @@ interface CalendarEvent {
   end_time: string;
   all_day: boolean;
   event_type: string;
+  priority: string;
   created_at: string;
+  user_id: string;
 }
 
 const Calendar = () => {
@@ -35,6 +37,7 @@ const Calendar = () => {
   const [view, setView] = useState<"month" | "week" | "day">("month");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [newEvent, setNewEvent] = useState({
     title: "",
     description: "",
@@ -42,6 +45,7 @@ const Calendar = () => {
     end_time: "",
     all_day: false,
     event_type: "other",
+    priority: "medium",
   });
 
   useEffect(() => {
@@ -94,33 +98,92 @@ const Calendar = () => {
       end_time: newEvent.end_time || newEvent.start_time,
       all_day: newEvent.all_day,
       event_type: newEvent.event_type,
+      priority: newEvent.priority,
       user_id: user?.id,
     };
 
-    const { error } = await supabase.from("calendar_events").insert([eventData]);
+    if (editingEvent) {
+      const { error } = await supabase
+        .from("calendar_events")
+        .update(eventData)
+        .eq("id", editingEvent.id);
+
+      if (error) {
+        toast({
+          title: "Error updating event",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Event updated",
+          description: "Your event has been updated successfully",
+        });
+      }
+    } else {
+      const { error } = await supabase.from("calendar_events").insert([eventData]);
+
+      if (error) {
+        toast({
+          title: "Error creating event",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Event created",
+          description: "Your event has been created successfully",
+        });
+      }
+    }
+
+    setIsDialogOpen(false);
+    setNewEvent({
+      title: "",
+      description: "",
+      start_time: "",
+      end_time: "",
+      all_day: false,
+      event_type: "other",
+      priority: "medium",
+    });
+    setEditingEvent(null);
+    fetchEvents();
+  };
+
+  const deleteEvent = async (eventId: string) => {
+    const { error } = await supabase
+      .from("calendar_events")
+      .delete()
+      .eq("id", eventId);
 
     if (error) {
       toast({
-        title: "Error creating event",
+        title: "Error deleting event",
         description: error.message,
         variant: "destructive",
       });
     } else {
       toast({
-        title: "Event created",
-        description: "Your event has been created successfully",
-      });
-      setIsDialogOpen(false);
-      setNewEvent({
-        title: "",
-        description: "",
-        start_time: "",
-        end_time: "",
-        all_day: false,
-        event_type: "other",
+        title: "Event deleted",
+        description: "Your event has been deleted successfully",
       });
       fetchEvents();
     }
+  };
+
+  const editEvent = (event: CalendarEvent) => {
+    setEditingEvent(event);
+    setNewEvent({
+      title: event.title,
+      description: event.description || "",
+      start_time: format(new Date(event.start_time), "yyyy-MM-dd'T'HH:mm"),
+      end_time: format(new Date(event.end_time), "yyyy-MM-dd'T'HH:mm"),
+      all_day: event.all_day,
+      event_type: event.event_type,
+      priority: event.priority,
+    });
+    setIsDialogOpen(true);
   };
 
   const handleDateClick = (date: Date) => {
@@ -178,6 +241,8 @@ const Calendar = () => {
           currentDate={currentDate}
           events={events}
           onDateClick={handleDateClick}
+          onEditEvent={editEvent}
+          onDeleteEvent={deleteEvent}
         />
       )}
 
@@ -186,6 +251,8 @@ const Calendar = () => {
           currentDate={currentDate}
           events={events}
           onTimeSlotClick={handleTimeSlotClick}
+          onEditEvent={editEvent}
+          onDeleteEvent={deleteEvent}
         />
       )}
 
@@ -194,15 +261,17 @@ const Calendar = () => {
           currentDate={currentDate}
           events={events}
           onTimeSlotClick={handleDayTimeSlotClick}
+          onEditEvent={editEvent}
+          onDeleteEvent={deleteEvent}
         />
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Create New Event</DialogTitle>
+            <DialogTitle>{editingEvent ? "Edit Event" : "Create New Event"}</DialogTitle>
             <DialogDescription>
-              Add a new event to your calendar. Fill in the details below.
+              {editingEvent ? "Edit the event details below." : "Add a new event to your calendar. Fill in the details below."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -242,6 +311,23 @@ const Calendar = () => {
               </Select>
             </div>
             <div className="grid gap-2">
+              <Label>Priority</Label>
+              <Select
+                value={newEvent.priority}
+                onValueChange={(value) => setNewEvent({ ...newEvent, priority: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="start_time">Start Time</Label>
               <Input
                 id="start_time"
@@ -275,7 +361,7 @@ const Calendar = () => {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={createEvent}>Create Event</Button>
+            <Button onClick={createEvent}>{editingEvent ? "Update Event" : "Create Event"}</Button>
           </div>
         </DialogContent>
       </Dialog>

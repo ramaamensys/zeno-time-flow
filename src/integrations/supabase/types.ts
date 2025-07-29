@@ -22,6 +22,7 @@ export type Database = {
           end_time: string
           event_type: string | null
           id: string
+          priority: string | null
           recurrence_rule: string | null
           start_time: string
           task_id: string | null
@@ -36,6 +37,7 @@ export type Database = {
           end_time: string
           event_type?: string | null
           id?: string
+          priority?: string | null
           recurrence_rule?: string | null
           start_time: string
           task_id?: string | null
@@ -50,6 +52,7 @@ export type Database = {
           end_time?: string
           event_type?: string | null
           id?: string
+          priority?: string | null
           recurrence_rule?: string | null
           start_time?: string
           task_id?: string | null

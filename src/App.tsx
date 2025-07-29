@@ -32,44 +32,9 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/admin" element={<AdminAuth />} />
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <Layout><Dashboard /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/tasks" element={
-              <ProtectedRoute>
-                <Layout><Tasks /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/planner" element={
-              <ProtectedRoute>
-                <Layout><Planner /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/habits" element={
-              <ProtectedRoute>
-                <Layout><Habits /></Layout>
-              </ProtectedRoute>
-            } />
             <Route path="/calendar" element={
               <ProtectedRoute>
                 <Layout><Calendar /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/focus" element={
-              <ProtectedRoute>
-                <Layout><Focus /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <Layout><Profile /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/users" element={
-              <ProtectedRoute>
-                <Layout><UserManagement /></Layout>
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />

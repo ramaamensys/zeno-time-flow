@@ -9,16 +9,20 @@ interface CalendarEvent {
   end_time: string;
   all_day: boolean;
   event_type: string;
+  priority: string;
   created_at: string;
+  user_id: string;
 }
 
 interface DayViewProps {
   currentDate: Date;
   events: CalendarEvent[];
   onTimeSlotClick: (hour: number) => void;
+  onEditEvent?: (event: CalendarEvent) => void;
+  onDeleteEvent?: (eventId: string) => void;
 }
 
-export const DayView = ({ currentDate, events, onTimeSlotClick }: DayViewProps) => {
+export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onDeleteEvent }: DayViewProps) => {
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
   const getEventsForHour = (hour: number) => {
@@ -30,13 +34,22 @@ export const DayView = ({ currentDate, events, onTimeSlotClick }: DayViewProps) 
     });
   };
 
-  const getEventTypeColor = (type: string) => {
-    switch (type) {
-      case "meeting": return "bg-blue-500";
-      case "task": return "bg-green-500";
-      case "personal": return "bg-purple-500";
+  const getPriorityColor = (priority: string, isOverdue: boolean) => {
+    if (isOverdue) return "bg-red-600";
+    
+    switch (priority) {
+      case "urgent": return "bg-red-500";
+      case "high": return "bg-orange-500";
+      case "medium": return "bg-blue-500";
+      case "low": return "bg-green-500";
       default: return "bg-gray-500";
     }
+  };
+
+  const isEventOverdue = (event: CalendarEvent) => {
+    const now = new Date();
+    const eventDate = new Date(event.start_time);
+    return eventDate < now && !event.all_day;
   };
 
   return (
@@ -66,23 +79,37 @@ export const DayView = ({ currentDate, events, onTimeSlotClick }: DayViewProps) 
                 onClick={() => onTimeSlotClick(hour)}
               >
                 <div className="space-y-1">
-                  {hourEvents.map((event) => (
-                    <div
-                      key={event.id}
-                      className={cn(
-                        "p-2 rounded text-white",
-                        getEventTypeColor(event.event_type)
-                      )}
-                    >
-                      <div className="font-medium">{event.title}</div>
-                      {event.description && (
-                        <div className="text-xs opacity-90 mt-1">{event.description}</div>
-                      )}
-                      <div className="text-xs opacity-75 mt-1">
-                        {format(new Date(event.start_time), "h:mm a")} - {format(new Date(event.end_time), "h:mm a")}
+                  {hourEvents.map((event) => {
+                    const isOverdue = isEventOverdue(event);
+                    return (
+                      <div
+                        key={event.id}
+                        className={cn(
+                          "p-2 rounded text-white cursor-pointer hover:opacity-80",
+                          getPriorityColor(event.priority, isOverdue)
+                        )}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditEvent?.(event);
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteEvent?.(event.id);
+                        }}
+                      >
+                        <div className="font-medium">{event.title}</div>
+                        <div className="text-xs opacity-75 mt-1">
+                          {event.priority} priority{isOverdue ? ' - OVERDUE' : ''}
+                        </div>
+                        {event.description && (
+                          <div className="text-xs opacity-90 mt-1">{event.description}</div>
+                        )}
+                        <div className="text-xs opacity-75 mt-1">
+                          {format(new Date(event.start_time), "h:mm a")} - {format(new Date(event.end_time), "h:mm a")}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

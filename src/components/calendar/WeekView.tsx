@@ -9,16 +9,20 @@ interface CalendarEvent {
   end_time: string;
   all_day: boolean;
   event_type: string;
+  priority: string;
   created_at: string;
+  user_id: string;
 }
 
 interface WeekViewProps {
   currentDate: Date;
   events: CalendarEvent[];
   onTimeSlotClick: (date: Date, hour: number) => void;
+  onEditEvent?: (event: CalendarEvent) => void;
+  onDeleteEvent?: (eventId: string) => void;
 }
 
-export const WeekView = ({ currentDate, events, onTimeSlotClick }: WeekViewProps) => {
+export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onDeleteEvent }: WeekViewProps) => {
   const weekStart = startOfWeek(currentDate);
   const weekEnd = endOfWeek(currentDate);
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
@@ -33,13 +37,22 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick }: WeekViewProps
     });
   };
 
-  const getEventTypeColor = (type: string) => {
-    switch (type) {
-      case "meeting": return "bg-blue-500";
-      case "task": return "bg-green-500";
-      case "personal": return "bg-purple-500";
+  const getPriorityColor = (priority: string, isOverdue: boolean) => {
+    if (isOverdue) return "bg-red-600";
+    
+    switch (priority) {
+      case "urgent": return "bg-red-500";
+      case "high": return "bg-orange-500";
+      case "medium": return "bg-blue-500";
+      case "low": return "bg-green-500";
       default: return "bg-gray-500";
     }
+  };
+
+  const isEventOverdue = (event: CalendarEvent) => {
+    const now = new Date();
+    const eventDate = new Date(event.start_time);
+    return eventDate < now && !event.all_day;
   };
 
   return (
@@ -75,18 +88,29 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick }: WeekViewProps
                   className="min-h-[60px] p-1 border-l border-border hover:bg-muted/30 cursor-pointer transition-colors"
                   onClick={() => onTimeSlotClick(day, hour)}
                 >
-                  {slotEvents.map((event) => (
-                    <div
-                      key={event.id}
-                      className={cn(
-                        "text-xs p-1 rounded text-white mb-1 truncate",
-                        getEventTypeColor(event.event_type)
-                      )}
-                      title={event.title}
-                    >
-                      {event.title}
-                    </div>
-                  ))}
+                  {slotEvents.map((event) => {
+                    const isOverdue = isEventOverdue(event);
+                    return (
+                      <div
+                        key={event.id}
+                        className={cn(
+                          "text-xs p-1 rounded text-white mb-1 truncate cursor-pointer hover:opacity-80",
+                          getPriorityColor(event.priority, isOverdue)
+                        )}
+                        title={`${event.title} (${event.priority} priority)${isOverdue ? ' - OVERDUE' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditEvent?.(event);
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteEvent?.(event.id);
+                        }}
+                      >
+                        {event.title}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}
