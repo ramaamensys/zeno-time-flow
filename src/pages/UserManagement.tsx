@@ -98,7 +98,7 @@ export default function UserManagement() {
         .from('profiles')
         .select(`
           *,
-          user_roles!inner(role)
+          user_roles(role)
         `)
         .order('created_at', { ascending: false });
 
@@ -106,7 +106,7 @@ export default function UserManagement() {
 
       const usersWithRoles = data.map(profile => ({
         ...profile,
-        role: (profile.user_roles as any)[0]?.role || 'user'
+        role: (profile.user_roles as any)?.[0]?.role || 'user'
       }));
 
       setUsers(usersWithRoles);
