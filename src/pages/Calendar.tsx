@@ -70,13 +70,15 @@ const Calendar = () => {
   useEffect(() => {
     if (user) {
       fetchUserRole();
-      fetchEvents();
       fetchUsers();
+      fetchEvents();
     }
   }, [user]);
 
   useEffect(() => {
-    applyFilters();
+    if (allEvents.length > 0) {
+      applyFilters();
+    }
   }, [allEvents, filters]);
 
   const fetchUserRole = async () => {
@@ -148,6 +150,11 @@ const Calendar = () => {
   };
 
   const applyFilters = () => {
+    if (!allEvents.length) {
+      setEvents([]);
+      return;
+    }
+
     let filteredEvents = [...allEvents];
 
     if (filters.priority) {
@@ -337,7 +344,7 @@ const Calendar = () => {
   }
 
   return (
-    <div className="h-full">
+    <div className="h-full space-y-6">
       <DailyQuote />
       
       <CalendarHeader
@@ -350,71 +357,77 @@ const Calendar = () => {
 
       {/* Filters section - Only for super_admin and admin */}
       {(userRole === "super_admin" || userRole === "admin") && (
-        <Card className="mb-4">
-          <CardContent className="p-4">
+        <Card className="shadow-sm">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                <span className="font-medium">Filters</span>
+                <Filter className="h-5 w-5 text-primary" />
+                <span className="font-semibold text-lg">Filters</span>
+                {(filters.priority || filters.eventType || filters.userId) && (
+                  <span className="bg-primary text-primary-foreground px-2 py-1 rounded-full text-xs font-medium">
+                    {[filters.priority, filters.eventType, filters.userId].filter(Boolean).length}
+                  </span>
+                )}
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowFilters(!showFilters)}
+                className="hover:bg-primary/10"
               >
-                {showFilters ? "Hide" : "Show"}
+                {showFilters ? "Hide Filters" : "Show Filters"}
               </Button>
             </div>
             
             {showFilters && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <Label>Priority</Label>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-foreground">Priority Level</Label>
                     <Select
                       value={filters.priority}
                       onValueChange={(value) => setFilters(prev => ({ ...prev, priority: value }))}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="All priorities" />
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Select priority" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="">All priorities</SelectItem>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
+                        <SelectItem value="low">🟢 Low</SelectItem>
+                        <SelectItem value="medium">🟡 Medium</SelectItem>
+                        <SelectItem value="high">🟠 High</SelectItem>
+                        <SelectItem value="urgent">🔴 Urgent</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   
-                  <div>
-                    <Label>Event Type</Label>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-foreground">Event Type</Label>
                     <Select
                       value={filters.eventType}
                       onValueChange={(value) => setFilters(prev => ({ ...prev, eventType: value }))}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="All types" />
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="">All types</SelectItem>
-                        <SelectItem value="meeting">Meeting</SelectItem>
-                        <SelectItem value="task">Task</SelectItem>
-                        <SelectItem value="personal">Personal</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        <SelectItem value="meeting">📅 Meeting</SelectItem>
+                        <SelectItem value="task">✅ Task</SelectItem>
+                        <SelectItem value="personal">👤 Personal</SelectItem>
+                        <SelectItem value="other">📝 Other</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   
-                  <div>
-                    <Label>User</Label>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-foreground">Team Member</Label>
                     <Select
                       value={filters.userId}
                       onValueChange={(value) => setFilters(prev => ({ ...prev, userId: value }))}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="All users" />
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Select user" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="">All users</SelectItem>
@@ -431,31 +444,50 @@ const Calendar = () => {
                     <Button
                       variant="outline"
                       onClick={clearFilters}
-                      className="w-full"
+                      className="w-full h-10 hover:bg-destructive hover:text-destructive-foreground"
+                      disabled={!filters.priority && !filters.eventType && !filters.userId}
                     >
                       <X className="h-4 w-4 mr-2" />
-                      Clear
+                      Clear All
                     </Button>
                   </div>
                 </div>
                 
                 {(filters.priority || filters.eventType || filters.userId) && (
-                  <div className="flex flex-wrap gap-2 pt-2 border-t">
-                    <span className="text-sm text-muted-foreground">Active filters:</span>
+                  <div className="flex flex-wrap gap-3 pt-4 border-t border-border">
+                    <span className="text-sm font-medium text-muted-foreground">Active filters:</span>
                     {filters.priority && (
-                      <span className="bg-primary/10 text-primary px-2 py-1 rounded text-sm">
-                        Priority: {filters.priority}
-                      </span>
+                      <div className="flex items-center gap-1 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-sm font-medium">
+                        <span>Priority: {filters.priority}</span>
+                        <button
+                          onClick={() => setFilters(prev => ({ ...prev, priority: "" }))}
+                          className="ml-1 hover:bg-primary/20 rounded-full p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
                     )}
                     {filters.eventType && (
-                      <span className="bg-primary/10 text-primary px-2 py-1 rounded text-sm">
-                        Type: {filters.eventType}
-                      </span>
+                      <div className="flex items-center gap-1 bg-secondary/80 text-secondary-foreground px-3 py-1.5 rounded-full text-sm font-medium">
+                        <span>Type: {filters.eventType}</span>
+                        <button
+                          onClick={() => setFilters(prev => ({ ...prev, eventType: "" }))}
+                          className="ml-1 hover:bg-secondary rounded-full p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
                     )}
                     {filters.userId && (
-                      <span className="bg-primary/10 text-primary px-2 py-1 rounded text-sm">
-                        User: {getUserName(filters.userId)}
-                      </span>
+                      <div className="flex items-center gap-1 bg-accent/80 text-accent-foreground px-3 py-1.5 rounded-full text-sm font-medium">
+                        <span>User: {getUserName(filters.userId)}</span>
+                        <button
+                          onClick={() => setFilters(prev => ({ ...prev, userId: "" }))}
+                          className="ml-1 hover:bg-accent rounded-full p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
