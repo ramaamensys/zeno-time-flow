@@ -94,20 +94,29 @@ export default function UserManagement() {
 
   const loadUsers = async () => {
     try {
-      const { data, error } = await supabase
+      // First get all profiles
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          user_roles(role)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (profilesError) throw profilesError;
 
-      const usersWithRoles = data.map(profile => ({
-        ...profile,
-        role: (profile.user_roles as any)?.[0]?.role || 'user'
-      }));
+      // Then get roles for each user
+      const usersWithRoles = await Promise.all(
+        profiles.map(async (profile) => {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', profile.user_id)
+            .single();
+
+          return {
+            ...profile,
+            role: roleData?.role || 'user'
+          };
+        })
+      );
 
       setUsers(usersWithRoles);
     } catch (error) {
