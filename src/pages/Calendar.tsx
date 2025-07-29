@@ -12,6 +12,7 @@ import { CalendarHeader } from "@/components/calendar/CalendarHeader";
 import { MonthView } from "@/components/calendar/MonthView";
 import { WeekView } from "@/components/calendar/WeekView";
 import { DayView } from "@/components/calendar/DayView";
+import DailyQuote from "@/components/DailyQuote";
 import { format } from "date-fns";
 
 interface CalendarEvent {
@@ -228,6 +229,8 @@ const Calendar = () => {
 
   return (
     <div className="h-full">
+      <DailyQuote />
+      
       <CalendarHeader
         currentDate={currentDate}
         onDateChange={setCurrentDate}
