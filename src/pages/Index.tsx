@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Calendar, CheckSquare, Timer, Target } from "lucide-react";
+import { CheckSquare } from "lucide-react";
 
 const Index = () => {
   return (
@@ -24,26 +24,12 @@ const Index = () => {
               <Link to="/auth">Login</Link>
             </Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-            <div className="flex items-start gap-3">
+          <div className="flex justify-center">
+            <div className="flex items-start gap-3 max-w-md">
               <CheckSquare className="h-6 w-6 text-primary mt-1" />
               <div>
                 <h3 className="font-semibold mb-2">Task Management</h3>
                 <p className="text-sm text-muted-foreground">Create, organize, and track your tasks with priorities and due dates</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <Calendar className="h-6 w-6 text-primary mt-1" />
-              <div>
-                <h3 className="font-semibold mb-2">Calendar Integration</h3>
-                <p className="text-sm text-muted-foreground">Schedule events and manage your time effectively</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <Target className="h-6 w-6 text-primary mt-1" />
-              <div>
-                <h3 className="font-semibold mb-2">Focus Sessions</h3>
-                <p className="text-sm text-muted-foreground">Track focused work time and measure productivity</p>
               </div>
             </div>
           </div>
