@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Users, Plus, Edit, Trash2 } from "lucide-react";
+import { Loader2, Users, Plus, Edit, Trash2, Search, Filter } from "lucide-react";
 
 interface UserProfile {
   id: string;
@@ -58,6 +58,12 @@ export default function UserManagement() {
   });
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedRole, setSelectedRole] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -320,6 +326,18 @@ export default function UserManagement() {
     }
   };
 
+  // Filter users based on search term, role, and status
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch = 
+      user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesRole = selectedRole === "all" || user.role === selectedRole;
+    const matchesStatus = selectedStatus === "all" || user.status === selectedStatus;
+    
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -347,12 +365,77 @@ export default function UserManagement() {
         </p>
       </div>
 
+      {/* Filters Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Search Filter */}
+            <div className="flex-1">
+              <Label htmlFor="search" className="text-sm font-medium">
+                Search Users
+              </Label>
+              <div className="relative mt-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="search"
+                  placeholder="Search by name or email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            {/* Role Filter */}
+            <div className="w-full sm:w-48">
+              <Label htmlFor="role-filter" className="text-sm font-medium">
+                Filter by Role
+              </Label>
+              <Select value={selectedRole} onValueChange={setSelectedRole}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="All Roles" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="super_admin">Super Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Status Filter */}
+            <div className="w-full sm:w-48">
+              <Label htmlFor="status-filter" className="text-sm font-medium">
+                Filter by Status
+              </Label>
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="deleted">Deleted</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              All Users ({users.length})
+              Users ({filteredUsers.length} of {users.length})
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
@@ -497,7 +580,14 @@ export default function UserManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((userProfile) => (
+              {filteredUsers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    No users found matching the current filters.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers.map((userProfile) => (
                 <TableRow key={userProfile.id}>
                   <TableCell className="font-medium">
                     {userProfile.full_name || 'No name'}
@@ -561,7 +651,8 @@ export default function UserManagement() {
                       </div>
                     </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
