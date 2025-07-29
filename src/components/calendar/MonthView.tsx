@@ -21,9 +21,11 @@ interface MonthViewProps {
   onDateClick: (date: Date) => void;
   onEditEvent?: (event: CalendarEvent) => void;
   onDeleteEvent?: (eventId: string) => void;
+  onUserEventClick?: (userId: string) => void;
+  getUserName?: (userId: string) => string;
 }
 
-export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDeleteEvent }: MonthViewProps) => {
+export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDeleteEvent, onUserEventClick, getUserName }: MonthViewProps) => {
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const calendarStart = startOfWeek(monthStart);
@@ -101,17 +103,28 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
                       "text-xs p-1 rounded text-white truncate cursor-pointer hover:opacity-80",
                       getPriorityColor(event.priority, isOverdue)
                     )}
-                    title={`${event.title} (${event.priority} priority)${isOverdue ? ' - OVERDUE' : ''}`}
+                    title={`${event.title} (${event.priority} priority)${isOverdue ? ' - OVERDUE' : ''}${getUserName && onUserEventClick ? ` - ${getUserName(event.user_id)}` : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      onEditEvent?.(event);
+                      if (onUserEventClick && e.ctrlKey) {
+                        onUserEventClick(event.user_id);
+                      } else {
+                        onEditEvent?.(event);
+                      }
                     }}
                     onDoubleClick={(e) => {
                       e.stopPropagation();
                       onDeleteEvent?.(event.id);
                     }}
                   >
-                    {event.title}
+                    <div className="flex items-center justify-between">
+                      <span className="truncate">{event.title}</span>
+                      {getUserName && (
+                        <span className="text-xs opacity-75 ml-1">
+                          {getUserName(event.user_id).split(' ')[0]}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 );
               })}

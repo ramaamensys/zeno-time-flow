@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CalendarHeader } from "@/components/calendar/CalendarHeader";
@@ -14,6 +15,7 @@ import { WeekView } from "@/components/calendar/WeekView";
 import { DayView } from "@/components/calendar/DayView";
 import DailyQuote from "@/components/DailyQuote";
 import { format } from "date-fns";
+import { Filter, X } from "lucide-react";
 
 interface CalendarEvent {
   id: string;
@@ -28,10 +30,20 @@ interface CalendarEvent {
   user_id: string;
 }
 
+interface UserProfile {
+  id: string;
+  full_name: string | null;
+  email: string;
+  user_id: string;
+}
+
 const Calendar = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [allEvents, setAllEvents] = useState<CalendarEvent[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -39,6 +51,12 @@ const Calendar = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    priority: "",
+    eventType: "",
+    userId: "",
+  });
   const [newEvent, setNewEvent] = useState({
     title: "",
     description: "",
@@ -51,15 +69,71 @@ const Calendar = () => {
 
   useEffect(() => {
     if (user) {
+      fetchUserRole();
       fetchEvents();
+      fetchUsers();
     }
   }, [user]);
 
+  useEffect(() => {
+    applyFilters();
+  }, [allEvents, filters]);
+
+  const fetchUserRole = async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+    
+    setUserRole(data?.role || "user");
+  };
+
+  const fetchUsers = async () => {
+    if (!user) return;
+    
+    // Only fetch users if current user is super_admin or admin
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (roleData?.role === "super_admin" || roleData?.role === "admin") {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, user_id")
+        .order("full_name");
+
+      if (!error) {
+        setUsers(data || []);
+      }
+    }
+  };
+
   const fetchEvents = async () => {
-    const { data, error } = await supabase
+    if (!user) return;
+
+    // Check if user is super_admin or admin to see all events
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    let query = supabase
       .from("calendar_events")
       .select("*")
       .order("start_time", { ascending: true });
+
+    // If not super_admin or admin, only show their own events
+    if (roleData?.role !== "super_admin" && roleData?.role !== "admin") {
+      query = query.eq("user_id", user.id);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       toast({
@@ -68,9 +142,39 @@ const Calendar = () => {
         variant: "destructive",
       });
     } else {
-      setEvents(data || []);
+      setAllEvents(data || []);
     }
     setIsLoading(false);
+  };
+
+  const applyFilters = () => {
+    let filteredEvents = [...allEvents];
+
+    if (filters.priority) {
+      filteredEvents = filteredEvents.filter(event => event.priority === filters.priority);
+    }
+
+    if (filters.eventType) {
+      filteredEvents = filteredEvents.filter(event => event.event_type === filters.eventType);
+    }
+
+    if (filters.userId) {
+      filteredEvents = filteredEvents.filter(event => event.user_id === filters.userId);
+    }
+
+    setEvents(filteredEvents);
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      priority: "",
+      eventType: "",
+      userId: "",
+    });
+  };
+
+  const handleUserEventClick = (userId: string) => {
+    setFilters(prev => ({ ...prev, userId }));
   };
 
   const createEvent = async () => {
@@ -150,6 +254,11 @@ const Calendar = () => {
     });
     setEditingEvent(null);
     fetchEvents();
+  };
+
+  const getUserName = (userId: string) => {
+    const userProfile = users.find(u => u.user_id === userId);
+    return userProfile?.full_name || userProfile?.email || "Unknown User";
   };
 
   const deleteEvent = async (eventId: string) => {
@@ -239,6 +348,123 @@ const Calendar = () => {
         onNewEvent={() => openEventDialog()}
       />
 
+      {/* Filters section - Only for super_admin and admin */}
+      {(userRole === "super_admin" || userRole === "admin") && (
+        <Card className="mb-4">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                <span className="font-medium">Filters</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                {showFilters ? "Hide" : "Show"}
+              </Button>
+            </div>
+            
+            {showFilters && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <Label>Priority</Label>
+                    <Select
+                      value={filters.priority}
+                      onValueChange={(value) => setFilters(prev => ({ ...prev, priority: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="All priorities" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All priorities</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label>Event Type</Label>
+                    <Select
+                      value={filters.eventType}
+                      onValueChange={(value) => setFilters(prev => ({ ...prev, eventType: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="All types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All types</SelectItem>
+                        <SelectItem value="meeting">Meeting</SelectItem>
+                        <SelectItem value="task">Task</SelectItem>
+                        <SelectItem value="personal">Personal</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label>User</Label>
+                    <Select
+                      value={filters.userId}
+                      onValueChange={(value) => setFilters(prev => ({ ...prev, userId: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="All users" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">All users</SelectItem>
+                        {users.map((user) => (
+                          <SelectItem key={user.user_id} value={user.user_id}>
+                            {user.full_name || user.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex items-end">
+                    <Button
+                      variant="outline"
+                      onClick={clearFilters}
+                      className="w-full"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+                
+                {(filters.priority || filters.eventType || filters.userId) && (
+                  <div className="flex flex-wrap gap-2 pt-2 border-t">
+                    <span className="text-sm text-muted-foreground">Active filters:</span>
+                    {filters.priority && (
+                      <span className="bg-primary/10 text-primary px-2 py-1 rounded text-sm">
+                        Priority: {filters.priority}
+                      </span>
+                    )}
+                    {filters.eventType && (
+                      <span className="bg-primary/10 text-primary px-2 py-1 rounded text-sm">
+                        Type: {filters.eventType}
+                      </span>
+                    )}
+                    {filters.userId && (
+                      <span className="bg-primary/10 text-primary px-2 py-1 rounded text-sm">
+                        User: {getUserName(filters.userId)}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {view === "month" && (
         <MonthView
           currentDate={currentDate}
@@ -246,6 +472,8 @@ const Calendar = () => {
           onDateClick={handleDateClick}
           onEditEvent={editEvent}
           onDeleteEvent={deleteEvent}
+          onUserEventClick={(userRole === "super_admin" || userRole === "admin") ? handleUserEventClick : undefined}
+          getUserName={(userRole === "super_admin" || userRole === "admin") ? getUserName : undefined}
         />
       )}
 
@@ -256,6 +484,8 @@ const Calendar = () => {
           onTimeSlotClick={handleTimeSlotClick}
           onEditEvent={editEvent}
           onDeleteEvent={deleteEvent}
+          onUserEventClick={(userRole === "super_admin" || userRole === "admin") ? handleUserEventClick : undefined}
+          getUserName={(userRole === "super_admin" || userRole === "admin") ? getUserName : undefined}
         />
       )}
 
@@ -266,6 +496,8 @@ const Calendar = () => {
           onTimeSlotClick={handleDayTimeSlotClick}
           onEditEvent={editEvent}
           onDeleteEvent={deleteEvent}
+          onUserEventClick={(userRole === "super_admin" || userRole === "admin") ? handleUserEventClick : undefined}
+          getUserName={(userRole === "super_admin" || userRole === "admin") ? getUserName : undefined}
         />
       )}
 

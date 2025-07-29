@@ -20,9 +20,11 @@ interface WeekViewProps {
   onTimeSlotClick: (date: Date, hour: number) => void;
   onEditEvent?: (event: CalendarEvent) => void;
   onDeleteEvent?: (eventId: string) => void;
+  onUserEventClick?: (userId: string) => void;
+  getUserName?: (userId: string) => string;
 }
 
-export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onDeleteEvent }: WeekViewProps) => {
+export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onDeleteEvent, onUserEventClick, getUserName }: WeekViewProps) => {
   const weekStart = startOfWeek(currentDate);
   const weekEnd = endOfWeek(currentDate);
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
@@ -97,17 +99,28 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, on
                           "text-xs p-1 rounded text-white mb-1 truncate cursor-pointer hover:opacity-80",
                           getPriorityColor(event.priority, isOverdue)
                         )}
-                        title={`${event.title} (${event.priority} priority)${isOverdue ? ' - OVERDUE' : ''}`}
+                        title={`${event.title} (${event.priority} priority)${isOverdue ? ' - OVERDUE' : ''}${getUserName && onUserEventClick ? ` - ${getUserName(event.user_id)}` : ''}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          onEditEvent?.(event);
+                          if (onUserEventClick && e.ctrlKey) {
+                            onUserEventClick(event.user_id);
+                          } else {
+                            onEditEvent?.(event);
+                          }
                         }}
                         onDoubleClick={(e) => {
                           e.stopPropagation();
                           onDeleteEvent?.(event.id);
                         }}
                       >
-                        {event.title}
+                        <div className="flex items-center justify-between">
+                          <span className="truncate">{event.title}</span>
+                          {getUserName && (
+                            <span className="text-xs opacity-75">
+                              {getUserName(event.user_id).split(' ')[0]}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

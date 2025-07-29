@@ -20,9 +20,11 @@ interface DayViewProps {
   onTimeSlotClick: (hour: number) => void;
   onEditEvent?: (event: CalendarEvent) => void;
   onDeleteEvent?: (eventId: string) => void;
+  onUserEventClick?: (userId: string) => void;
+  getUserName?: (userId: string) => string;
 }
 
-export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onDeleteEvent }: DayViewProps) => {
+export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onDeleteEvent, onUserEventClick, getUserName }: DayViewProps) => {
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
   const getEventsForHour = (hour: number) => {
@@ -90,14 +92,25 @@ export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onD
                         )}
                         onClick={(e) => {
                           e.stopPropagation();
-                          onEditEvent?.(event);
+                          if (onUserEventClick && e.ctrlKey) {
+                            onUserEventClick(event.user_id);
+                          } else {
+                            onEditEvent?.(event);
+                          }
                         }}
                         onDoubleClick={(e) => {
                           e.stopPropagation();
                           onDeleteEvent?.(event.id);
                         }}
                       >
-                        <div className="font-medium">{event.title}</div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{event.title}</span>
+                          {getUserName && (
+                            <span className="text-xs opacity-75">
+                              {getUserName(event.user_id)}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs opacity-75 mt-1">
                           {event.priority} priority{isOverdue ? ' - OVERDUE' : ''}
                         </div>
