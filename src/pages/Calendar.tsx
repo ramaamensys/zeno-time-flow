@@ -285,6 +285,7 @@ const Calendar = () => {
   };
 
   const getUserName = (userId: string) => {
+    if (!userId || !users.length) return "Unknown User";
     const userProfile = users.find(u => u.user_id === userId);
     return userProfile?.full_name || userProfile?.email || "Unknown User";
   };
@@ -384,7 +385,7 @@ const Calendar = () => {
               <div className="flex items-center gap-2">
                 <Filter className="h-5 w-5 text-primary" />
                 <span className="font-semibold text-lg">Filters</span>
-                {(filters.priority || filters.eventType || filters.userId) && (
+                {(filters.priority || filters.eventType || (filters.userId && users.length > 0)) && (
                   <span className="bg-primary text-primary-foreground px-2 py-1 rounded-full text-xs font-medium">
                     {[filters.priority, filters.eventType, filters.userId].filter(Boolean).length}
                   </span>
@@ -474,7 +475,7 @@ const Calendar = () => {
                   </div>
                 </div>
                 
-                {(filters.priority || filters.eventType || filters.userId) && (
+                {(filters.priority || filters.eventType || (filters.userId && users.length > 0)) && (
                   <div className="flex flex-wrap gap-3 pt-4 border-t border-border">
                     <span className="text-sm font-medium text-muted-foreground">Active filters:</span>
                     {filters.priority && (
@@ -499,7 +500,7 @@ const Calendar = () => {
                         </button>
                       </div>
                     )}
-                    {filters.userId && (
+                    {filters.userId && users.length > 0 && (
                       <div className="flex items-center gap-1 bg-accent/80 text-accent-foreground px-3 py-1.5 rounded-full text-sm font-medium">
                         <span>User: {getUserName(filters.userId)}</span>
                         <button
