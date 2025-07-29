@@ -267,7 +267,7 @@ const Calendar = () => {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingEvent ? "Edit Event" : "Create New Event"}</DialogTitle>
             <DialogDescription>
@@ -291,62 +291,67 @@ const Calendar = () => {
                 value={newEvent.description}
                 onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
                 placeholder="Enter event description"
+                className="min-h-[80px]"
               />
             </div>
-            <div className="grid gap-2">
-              <Label>Event Type</Label>
-              <Select
-                value={newEvent.event_type}
-                onValueChange={(value) => setNewEvent({ ...newEvent, event_type: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="meeting">Meeting</SelectItem>
-                  <SelectItem value="task">Task</SelectItem>
-                  <SelectItem value="personal">Personal</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>Priority</Label>
-              <Select
-                value={newEvent.priority}
-                onValueChange={(value) => setNewEvent({ ...newEvent, priority: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="start_time">Start Time</Label>
-              <Input
-                id="start_time"
-                type="datetime-local"
-                value={newEvent.start_time}
-                onChange={(e) => setNewEvent({ ...newEvent, start_time: e.target.value })}
-              />
-            </div>
-            {!newEvent.all_day && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="end_time">End Time</Label>
+                <Label>Event Type</Label>
+                <Select
+                  value={newEvent.event_type}
+                  onValueChange={(value) => setNewEvent({ ...newEvent, event_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="meeting">Meeting</SelectItem>
+                    <SelectItem value="task">Task</SelectItem>
+                    <SelectItem value="personal">Personal</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Priority</Label>
+                <Select
+                  value={newEvent.priority}
+                  onValueChange={(value) => setNewEvent({ ...newEvent, priority: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="start_time">Start Time</Label>
                 <Input
-                  id="end_time"
+                  id="start_time"
                   type="datetime-local"
-                  value={newEvent.end_time}
-                  onChange={(e) => setNewEvent({ ...newEvent, end_time: e.target.value })}
+                  value={newEvent.start_time}
+                  onChange={(e) => setNewEvent({ ...newEvent, start_time: e.target.value })}
                 />
               </div>
-            )}
+              {!newEvent.all_day && (
+                <div className="grid gap-2">
+                  <Label htmlFor="end_time">End Time</Label>
+                  <Input
+                    id="end_time"
+                    type="datetime-local"
+                    value={newEvent.end_time}
+                    onChange={(e) => setNewEvent({ ...newEvent, end_time: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
@@ -357,11 +362,11 @@ const Calendar = () => {
               <Label htmlFor="all_day">All day event</Label>
             </div>
           </div>
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+          <div className="flex flex-col sm:flex-row justify-end gap-2 sm:space-x-2">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button onClick={createEvent}>{editingEvent ? "Update Event" : "Create Event"}</Button>
+            <Button onClick={createEvent} className="w-full sm:w-auto">{editingEvent ? "Update Event" : "Create Event"}</Button>
           </div>
         </DialogContent>
       </Dialog>
