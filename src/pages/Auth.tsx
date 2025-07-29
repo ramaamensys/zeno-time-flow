@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
 
+
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -51,8 +52,17 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-background p-4">
+      <div className="absolute top-4 left-4 flex items-center gap-3">
+        <div className="h-10 w-10 bg-primary rounded flex items-center justify-center">
+          <span className="text-white font-bold text-lg">Z</span>
+        </div>
+        <div className="flex flex-col">
+          <span className="font-bold text-lg leading-tight">Zeno Time Flow</span>
+        </div>
+      </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle>Welcome to TimeFlow</CardTitle>
           <CardDescription>
@@ -92,6 +102,7 @@ const Auth = () => {
           </form>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };

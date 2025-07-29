@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LogOut } from "lucide-react";
 
+
 interface LayoutProps {
   children: React.ReactNode;
 }
@@ -21,7 +22,14 @@ const Layout = ({ children }: LayoutProps) => {
             <div className="flex items-center justify-between h-full px-4">
               <div className="flex items-center gap-2">
                 <SidebarTrigger />
-                <h2 className="font-semibold">TimeFlow</h2>
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 bg-primary rounded flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">Z</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <h2 className="font-semibold text-sm leading-tight">Zeno Time Flow</h2>
+                  </div>
+                </div>
               </div>
               
               <div className="flex items-center gap-4">
