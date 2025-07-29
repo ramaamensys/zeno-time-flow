@@ -22,7 +22,7 @@ const Auth = () => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/dashboard");
+        navigate("/calendar");
       }
     };
     checkUser();
@@ -76,7 +76,7 @@ const Auth = () => {
         variant: "destructive",
       });
     } else {
-      navigate("/dashboard");
+      navigate("/calendar");
     }
     setIsLoading(false);
   };
