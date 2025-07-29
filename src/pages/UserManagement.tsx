@@ -39,6 +39,7 @@ interface UserProfile {
   full_name: string;
   email: string;
   created_at: string;
+  status: string;
   role: string;
 }
 
@@ -268,30 +269,22 @@ export default function UserManagement() {
   };
 
   const deleteUser = async (userId: string, userEmail: string) => {
-    if (!confirm(`Are you sure you want to delete user ${userEmail}? This action cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to delete user ${userEmail}? This will mark the user as deleted.`)) {
       return;
     }
 
     try {
-      // First delete from user_roles
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', userId);
-
-      if (roleError) throw roleError;
-
-      // Then delete from profiles
-      const { error: profileError } = await supabase
+      // Mark user as deleted in profiles table
+      const { error } = await supabase
         .from('profiles')
-        .delete()
+        .update({ status: 'deleted' })
         .eq('user_id', userId);
 
-      if (profileError) throw profileError;
+      if (error) throw error;
 
       toast({
         title: "Success",
-        description: "User deleted successfully",
+        description: "User marked as deleted successfully",
       });
 
       await loadUsers();
@@ -302,6 +295,17 @@ export default function UserManagement() {
         description: error.message || "Failed to delete user",
         variant: "destructive",
       });
+    }
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'default';
+      case 'deleted':
+        return 'destructive';
+      default:
+        return 'secondary';
     }
   };
 
@@ -486,6 +490,7 @@ export default function UserManagement() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead>Actions</TableHead>
@@ -499,6 +504,11 @@ export default function UserManagement() {
                   </TableCell>
                   <TableCell>{userProfile.email}</TableCell>
                   <TableCell>
+                    <Badge variant={getStatusBadgeVariant(userProfile.status)}>
+                      {userProfile.status.charAt(0).toUpperCase() + userProfile.status.slice(1)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
                     <Badge variant={getRoleBadgeVariant(userProfile.role)}>
                       {userProfile.role.replace('_', ' ')}
                     </Badge>
@@ -506,47 +516,50 @@ export default function UserManagement() {
                   <TableCell>
                     {new Date(userProfile.created_at).toLocaleDateString()}
                   </TableCell>
-                   <TableCell>
-                     <div className="flex items-center gap-2">
-                       {userProfile.user_id !== user?.id && (
-                         <>
-                           <Select
-                             value={userProfile.role}
-                             onValueChange={(value) => updateUserRole(userProfile.user_id, value as 'user' | 'admin' | 'super_admin')}
-                           >
-                             <SelectTrigger className="w-32">
-                               <SelectValue />
-                             </SelectTrigger>
-                             <SelectContent>
-                               <SelectItem value="user">User</SelectItem>
-                               <SelectItem value="admin">Admin</SelectItem>
-                               <SelectItem value="super_admin">Super Admin</SelectItem>
-                             </SelectContent>
-                           </Select>
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             onClick={() => {
-                               setEditingUser(userProfile);
-                               setIsEditDialogOpen(true);
-                             }}
-                           >
-                             <Edit className="h-4 w-4" />
-                           </Button>
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             onClick={() => deleteUser(userProfile.user_id, userProfile.email)}
-                           >
-                             <Trash2 className="h-4 w-4" />
-                           </Button>
-                         </>
-                       )}
-                       {userProfile.user_id === user?.id && (
-                         <span className="text-sm text-muted-foreground">You</span>
-                       )}
-                     </div>
-                   </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {userProfile.user_id !== user?.id && userProfile.status === 'active' && (
+                          <>
+                            <Select
+                              value={userProfile.role}
+                              onValueChange={(value) => updateUserRole(userProfile.user_id, value as 'user' | 'admin' | 'super_admin')}
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="user">User</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="super_admin">Super Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditingUser(userProfile);
+                                setIsEditDialogOpen(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => deleteUser(userProfile.user_id, userProfile.email)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        {userProfile.user_id === user?.id && (
+                          <span className="text-sm text-muted-foreground">You</span>
+                        )}
+                        {userProfile.status === 'deleted' && (
+                          <span className="text-sm text-muted-foreground">Deleted User</span>
+                        )}
+                      </div>
+                    </TableCell>
                 </TableRow>
               ))}
             </TableBody>
