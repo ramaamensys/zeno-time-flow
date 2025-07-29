@@ -6,15 +6,17 @@ const DailyQuote = () => {
   const dailyQuote = getDailyQuote();
 
   return (
-    <Card className="mb-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
-      <CardContent className="pt-6">
+    <Card className="mb-6 mx-auto max-w-2xl bg-gradient-to-br from-primary/15 via-primary/8 to-accent/10 border-primary/30 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/25 transition-all duration-300">
+      <CardContent className="p-6">
         <div className="flex items-start gap-4">
-          <Quote className="h-8 w-8 text-primary mt-1 flex-shrink-0" />
+          <div className="p-2 rounded-full bg-primary/20 backdrop-blur-sm">
+            <Quote className="h-6 w-6 text-primary" />
+          </div>
           <div className="flex-1">
-            <blockquote className="text-lg font-medium text-foreground mb-2 leading-relaxed">
+            <blockquote className="text-base font-medium text-foreground mb-3 leading-relaxed italic">
               "{dailyQuote.quote}"
             </blockquote>
-            <cite className="text-sm text-muted-foreground font-medium">
+            <cite className="text-sm text-muted-foreground font-semibold tracking-wide">
               — {dailyQuote.author}
             </cite>
           </div>
