@@ -37,6 +37,11 @@ const App = () => (
                 <Layout><Calendar /></Layout>
               </ProtectedRoute>
             } />
+            <Route path="/user-management" element={
+              <ProtectedRoute>
+                <Layout><UserManagement /></Layout>
+              </ProtectedRoute>
+            } />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

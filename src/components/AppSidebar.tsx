@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -10,6 +10,8 @@ import {
   ClipboardList,
   BarChart3,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 import {
   Sidebar,
@@ -23,15 +25,36 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const items = [
-  { title: "Calendar", url: "/calendar", icon: Calendar },
-];
-
 export function AppSidebar() {
   const { state } = useSidebar();
+  const { user } = useAuth();
+  const [userRole, setUserRole] = useState<string | null>(null);
   const location = useLocation();
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!user) return;
+      
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      
+      setUserRole(data?.role || null);
+    };
+
+    fetchUserRole();
+  }, [user]);
+
+  const items = [
+    { title: "Calendar", url: "/calendar", icon: Calendar },
+    ...(userRole === 'super_admin' || userRole === 'admin' ? [
+      { title: "User Management", url: "/user-management", icon: Users }
+    ] : [])
+  ];
 
   const isActive = (path: string) => currentPath === path;
   const isExpanded = items.some((i) => isActive(i.url));
