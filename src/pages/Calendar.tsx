@@ -76,6 +76,10 @@ const Calendar = () => {
   }, [user]);
 
   useEffect(() => {
+    console.log("🔄 Apply filters effect triggered:", { 
+      allEventsLength: allEvents.length, 
+      filtersActive: Object.values(filters).some(Boolean)
+    });
     if (allEvents.length > 0) {
       applyFilters();
     }
@@ -84,12 +88,14 @@ const Calendar = () => {
   const fetchUserRole = async () => {
     if (!user) return;
     
+    console.log("🔐 Fetching user role for:", user.id);
     const { data } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
       .single();
     
+    console.log("👤 User role:", data?.role || "user");
     setUserRole(data?.role || "user");
   };
 
@@ -138,37 +144,52 @@ const Calendar = () => {
     const { data, error } = await query;
 
     if (error) {
+      console.error("❌ Error fetching events:", error);
       toast({
         title: "Error fetching events",
         description: error.message,
         variant: "destructive",
       });
     } else {
+      console.log("✅ Fetched events:", data?.length || 0, "events");
+      console.log("📋 Sample events:", data?.slice(0, 2));
       setAllEvents(data || []);
     }
     setIsLoading(false);
   };
 
   const applyFilters = () => {
+    console.log("🔍 ApplyFilters called with:", {
+      allEventsCount: allEvents.length,
+      filters,
+      userRole
+    });
+    
     if (!allEvents.length) {
+      console.log("❌ No events to filter");
       setEvents([]);
       return;
     }
 
     let filteredEvents = [...allEvents];
+    console.log("📊 Starting with events:", filteredEvents.length);
 
     if (filters.priority) {
       filteredEvents = filteredEvents.filter(event => event.priority === filters.priority);
+      console.log(`🟡 After priority filter (${filters.priority}):`, filteredEvents.length);
     }
 
     if (filters.eventType) {
       filteredEvents = filteredEvents.filter(event => event.event_type === filters.eventType);
+      console.log(`📅 After type filter (${filters.eventType}):`, filteredEvents.length);
     }
 
     if (filters.userId) {
       filteredEvents = filteredEvents.filter(event => event.user_id === filters.userId);
+      console.log(`👤 After user filter (${filters.userId}):`, filteredEvents.length);
     }
 
+    console.log("✅ Final filtered events:", filteredEvents.length);
     setEvents(filteredEvents);
   };
 
