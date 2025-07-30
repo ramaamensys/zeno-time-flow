@@ -1,6 +1,7 @@
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { getUserColor, getPriorityOverlay } from "@/utils/userColors";
 
 interface CalendarEvent {
   id: string;
@@ -43,16 +44,10 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
     });
   };
 
-  const getPriorityColor = (priority: string, isOverdue: boolean) => {
-    if (isOverdue) return "bg-red-600";
-    
-    switch (priority) {
-      case "urgent": return "bg-red-500";
-      case "high": return "bg-orange-500";
-      case "medium": return "bg-blue-500";
-      case "low": return "bg-green-500";
-      default: return "bg-gray-500";
-    }
+  const getEventStyling = (event: CalendarEvent, isOverdue: boolean) => {
+    const userColor = getUserColor(event.user_id);
+    const priorityOverlay = getPriorityOverlay(event.priority, isOverdue);
+    return `${userColor} ${priorityOverlay}`;
   };
 
   const isEventOverdue = (event: CalendarEvent) => {
@@ -101,7 +96,7 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
                     key={event.id}
                     className={cn(
                       "text-xs p-1 rounded text-white truncate cursor-pointer hover:opacity-80",
-                      getPriorityColor(event.priority, isOverdue)
+                      getEventStyling(event, isOverdue)
                     )}
                     title={`${event.title} (${event.priority} priority)${isOverdue ? ' - OVERDUE' : ''}${getUserName && onUserEventClick ? ` - ${getUserName(event.user_id)}` : ''}`}
                     onClick={(e) => {

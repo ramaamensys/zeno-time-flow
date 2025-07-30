@@ -1,5 +1,6 @@
 import { format, isToday } from "date-fns";
 import { cn } from "@/lib/utils";
+import { getUserColor, getPriorityOverlay } from "@/utils/userColors";
 
 interface CalendarEvent {
   id: string;
@@ -36,16 +37,10 @@ export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onD
     });
   };
 
-  const getPriorityColor = (priority: string, isOverdue: boolean) => {
-    if (isOverdue) return "bg-red-600";
-    
-    switch (priority) {
-      case "urgent": return "bg-red-500";
-      case "high": return "bg-orange-500";
-      case "medium": return "bg-blue-500";
-      case "low": return "bg-green-500";
-      default: return "bg-gray-500";
-    }
+  const getEventStyling = (event: CalendarEvent, isOverdue: boolean) => {
+    const userColor = getUserColor(event.user_id);
+    const priorityOverlay = getPriorityOverlay(event.priority, isOverdue);
+    return `${userColor} ${priorityOverlay}`;
   };
 
   const isEventOverdue = (event: CalendarEvent) => {
@@ -88,7 +83,7 @@ export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onD
                         key={event.id}
                         className={cn(
                           "p-2 rounded text-white cursor-pointer hover:opacity-80",
-                          getPriorityColor(event.priority, isOverdue)
+                          getEventStyling(event, isOverdue)
                         )}
                         onClick={(e) => {
                           e.stopPropagation();
