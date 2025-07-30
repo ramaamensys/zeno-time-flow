@@ -41,6 +41,8 @@ const Calendar = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userProfiles, setUserProfiles] = useState<Record<string, string>>({});
   const [newEvent, setNewEvent] = useState({
     title: "",
     description: "",
@@ -53,9 +55,41 @@ const Calendar = () => {
 
   useEffect(() => {
     if (user) {
+      fetchUserRole();
       fetchEvents();
     }
   }, [user]);
+
+  const fetchUserRole = async () => {
+    if (!user) return;
+
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    setUserRole(roleData?.role || null);
+    
+    // If user is super_admin or admin, fetch all user profiles
+    if (roleData?.role === "super_admin" || roleData?.role === "admin") {
+      fetchUserProfiles();
+    }
+  };
+
+  const fetchUserProfiles = async () => {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("user_id, full_name, email");
+
+    if (profiles) {
+      const profileMap: Record<string, string> = {};
+      profiles.forEach(profile => {
+        profileMap[profile.user_id] = profile.full_name || profile.email || "Unknown User";
+      });
+      setUserProfiles(profileMap);
+    }
+  };
 
   const fetchEvents = async () => {
     if (!user) return;
@@ -303,6 +337,14 @@ const Calendar = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {editingEvent && (userRole === "super_admin" || userRole === "admin") && (
+              <div className="grid gap-2">
+                <Label>Created By</Label>
+                <div className="p-2 bg-muted rounded text-sm">
+                  {userProfiles[editingEvent.user_id] || "Unknown User"}
+                </div>
+              </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="title">Title</Label>
               <Input
