@@ -1,9 +1,26 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Quote } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Quote, X } from "lucide-react";
 import { getDailyQuote } from "@/utils/dailyQuotes";
 
 const DailyQuote = () => {
+  const [isVisible, setIsVisible] = useState(true);
   const dailyQuote = getDailyQuote();
+
+  useEffect(() => {
+    const isHidden = localStorage.getItem('dailyQuoteHidden');
+    if (isHidden) {
+      setIsVisible(false);
+    }
+  }, []);
+
+  const handleClose = () => {
+    setIsVisible(false);
+    localStorage.setItem('dailyQuoteHidden', 'true');
+  };
+
+  if (!isVisible) return null;
 
   return (
     <Card className="mb-6 mx-auto max-w-2xl bg-gradient-to-br from-primary/15 via-primary/8 to-accent/10 border-primary/30 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/25 transition-all duration-300">
@@ -20,6 +37,14 @@ const DailyQuote = () => {
               — {dailyQuote.author}
             </cite>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClose}
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       </CardContent>
     </Card>

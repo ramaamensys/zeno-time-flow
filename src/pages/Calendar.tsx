@@ -109,11 +109,15 @@ const Calendar = () => {
       return;
     }
 
+    // Convert local datetime to ISO string to preserve timezone
+    const startTime = new Date(newEvent.start_time).toISOString();
+    const endTime = newEvent.end_time ? new Date(newEvent.end_time).toISOString() : startTime;
+
     const eventData = {
       title: newEvent.title,
       description: newEvent.description || null,
-      start_time: newEvent.start_time,
-      end_time: newEvent.end_time || newEvent.start_time,
+      start_time: startTime,
+      end_time: endTime,
       all_day: newEvent.all_day,
       event_type: newEvent.event_type,
       priority: newEvent.priority,
