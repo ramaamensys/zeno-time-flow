@@ -6,12 +6,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="absolute top-4 left-4 flex items-center gap-3">
-        <div className="h-10 w-10 bg-primary rounded flex items-center justify-center">
-          <span className="text-white font-bold text-lg">Z</span>
-        </div>
-        <div className="flex flex-col">
-          <span className="font-bold text-lg leading-tight">Zeno Time Flow</span>
-        </div>
+        <img src="/lovable-uploads/fa6f8e31-6e31-41cd-932c-1b8fb539d96a.png" alt="Zeno Logo" className="h-12 w-auto" />
       </div>
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center max-w-2xl mx-auto px-4">
