@@ -63,9 +63,13 @@ export const CalendarHeader = ({
   return (
     <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <Button onClick={onNewEvent} size="lg">
-          <Plus className="mr-2 h-5 w-5" />
-          Create Event
+        <Button 
+          onClick={onNewEvent} 
+          className="bg-gray-800 hover:bg-gray-700 text-white"
+          size="lg"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Create
         </Button>
         
         <div className="flex items-center gap-2">
@@ -76,25 +80,24 @@ export const CalendarHeader = ({
             <ChevronRight className="h-4 w-4" />
           </Button>
           <Button variant="outline" onClick={() => onDateChange(new Date())}>
-            <CalendarIcon className="mr-2 h-4 w-4" />
             Today
           </Button>
         </div>
       </div>
       
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <h1 className="text-2xl lg:text-3xl font-bold">
+        <h1 className="text-2xl lg:text-3xl font-semibold text-gray-800">
           {format(currentDate, getDateFormat())}
         </h1>
         
         <Select value={view} onValueChange={onViewChange}>
-          <SelectTrigger className="w-36">
+          <SelectTrigger className="w-28">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="day">Day View</SelectItem>
-            <SelectItem value="week">Week View</SelectItem>
-            <SelectItem value="month">Month View</SelectItem>
+            <SelectItem value="day">Day</SelectItem>
+            <SelectItem value="week">Week</SelectItem>
+            <SelectItem value="month">Month</SelectItem>
           </SelectContent>
         </Select>
       </div>

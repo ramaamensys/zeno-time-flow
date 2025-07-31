@@ -45,23 +45,23 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
   };
 
   const getEventStyling = (event: CalendarEvent, isOverdue: boolean) => {
-    const baseClasses = "rounded-md px-2 py-1 text-xs font-medium";
+    const baseClasses = "rounded-md px-3 py-1 text-xs font-medium text-white";
     
     if (isOverdue) {
-      return `${baseClasses} bg-red-600 text-white animate-pulse`;
+      return `${baseClasses} bg-red-500`;
     }
     
     switch (event.priority) {
       case "urgent":
-        return `${baseClasses} bg-red-500 text-white`;
+        return `${baseClasses} bg-red-500`;
       case "high":
-        return `${baseClasses} bg-orange-500 text-white`;
+        return `${baseClasses} bg-orange-500`;
       case "medium":
-        return `${baseClasses} bg-blue-500 text-white`;
+        return `${baseClasses} bg-blue-500`;
       case "low":
-        return `${baseClasses} bg-green-500 text-white`;
+        return `${baseClasses} bg-green-500`;
       default:
-        return `${baseClasses} bg-gray-500 text-white`;
+        return `${baseClasses} bg-gray-500`;
     }
   };
 
@@ -72,13 +72,12 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
   };
 
   return (
-    <div className="bg-card rounded-lg shadow-lg overflow-hidden">
+    <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
       <div className="grid grid-cols-7">
         {/* Header row */}
-        {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, idx) => (
-          <div key={day} className="bg-primary text-primary-foreground p-4 text-center font-semibold">
-            <div className="hidden md:block">{day}</div>
-            <div className="md:hidden">{day.slice(0, 3)}</div>
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => (
+          <div key={day} className="bg-gray-50 border-b border-gray-200 p-3 text-center font-medium text-gray-600 text-sm">
+            {day}
           </div>
         ))}
         
@@ -92,15 +91,15 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
             <div
               key={index}
               className={cn(
-                "min-h-[140px] p-3 border-b border-r border-border hover:bg-accent/50 cursor-pointer transition-colors",
-                !isCurrentMonth && "bg-muted/50 text-muted-foreground",
-                isCurrentDay && "bg-accent border-2 border-primary"
+                "min-h-[120px] p-2 border-b border-r border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors relative",
+                !isCurrentMonth && "bg-gray-50/50 text-gray-400",
+                isCurrentDay && "bg-blue-50"
               )}
               onClick={() => onDateClick(date)}
             >
               <div className={cn(
-                "text-sm font-semibold mb-2",
-                isCurrentDay && "text-primary"
+                "text-sm font-medium mb-2 w-7 h-7 flex items-center justify-center rounded-full",
+                isCurrentDay && "bg-blue-500 text-white"
               )}>
                 {format(date, "d")}
               </div>
@@ -113,7 +112,7 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
                       key={event.id}
                       className={cn(
                         getEventStyling(event, isOverdue),
-                        "truncate cursor-pointer"
+                        "truncate cursor-pointer hover:opacity-90 transition-opacity"
                       )}
                       title={`${event.title} (${event.priority} priority)${isOverdue ? ' - OVERDUE' : ''}${getUserName && onUserEventClick ? ` - ${getUserName(event.user_id)}` : ''}`}
                       onClick={(e) => {
@@ -131,10 +130,6 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
                     >
                       <div className="flex items-center justify-between">
                         <span className="truncate flex-1">
-                          {event.event_type === "meeting" && "🤝 "}
-                          {event.event_type === "task" && "📋 "}
-                          {event.event_type === "personal" && "👤 "}
-                          {event.event_type === "other" && "📌 "}
                           {event.title}
                         </span>
                         {getUserName && (
@@ -147,7 +142,7 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
                   );
                 })}
                 {dayEvents.length > 3 && (
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-gray-600">
                     +{dayEvents.length - 3} more
                   </div>
                 )}
