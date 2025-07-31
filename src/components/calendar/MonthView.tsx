@@ -45,23 +45,23 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
   };
 
   const getEventStyling = (event: CalendarEvent, isOverdue: boolean) => {
-    const baseClasses = "calendar-event text-white font-medium";
+    const baseClasses = "rounded-md px-2 py-1 text-xs font-medium";
     
     if (isOverdue) {
-      return `${baseClasses} event-priority-urgent`;
+      return `${baseClasses} bg-red-600 text-white animate-pulse`;
     }
     
     switch (event.priority) {
       case "urgent":
-        return `${baseClasses} event-priority-urgent`;
+        return `${baseClasses} bg-red-500 text-white`;
       case "high":
-        return `${baseClasses} event-priority-high`;
+        return `${baseClasses} bg-orange-500 text-white`;
       case "medium":
-        return `${baseClasses} event-priority-medium`;
+        return `${baseClasses} bg-blue-500 text-white`;
       case "low":
-        return `${baseClasses} event-priority-low`;
+        return `${baseClasses} bg-green-500 text-white`;
       default:
-        return `${baseClasses} event-priority-medium`;
+        return `${baseClasses} bg-gray-500 text-white`;
     }
   };
 
@@ -72,11 +72,11 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
   };
 
   return (
-    <div className="calendar-card overflow-hidden calendar-slide-up">
+    <div className="bg-card rounded-lg shadow-lg overflow-hidden">
       <div className="grid grid-cols-7">
         {/* Header row */}
         {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, idx) => (
-          <div key={day} className="calendar-header p-4 text-center font-semibold text-white">
+          <div key={day} className="bg-primary text-primary-foreground p-4 text-center font-semibold">
             <div className="hidden md:block">{day}</div>
             <div className="md:hidden">{day.slice(0, 3)}</div>
           </div>
@@ -92,31 +92,29 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
             <div
               key={index}
               className={cn(
-                "calendar-day min-h-[140px] p-3 border-b border-r border-border/20 relative",
-                !isCurrentMonth && "bg-muted/20 text-muted-foreground opacity-60",
-                isCurrentDay && "today",
-                dayEvents.length > 0 && "has-events"
+                "min-h-[140px] p-3 border-b border-r border-border hover:bg-accent/50 cursor-pointer transition-colors",
+                !isCurrentMonth && "bg-muted/50 text-muted-foreground",
+                isCurrentDay && "bg-accent border-2 border-primary"
               )}
               onClick={() => onDateClick(date)}
             >
               <div className={cn(
-                "text-sm font-semibold mb-2 flex items-center justify-center w-8 h-8 rounded-full",
-                isCurrentDay && "bg-primary text-primary-foreground shadow-lg"
+                "text-sm font-semibold mb-2",
+                isCurrentDay && "text-primary"
               )}>
                 {format(date, "d")}
               </div>
               
-              <div className="space-y-1.5">
-                {dayEvents.slice(0, 3).map((event, eventIndex) => {
+              <div className="space-y-1">
+                {dayEvents.slice(0, 3).map((event) => {
                   const isOverdue = isEventOverdue(event);
                   return (
                     <div
                       key={event.id}
                       className={cn(
                         getEventStyling(event, isOverdue),
-                        "calendar-scale-in truncate cursor-pointer group relative"
+                        "truncate cursor-pointer"
                       )}
-                      style={{ animationDelay: `${eventIndex * 0.1}s` }}
                       title={`${event.title} (${event.priority} priority)${isOverdue ? ' - OVERDUE' : ''}${getUserName && onUserEventClick ? ` - ${getUserName(event.user_id)}` : ''}`}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -132,7 +130,7 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
                       }}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="truncate flex-1 text-xs">
+                        <span className="truncate flex-1">
                           {event.event_type === "meeting" && "🤝 "}
                           {event.event_type === "task" && "📋 "}
                           {event.event_type === "personal" && "👤 "}
@@ -140,26 +138,20 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
                           {event.title}
                         </span>
                         {getUserName && (
-                          <span className="text-xs opacity-80 ml-1 font-medium">
+                          <span className="text-xs opacity-80 ml-1">
                             {getUserName(event.user_id).split(' ')[0]}
                           </span>
                         )}
                       </div>
-                      <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-md"></div>
                     </div>
                   );
                 })}
                 {dayEvents.length > 3 && (
-                  <div className="text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded-md border border-primary/20">
-                    +{dayEvents.length - 3} more events
+                  <div className="text-xs text-muted-foreground">
+                    +{dayEvents.length - 3} more
                   </div>
                 )}
               </div>
-              
-              {/* Dot indicator for days with events */}
-              {dayEvents.length > 0 && (
-                <div className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full shadow-sm animate-pulse"></div>
-              )}
             </div>
           );
         })}
