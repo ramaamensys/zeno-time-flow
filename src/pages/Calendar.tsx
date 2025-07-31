@@ -288,14 +288,18 @@ const Calendar = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-primary/10 flex items-center justify-center">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+          <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-primary-glow rounded-full animate-spin animate-pulse"></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-primary/10 p-6">
+      <div className="max-w-7xl mx-auto space-y-8">
       <DailyQuote />
       
       <CalendarHeader
@@ -475,6 +479,7 @@ const Calendar = () => {
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 };
