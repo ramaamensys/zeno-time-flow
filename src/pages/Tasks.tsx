@@ -407,13 +407,13 @@ const Tasks = () => {
               <Label>Team Member</Label>
               <Select
                 value={filters.teamMember}
-                onValueChange={(value) => setFilters({ ...filters, teamMember: value })}
+                onValueChange={(value) => setFilters({ ...filters, teamMember: value === "all" ? "" : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All team members" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All team members</SelectItem>
+                  <SelectItem value="all">All team members</SelectItem>
                   {teamMembers.map((member) => (
                     <SelectItem key={member.user_id} value={member.user_id}>
                       {member.full_name || member.email}
@@ -426,13 +426,13 @@ const Tasks = () => {
               <Label>Priority</Label>
               <Select
                 value={filters.priority}
-                onValueChange={(value) => setFilters({ ...filters, priority: value })}
+                onValueChange={(value) => setFilters({ ...filters, priority: value === "all" ? "" : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All priorities" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All priorities</SelectItem>
+                  <SelectItem value="all">All priorities</SelectItem>
                   <SelectItem value="high">High</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="low">Low</SelectItem>
@@ -443,13 +443,13 @@ const Tasks = () => {
               <Label>Date Range</Label>
               <Select
                 value={filters.dateRange}
-                onValueChange={(value) => setFilters({ ...filters, dateRange: value })}
+                onValueChange={(value) => setFilters({ ...filters, dateRange: value === "all" ? "" : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All dates" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All dates</SelectItem>
+                  <SelectItem value="all">All dates</SelectItem>
                   <SelectItem value="today">Today</SelectItem>
                   <SelectItem value="week">This Week</SelectItem>
                   <SelectItem value="month">This Month</SelectItem>
