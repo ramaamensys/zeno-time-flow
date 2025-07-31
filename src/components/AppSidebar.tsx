@@ -51,6 +51,7 @@ export function AppSidebar() {
 
   const items = [
     { title: "Calendar", url: "/calendar", icon: Calendar },
+    { title: "Tasks", url: "/tasks", icon: CheckSquare },
     ...(userRole === 'super_admin' || userRole === 'admin' ? [
       { title: "User Management", url: "/user-management", icon: Users }
     ] : [])
