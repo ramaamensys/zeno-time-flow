@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Calendar, Clock, Flag, CheckSquare } from "lucide-react";
+import { Plus, Calendar, Clock, Flag, CheckSquare, Trash2, Filter, User, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -23,14 +23,34 @@ interface CalendarEvent {
   all_day: boolean;
   event_type: string;
   created_at: string;
+  user_id: string;
+  profiles?: {
+    full_name: string | null;
+    email: string;
+  };
+}
+
+interface TeamMember {
+  user_id: string;
+  full_name: string | null;
+  email: string;
 }
 
 const Tasks = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [filteredEvents, setFilteredEvents] = useState<CalendarEvent[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    teamMember: "",
+    priority: "",
+    dateRange: "",
+  });
   const [newEvent, setNewEvent] = useState({
     title: "",
     description: "",
@@ -44,25 +64,105 @@ const Tasks = () => {
   useEffect(() => {
     if (user) {
       fetchEvents();
+      fetchTeamMembers();
     }
   }, [user]);
 
+  useEffect(() => {
+    applyFilters();
+  }, [events, filters]);
+
   const fetchEvents = async () => {
-    const { data, error } = await supabase
+    // First get the events
+    const { data: eventsData, error: eventsError } = await supabase
       .from("calendar_events")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("start_time", { ascending: true });
 
-    if (error) {
+    if (eventsError) {
       toast({
         title: "Error fetching events",
-        description: error.message,
+        description: eventsError.message,
         variant: "destructive",
       });
-    } else {
-      setEvents(data || []);
+      setIsLoading(false);
+      return;
     }
+
+    // Then get the profiles for the users
+    const userIds = [...new Set(eventsData?.map(event => event.user_id) || [])];
+    const { data: profilesData, error: profilesError } = await supabase
+      .from("profiles")
+      .select("user_id, full_name, email")
+      .in("user_id", userIds);
+
+    if (profilesError) {
+      console.error("Error fetching profiles:", profilesError);
+    }
+
+    // Combine the data
+    const eventsWithProfiles = eventsData?.map(event => ({
+      ...event,
+      profiles: profilesData?.find(profile => profile.user_id === event.user_id) || null
+    })) || [];
+
+    setEvents(eventsWithProfiles);
     setIsLoading(false);
+  };
+
+  const fetchTeamMembers = async () => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("user_id, full_name, email");
+
+    if (error) {
+      console.error("Error fetching team members:", error);
+    } else {
+      setTeamMembers(data || []);
+    }
+  };
+
+  const applyFilters = () => {
+    let filtered = [...events];
+
+    if (filters.teamMember) {
+      filtered = filtered.filter(event => event.user_id === filters.teamMember);
+    }
+
+    if (filters.priority) {
+      filtered = filtered.filter(event => event.priority === filters.priority);
+    }
+
+    if (filters.dateRange) {
+      const today = new Date();
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
+      switch (filters.dateRange) {
+        case "today":
+          filtered = filtered.filter(event => {
+            const eventDate = new Date(event.start_time);
+            const startOfEventDay = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+            return startOfEventDay.getTime() === startOfToday.getTime();
+          });
+          break;
+        case "week":
+          const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+          filtered = filtered.filter(event => {
+            const eventDate = new Date(event.start_time);
+            return eventDate >= today && eventDate <= weekFromNow;
+          });
+          break;
+        case "month":
+          const monthFromNow = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+          filtered = filtered.filter(event => {
+            const eventDate = new Date(event.start_time);
+            return eventDate >= today && eventDate <= monthFromNow;
+          });
+          break;
+      }
+    }
+
+    setFilteredEvents(filtered);
   };
 
   const createEvent = async () => {
@@ -122,6 +222,29 @@ const Tasks = () => {
     }
   };
 
+  const deleteEvent = async (eventId: string) => {
+    const { error } = await supabase
+      .from("calendar_events")
+      .delete()
+      .eq("id", eventId);
+
+    if (error) {
+      toast({
+        title: "Error deleting event",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Event deleted",
+        description: "The event has been deleted successfully",
+      });
+      setIsDetailDialogOpen(false);
+      setSelectedEvent(null);
+      fetchEvents();
+    }
+  };
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "high": return "destructive";
@@ -139,6 +262,16 @@ const Tasks = () => {
       default: return "secondary";
     }
   };
+
+  const clearFilters = () => {
+    setFilters({
+      teamMember: "",
+      priority: "",
+      dateRange: "",
+    });
+  };
+
+  const hasActiveFilters = filters.teamMember || filters.priority || filters.dateRange;
 
   if (isLoading) {
     return (
@@ -252,68 +385,219 @@ const Tasks = () => {
         </Dialog>
       </div>
 
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center">
+              <Filter className="mr-2 h-4 w-4" />
+              Filters
+            </CardTitle>
+            {hasActiveFilters && (
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                <X className="mr-2 h-4 w-4" />
+                Clear Filters
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Team Member</Label>
+              <Select
+                value={filters.teamMember}
+                onValueChange={(value) => setFilters({ ...filters, teamMember: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All team members" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All team members</SelectItem>
+                  {teamMembers.map((member) => (
+                    <SelectItem key={member.user_id} value={member.user_id}>
+                      {member.full_name || member.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Priority</Label>
+              <Select
+                value={filters.priority}
+                onValueChange={(value) => setFilters({ ...filters, priority: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All priorities" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All priorities</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Date Range</Label>
+              <Select
+                value={filters.dateRange}
+                onValueChange={(value) => setFilters({ ...filters, dateRange: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All dates" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All dates</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">This Week</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Task List */}
       <div className="grid gap-4">
-        {events.length === 0 ? (
+        {filteredEvents.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16">
               <CheckSquare className="h-12 w-12 text-muted-foreground mb-4" />
-              <CardTitle className="mb-2">No events yet</CardTitle>
+              <CardTitle className="mb-2">
+                {hasActiveFilters ? "No tasks match your filters" : "No events yet"}
+              </CardTitle>
               <CardDescription className="text-center">
-                Create your first event to get started with your productivity journey
+                {hasActiveFilters 
+                  ? "Try adjusting your filters to see more tasks"
+                  : "Create your first event to get started with your productivity journey"
+                }
               </CardDescription>
             </CardContent>
           </Card>
         ) : (
-          events.map((event) => (
-            <Card key={event.id}>
+          filteredEvents.map((event) => (
+            <Card 
+              key={event.id} 
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => {
+                setSelectedEvent(event);
+                setIsDetailDialogOpen(true);
+              }}
+            >
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <CardTitle className="text-lg">{event.title}</CardTitle>
-                    {event.description && (
-                      <CardDescription>{event.description}</CardDescription>
-                    )}
-                  </div>
-                  <div className="flex space-x-2">
-                    <Badge variant={getPriorityColor(event.priority)}>
-                      <Flag className="w-3 h-3 mr-1" />
-                      {event.priority}
-                    </Badge>
-                    <Badge variant={getEventTypeColor(event.event_type)}>
-                      {event.event_type}
-                    </Badge>
+                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                      <div className="flex items-center">
+                        <Calendar className="w-4 h-4 mr-1" />
+                        {event.all_day ? (
+                          format(new Date(event.start_time), "MMM dd, yyyy")
+                        ) : (
+                          format(new Date(event.start_time), "MMM dd, h:mm a")
+                        )}
+                      </div>
+                      <div className="flex items-center">
+                        <User className="w-4 h-4 mr-1" />
+                        {event.profiles?.full_name || event.profiles?.email || "Unknown"}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                    <div className="flex items-center">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      {event.all_day ? (
-                        format(new Date(event.start_time), "MMM dd, yyyy")
-                      ) : (
-                        <>
-                          {format(new Date(event.start_time), "MMM dd, h:mm a")}
-                          {event.end_time && event.end_time !== event.start_time && (
-                            <> - {format(new Date(event.end_time), "h:mm a")}</>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    {!event.all_day && event.end_time && event.end_time !== event.start_time && (
-                      <div className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        {Math.round((new Date(event.end_time).getTime() - new Date(event.start_time).getTime()) / (1000 * 60))}m
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
             </Card>
           ))
         )}
       </div>
+
+      {/* Task Detail Dialog */}
+      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          {selectedEvent && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center justify-between">
+                  {selectedEvent.title}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => deleteEvent(selectedEvent.id)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {selectedEvent.description && (
+                  <div>
+                    <Label className="text-sm font-medium">Description</Label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {selectedEvent.description}
+                    </p>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium">Priority</Label>
+                    <div className="mt-1">
+                      <Badge variant={getPriorityColor(selectedEvent.priority)}>
+                        <Flag className="w-3 h-3 mr-1" />
+                        {selectedEvent.priority}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Type</Label>
+                    <div className="mt-1">
+                      <Badge variant={getEventTypeColor(selectedEvent.event_type)}>
+                        {selectedEvent.event_type}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium">Date & Time</Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {selectedEvent.all_day ? (
+                      format(new Date(selectedEvent.start_time), "EEEE, MMMM dd, yyyy")
+                    ) : (
+                      <>
+                        {format(new Date(selectedEvent.start_time), "EEEE, MMMM dd, yyyy 'at' h:mm a")}
+                        {selectedEvent.end_time && selectedEvent.end_time !== selectedEvent.start_time && (
+                          <> - {format(new Date(selectedEvent.end_time), "h:mm a")}</>
+                        )}
+                      </>
+                    )}
+                  </p>
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium">Created by</Label>
+                  <div className="flex items-center mt-1">
+                    <User className="w-4 h-4 mr-2" />
+                    <span className="text-sm">
+                      {selectedEvent.profiles?.full_name || selectedEvent.profiles?.email || "Unknown"}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium">Created on</Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {format(new Date(selectedEvent.created_at), "MMMM dd, yyyy 'at' h:mm a")}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
