@@ -28,20 +28,21 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Sending welcome email to: ${email}`);
 
     const emailResponse = await resend.emails.send({
-      from: "TeamSync <onboarding@resend.dev>",
+      from: "Rama K <rama.k@amensys.com>",
       to: [email],
-      subject: "Welcome to TeamSync - Your Account is Ready!",
+      subject: "Welcome to Our Team - Your Account is Ready!",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to TeamSync!</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">🎉 Welcome to Our Team!</h1>
           </div>
           
           <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
             <h2 style="color: #333; margin-top: 0;">Hello ${full_name || 'there'}!</h2>
             
-            <p style="color: #555; line-height: 1.6;">
-              Your account has been created successfully. You can now access TeamSync with the following credentials:
+            <p style="color: #555; line-height: 1.6; font-size: 16px;">
+              We're thrilled to welcome you to our team! 🌟 Your account has been set up and you're all ready to get started. 
+              Below are your login credentials to access the platform:
             </p>
             
             <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
