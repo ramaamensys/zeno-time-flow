@@ -274,6 +274,14 @@ const Calendar = () => {
         start_time: format(dateTime, "yyyy-MM-dd'T'HH:mm"),
         end_time: format(new Date(dateTime.getTime() + 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
       });
+    } else {
+      // Default to current date and time when no specific date is selected
+      const now = new Date();
+      setNewEvent({
+        ...newEvent,
+        start_time: format(now, "yyyy-MM-dd'T'HH:mm"),
+        end_time: format(new Date(now.getTime() + 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
+      });
     }
     setIsDialogOpen(true);
   };
