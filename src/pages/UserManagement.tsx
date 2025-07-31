@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Users, Plus, Edit, Trash2, Search, Filter } from "lucide-react";
+import { Loader2, Users, Plus, Edit, Trash2, Search, Filter, Mail } from "lucide-react";
 
 interface UserProfile {
   id: string;
@@ -299,6 +299,38 @@ export default function UserManagement() {
       toast({
         title: "Error",
         description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const reinviteUser = async (userEmail: string, userFullName: string, userRole: string) => {
+    try {
+      // Generate a temporary password for reinvitation
+      const tempPassword = Math.random().toString(36).slice(-12);
+      
+      // Send reinvite email
+      const { error } = await supabase.functions.invoke('send-welcome-email', {
+        body: {
+          email: userEmail,
+          full_name: userFullName,
+          role: userRole,
+          password: tempPassword,
+          isReinvite: true
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Reinvitation email sent to ${userEmail}`,
+      });
+    } catch (error: any) {
+      console.error('Error sending reinvitation:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send reinvitation email",
         variant: "destructive",
       });
     }
@@ -645,8 +677,15 @@ export default function UserManagement() {
                         {userProfile.user_id === user?.id && (
                           <span className="text-sm text-muted-foreground">You</span>
                         )}
-                        {userProfile.status === 'deleted' && (
-                          <span className="text-sm text-muted-foreground">Deleted User</span>
+                        {userProfile.status === 'deleted' && userProfile.user_id !== user?.id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => reinviteUser(userProfile.email, userProfile.full_name, userProfile.role)}
+                          >
+                            <Mail className="h-4 w-4 mr-1" />
+                            Reinvite
+                          </Button>
                         )}
                       </div>
                     </TableCell>
