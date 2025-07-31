@@ -11,117 +11,114 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Calendar, Clock, Flag, CheckSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
-interface Task {
+interface CalendarEvent {
   id: string;
   title: string;
   description: string | null;
-  status: string;
   priority: string;
-  due_date: string | null;
-  estimated_duration: number | null;
+  start_time: string;
+  end_time: string;
+  all_day: boolean;
+  event_type: string;
   created_at: string;
 }
 
 const Tasks = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newTask, setNewTask] = useState({
+  const [newEvent, setNewEvent] = useState({
     title: "",
     description: "",
     priority: "medium",
-    estimated_duration: "",
-    due_date: "",
+    start_time: "",
+    end_time: "",
+    all_day: false,
+    event_type: "task",
   });
 
   useEffect(() => {
     if (user) {
-      fetchTasks();
+      fetchEvents();
     }
   }, [user]);
 
-  const fetchTasks = async () => {
+  const fetchEvents = async () => {
     const { data, error } = await supabase
-      .from("tasks")
+      .from("calendar_events")
       .select("*")
       .order("created_at", { ascending: false });
 
     if (error) {
       toast({
-        title: "Error fetching tasks",
+        title: "Error fetching events",
         description: error.message,
         variant: "destructive",
       });
     } else {
-      setTasks(data || []);
+      setEvents(data || []);
     }
     setIsLoading(false);
   };
 
-  const createTask = async () => {
-    if (!newTask.title.trim()) {
+  const createEvent = async () => {
+    if (!newEvent.title.trim()) {
       toast({
         title: "Title required",
-        description: "Please enter a task title",
+        description: "Please enter an event title",
         variant: "destructive",
       });
       return;
     }
 
-    const taskData = {
-      title: newTask.title,
-      description: newTask.description || null,
-      priority: newTask.priority,
-      estimated_duration: newTask.estimated_duration ? parseInt(newTask.estimated_duration) : null,
-      due_date: newTask.due_date || null,
+    if (!newEvent.start_time) {
+      toast({
+        title: "Start time required",
+        description: "Please select a start time",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const eventData = {
+      title: newEvent.title,
+      description: newEvent.description || null,
+      priority: newEvent.priority,
+      start_time: newEvent.start_time,
+      end_time: newEvent.end_time || newEvent.start_time,
+      all_day: newEvent.all_day,
+      event_type: newEvent.event_type,
       user_id: user?.id,
     };
 
-    const { error } = await supabase.from("tasks").insert([taskData]);
+    const { error } = await supabase.from("calendar_events").insert([eventData]);
 
     if (error) {
       toast({
-        title: "Error creating task",
+        title: "Error creating event",
         description: error.message,
         variant: "destructive",
       });
     } else {
       toast({
-        title: "Task created",
-        description: "Your task has been created successfully",
+        title: "Event created",
+        description: "Your event has been created successfully",
       });
       setIsDialogOpen(false);
-      setNewTask({
+      setNewEvent({
         title: "",
         description: "",
         priority: "medium",
-        estimated_duration: "",
-        due_date: "",
+        start_time: "",
+        end_time: "",
+        all_day: false,
+        event_type: "task",
       });
-      fetchTasks();
-    }
-  };
-
-  const updateTaskStatus = async (taskId: string, newStatus: string) => {
-    const { error } = await supabase
-      .from("tasks")
-      .update({ 
-        status: newStatus,
-        completed_at: newStatus === "completed" ? new Date().toISOString() : null
-      })
-      .eq("id", taskId);
-
-    if (error) {
-      toast({
-        title: "Error updating task",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      fetchTasks();
+      fetchEvents();
     }
   };
 
@@ -134,11 +131,11 @@ const Tasks = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed": return "outline";
-      case "in_progress": return "default";
-      case "todo": return "secondary";
+  const getEventTypeColor = (eventType: string) => {
+    switch (eventType) {
+      case "task": return "default";
+      case "meeting": return "outline";
+      case "reminder": return "secondary";
       default: return "secondary";
     }
   };
@@ -157,7 +154,7 @@ const Tasks = () => {
         <div>
           <h1 className="text-3xl font-bold">Tasks</h1>
           <p className="text-muted-foreground">
-            Manage your tasks and track your progress
+            Manage your tasks and events in one place
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -169,9 +166,9 @@ const Tasks = () => {
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Create New Task</DialogTitle>
+              <DialogTitle>Create New Event</DialogTitle>
               <DialogDescription>
-                Add a new task to your list. Fill in the details below.
+                Add a new event to your calendar. Fill in the details below.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -179,25 +176,25 @@ const Tasks = () => {
                 <Label htmlFor="title">Title</Label>
                 <Input
                   id="title"
-                  value={newTask.title}
-                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                  placeholder="Enter task title"
+                  value={newEvent.title}
+                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                  placeholder="Enter event title"
                 />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
-                  value={newTask.description}
-                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                  placeholder="Enter task description"
+                  value={newEvent.description}
+                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                  placeholder="Enter event description"
                 />
               </div>
               <div className="grid gap-2">
                 <Label>Priority</Label>
                 <Select
-                  value={newTask.priority}
-                  onValueChange={(value) => setNewTask({ ...newTask, priority: value })}
+                  value={newEvent.priority}
+                  onValueChange={(value) => setNewEvent({ ...newEvent, priority: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -210,22 +207,38 @@ const Tasks = () => {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="duration">Estimated Duration (minutes)</Label>
+                <Label>Event Type</Label>
+                <Select
+                  value={newEvent.event_type}
+                  onValueChange={(value) => setNewEvent({ ...newEvent, event_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="task">Task</SelectItem>
+                    <SelectItem value="meeting">Meeting</SelectItem>
+                    <SelectItem value="reminder">Reminder</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="start_time">Start Time</Label>
                 <Input
-                  id="duration"
-                  type="number"
-                  value={newTask.estimated_duration}
-                  onChange={(e) => setNewTask({ ...newTask, estimated_duration: e.target.value })}
-                  placeholder="30"
+                  id="start_time"
+                  type="datetime-local"
+                  value={newEvent.start_time}
+                  onChange={(e) => setNewEvent({ ...newEvent, start_time: e.target.value })}
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="due_date">Due Date</Label>
+                <Label htmlFor="end_time">End Time</Label>
                 <Input
-                  id="due_date"
+                  id="end_time"
                   type="datetime-local"
-                  value={newTask.due_date}
-                  onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+                  value={newEvent.end_time}
+                  onChange={(e) => setNewEvent({ ...newEvent, end_time: e.target.value })}
                 />
               </div>
             </div>
@@ -233,41 +246,41 @@ const Tasks = () => {
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={createTask}>Create Task</Button>
+              <Button onClick={createEvent}>Create Event</Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
       <div className="grid gap-4">
-        {tasks.length === 0 ? (
+        {events.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16">
               <CheckSquare className="h-12 w-12 text-muted-foreground mb-4" />
-              <CardTitle className="mb-2">No tasks yet</CardTitle>
+              <CardTitle className="mb-2">No events yet</CardTitle>
               <CardDescription className="text-center">
-                Create your first task to get started with your productivity journey
+                Create your first event to get started with your productivity journey
               </CardDescription>
             </CardContent>
           </Card>
         ) : (
-          tasks.map((task) => (
-            <Card key={task.id}>
+          events.map((event) => (
+            <Card key={event.id}>
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
-                    <CardTitle className="text-lg">{task.title}</CardTitle>
-                    {task.description && (
-                      <CardDescription>{task.description}</CardDescription>
+                    <CardTitle className="text-lg">{event.title}</CardTitle>
+                    {event.description && (
+                      <CardDescription>{event.description}</CardDescription>
                     )}
                   </div>
                   <div className="flex space-x-2">
-                    <Badge variant={getPriorityColor(task.priority)}>
+                    <Badge variant={getPriorityColor(event.priority)}>
                       <Flag className="w-3 h-3 mr-1" />
-                      {task.priority}
+                      {event.priority}
                     </Badge>
-                    <Badge variant={getStatusColor(task.status)}>
-                      {task.status.replace("_", " ")}
+                    <Badge variant={getEventTypeColor(event.event_type)}>
+                      {event.event_type}
                     </Badge>
                   </div>
                 </div>
@@ -275,44 +288,24 @@ const Tasks = () => {
               <CardContent>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                    {task.estimated_duration && (
+                    <div className="flex items-center">
+                      <Calendar className="w-4 h-4 mr-1" />
+                      {event.all_day ? (
+                        format(new Date(event.start_time), "MMM dd, yyyy")
+                      ) : (
+                        <>
+                          {format(new Date(event.start_time), "MMM dd, h:mm a")}
+                          {event.end_time && event.end_time !== event.start_time && (
+                            <> - {format(new Date(event.end_time), "h:mm a")}</>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {!event.all_day && event.end_time && event.end_time !== event.start_time && (
                       <div className="flex items-center">
                         <Clock className="w-4 h-4 mr-1" />
-                        {task.estimated_duration}m
+                        {Math.round((new Date(event.end_time).getTime() - new Date(event.start_time).getTime()) / (1000 * 60))}m
                       </div>
-                    )}
-                    {task.due_date && (
-                      <div className="flex items-center">
-                        <Calendar className="w-4 h-4 mr-1" />
-                        {new Date(task.due_date).toLocaleDateString()}
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-x-2">
-                    {task.status === "todo" && (
-                      <Button
-                        size="sm"
-                        onClick={() => updateTaskStatus(task.id, "in_progress")}
-                      >
-                        Start
-                      </Button>
-                    )}
-                    {task.status === "in_progress" && (
-                      <Button
-                        size="sm"
-                        onClick={() => updateTaskStatus(task.id, "completed")}
-                      >
-                        Complete
-                      </Button>
-                    )}
-                    {task.status === "completed" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => updateTaskStatus(task.id, "todo")}
-                      >
-                        Reopen
-                      </Button>
                     )}
                   </div>
                 </div>
