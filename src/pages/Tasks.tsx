@@ -47,9 +47,9 @@ const Tasks = () => {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [filters, setFilters] = useState({
-    teamMember: "",
-    priority: "",
-    dateRange: "",
+    teamMember: "all",
+    priority: "all",
+    dateRange: "all",
   });
   const [newEvent, setNewEvent] = useState({
     title: "",
@@ -125,15 +125,15 @@ const Tasks = () => {
   const applyFilters = () => {
     let filtered = [...events];
 
-    if (filters.teamMember) {
+    if (filters.teamMember && filters.teamMember !== "all") {
       filtered = filtered.filter(event => event.user_id === filters.teamMember);
     }
 
-    if (filters.priority) {
+    if (filters.priority && filters.priority !== "all") {
       filtered = filtered.filter(event => event.priority === filters.priority);
     }
 
-    if (filters.dateRange) {
+    if (filters.dateRange && filters.dateRange !== "all") {
       const today = new Date();
       const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       
@@ -265,13 +265,13 @@ const Tasks = () => {
 
   const clearFilters = () => {
     setFilters({
-      teamMember: "",
-      priority: "",
-      dateRange: "",
+      teamMember: "all",
+      priority: "all",
+      dateRange: "all",
     });
   };
 
-  const hasActiveFilters = filters.teamMember || filters.priority || filters.dateRange;
+  const hasActiveFilters = filters.teamMember !== "all" || filters.priority !== "all" || filters.dateRange !== "all";
 
   if (isLoading) {
     return (
@@ -407,7 +407,7 @@ const Tasks = () => {
               <Label>Team Member</Label>
               <Select
                 value={filters.teamMember}
-                onValueChange={(value) => setFilters({ ...filters, teamMember: value === "all" ? "" : value })}
+                onValueChange={(value) => setFilters({ ...filters, teamMember: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All team members" />
@@ -426,7 +426,7 @@ const Tasks = () => {
               <Label>Priority</Label>
               <Select
                 value={filters.priority}
-                onValueChange={(value) => setFilters({ ...filters, priority: value === "all" ? "" : value })}
+                onValueChange={(value) => setFilters({ ...filters, priority: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All priorities" />
@@ -443,7 +443,7 @@ const Tasks = () => {
               <Label>Date Range</Label>
               <Select
                 value={filters.dateRange}
-                onValueChange={(value) => setFilters({ ...filters, dateRange: value === "all" ? "" : value })}
+                onValueChange={(value) => setFilters({ ...filters, dateRange: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All dates" />
