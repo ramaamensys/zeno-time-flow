@@ -205,7 +205,7 @@ const Calendar = () => {
       priority: "medium",
     });
     setEditingEvent(null);
-    fetchEvents();
+    fetchEvents(); // This will refresh events with updated times and trigger re-render
   };
 
 
@@ -268,6 +268,10 @@ const Calendar = () => {
       const dateTime = new Date(date);
       if (hour !== undefined) {
         dateTime.setHours(hour, 0, 0, 0);
+      } else {
+        // Use current time when no hour is specified (for monthly view)
+        const now = new Date();
+        dateTime.setHours(now.getHours(), now.getMinutes(), 0, 0);
       }
       setNewEvent({
         ...newEvent,
