@@ -249,21 +249,35 @@ const Calendar = () => {
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
     setSelectedHour(null);
+    setEditingEvent(null); // Reset editing event when clicking on a date
     openEventDialog(date);
   };
 
   const handleTimeSlotClick = (date: Date, hour: number) => {
     setSelectedDate(date);
     setSelectedHour(hour);
+    setEditingEvent(null); // Reset editing event when clicking on a time slot
     openEventDialog(date, hour);
   };
 
   const handleDayTimeSlotClick = (hour: number) => {
     setSelectedHour(hour);
+    setEditingEvent(null); // Reset editing event when clicking on a time slot
     openEventDialog(currentDate, hour);
   };
 
   const openEventDialog = (date?: Date, hour?: number) => {
+    // Reset form to default values
+    const defaultEvent = {
+      title: "",
+      description: "",
+      start_time: "",
+      end_time: "",
+      all_day: false,
+      event_type: "other",
+      priority: "medium",
+    };
+    
     if (date) {
       const dateTime = new Date(date);
       if (hour !== undefined) {
@@ -274,7 +288,7 @@ const Calendar = () => {
         dateTime.setHours(now.getHours(), now.getMinutes(), 0, 0);
       }
       setNewEvent({
-        ...newEvent,
+        ...defaultEvent,
         start_time: format(dateTime, "yyyy-MM-dd'T'HH:mm"),
         end_time: format(new Date(dateTime.getTime() + 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
       });
@@ -282,7 +296,7 @@ const Calendar = () => {
       // Default to current date and time when no specific date is selected
       const now = new Date();
       setNewEvent({
-        ...newEvent,
+        ...defaultEvent,
         start_time: format(now, "yyyy-MM-dd'T'HH:mm"),
         end_time: format(new Date(now.getTime() + 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
       });
