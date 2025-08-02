@@ -41,10 +41,18 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, on
       const slotEnd = new Date(date);
       slotEnd.setHours(hour + 1, 0, 0, 0);
       
+      // Only show event in its starting hour slot
       return isSameDay(eventStart, date) && 
-             eventStart < slotEnd && 
-             eventEnd > slotStart;
+             eventStart >= slotStart && 
+             eventStart < slotEnd;
     });
+  };
+
+  const getEventHeight = (event: CalendarEvent) => {
+    const eventStart = new Date(event.start_time);
+    const eventEnd = new Date(event.end_time);
+    const durationHours = (eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60);
+    return Math.max(1, Math.ceil(durationHours)) * 60; // 60px per hour
   };
 
   const getEventStyling = (event: CalendarEvent, isOverdue: boolean) => {
@@ -89,7 +97,7 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, on
               return (
                 <div
                   key={`${day.toISOString()}-${hour}`}
-                  className="min-h-[60px] p-1 border-l border-border hover:bg-muted/30 cursor-pointer transition-colors"
+                  className="min-h-[60px] p-1 border-l border-border hover:bg-muted/30 cursor-pointer transition-colors relative"
                   onClick={() => onTimeSlotClick(day, hour)}
                 >
                   {slotEvents.map((event) => {
@@ -98,9 +106,10 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, on
                       <div
                         key={event.id}
                         className={cn(
-                          "text-xs p-1 rounded text-white mb-1 truncate cursor-pointer hover:opacity-80",
+                          "text-xs p-1 rounded text-white mb-1 truncate cursor-pointer hover:opacity-80 absolute left-1 right-1 z-10",
                           getEventStyling(event, isOverdue)
                         )}
+                        style={{ height: `${getEventHeight(event)}px` }}
                         title={`${event.title} (${event.priority} priority)${isOverdue ? ' - OVERDUE' : ''}${getUserName && onUserEventClick ? ` - ${getUserName(event.user_id)}` : ''}`}
                         onClick={(e) => {
                           e.stopPropagation();
