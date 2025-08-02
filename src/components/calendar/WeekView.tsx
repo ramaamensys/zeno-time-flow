@@ -1,6 +1,6 @@
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isToday, eachHourOfInterval, startOfDay, endOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
-import { getUserColor, getPriorityOverlay } from "@/utils/userColors";
+import { getEventColor, getPriorityOverlay } from "@/utils/userColors";
 
 interface CalendarEvent {
   id: string;
@@ -48,9 +48,9 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, on
   };
 
   const getEventStyling = (event: CalendarEvent, isOverdue: boolean) => {
-    const userColor = getUserColor(event.user_id);
+    const eventColor = getEventColor(event.start_time, event.priority);
     const priorityOverlay = getPriorityOverlay(event.priority, isOverdue);
-    return `${userColor} ${priorityOverlay}`;
+    return `${eventColor} ${priorityOverlay}`;
   };
 
   const isEventOverdue = (event: CalendarEvent) => {
