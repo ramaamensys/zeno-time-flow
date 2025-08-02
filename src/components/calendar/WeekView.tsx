@@ -35,16 +35,14 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, on
   const getEventsForTimeSlot = (date: Date, hour: number) => {
     return events.filter(event => {
       const eventStart = new Date(event.start_time);
-      const eventEnd = new Date(event.end_time);
       const slotStart = new Date(date);
       slotStart.setHours(hour, 0, 0, 0);
       const slotEnd = new Date(date);
       slotEnd.setHours(hour + 1, 0, 0, 0);
       
-      // Only show event in its starting hour slot
+      // Only show event in its starting hour slot - check if event starts within this hour
       return isSameDay(eventStart, date) && 
-             eventStart >= slotStart && 
-             eventStart < slotEnd;
+             eventStart.getHours() === hour;
     });
   };
 
