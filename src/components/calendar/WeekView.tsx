@@ -52,7 +52,8 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, on
     const eventStart = new Date(event.start_time);
     const eventEnd = new Date(event.end_time);
     const durationHours = (eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60);
-    return Math.max(1, Math.ceil(durationHours)) * 60; // 60px per hour
+    // Ensure minimum 60px height per hour, subtract 8px for margins/borders
+    return Math.max(60, Math.round(durationHours * 60)) - 8;
   };
 
   const getEventStyling = (event: CalendarEvent, isOverdue: boolean) => {
