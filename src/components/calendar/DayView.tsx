@@ -121,10 +121,10 @@ export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onD
                           )}
                           <Button
                             size="icon"
-                            variant={event.completed ? "default" : "outline"}
+                            variant={event.completed ? "default" : "secondary"}
                             className={cn(
-                              "h-5 w-5 flex-shrink-0",
-                              event.completed && "bg-green-100 border-green-300 text-green-700 hover:bg-green-200"
+                              "h-6 w-6 flex-shrink-0 bg-white/90 hover:bg-white border border-gray-300 shadow-sm",
+                              event.completed && "bg-green-500 border-green-500 text-white hover:bg-green-600"
                             )}
                             onClick={(e) => {
                               e.stopPropagation();

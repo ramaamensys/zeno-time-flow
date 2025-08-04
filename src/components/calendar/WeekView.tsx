@@ -137,17 +137,17 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, on
                             )}
                             <Button
                               size="icon"
-                              variant={event.completed ? "default" : "outline"}
+                              variant={event.completed ? "default" : "secondary"}
                               className={cn(
-                                "h-4 w-4",
-                                event.completed && "bg-green-100 border-green-300 text-green-700 hover:bg-green-200"
+                                "h-5 w-5 bg-white/90 hover:bg-white border border-gray-300 shadow-sm",
+                                event.completed && "bg-green-500 border-green-500 text-white hover:bg-green-600"
                               )}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onToggleComplete?.(event.id, event.completed);
                               }}
                             >
-                              <Check className="h-2 w-2" />
+                              <Check className="h-2.5 w-2.5" />
                             </Button>
                           </div>
                         </div>
