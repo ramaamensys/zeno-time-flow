@@ -33,8 +33,17 @@ export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onD
       const eventDate = new Date(event.start_time);
       const eventHour = eventDate.getHours();
       const isSameDay = eventDate.toDateString() === currentDate.toDateString();
+      // Only show event in its starting hour slot
       return isSameDay && eventHour === hour;
     });
+  };
+
+  const getEventHeight = (event: CalendarEvent) => {
+    const eventStart = new Date(event.start_time);
+    const eventEnd = new Date(event.end_time);
+    const durationHours = (eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60);
+    // Each hour slot is 80px, so multiply duration by 80px per hour
+    return Math.max(80, durationHours * 80);
   };
 
   const getEventStyling = (event: CalendarEvent, isOverdue: boolean) => {
@@ -72,53 +81,52 @@ export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onD
                 {format(new Date().setHours(hour, 0, 0, 0), "h a")}
               </div>
               <div
-                className="flex-1 min-h-[80px] p-2 hover:bg-muted/30 cursor-pointer transition-colors"
+                className="flex-1 min-h-[80px] p-2 hover:bg-muted/30 cursor-pointer transition-colors relative"
                 onClick={() => onTimeSlotClick(hour)}
               >
-                <div className="space-y-1">
-                  {hourEvents.map((event) => {
-                    const isOverdue = isEventOverdue(event);
-                    return (
-                      <div
-                        key={event.id}
-                        className={cn(
-                          "p-2 rounded text-white cursor-pointer hover:opacity-80",
-                          getEventStyling(event, isOverdue)
+                {hourEvents.map((event) => {
+                  const isOverdue = isEventOverdue(event);
+                  return (
+                    <div
+                      key={event.id}
+                      className={cn(
+                        "p-2 rounded text-white cursor-pointer hover:opacity-80 absolute left-2 right-2 z-10",
+                        getEventStyling(event, isOverdue)
+                      )}
+                      style={{ height: `${getEventHeight(event)}px` }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onUserEventClick && e.ctrlKey) {
+                          onUserEventClick(event.user_id);
+                        } else {
+                          onEditEvent?.(event);
+                        }
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteEvent?.(event.id);
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{event.title}</span>
+                        {getUserName && (
+                          <span className="text-xs opacity-75">
+                            {getUserName(event.user_id)}
+                          </span>
                         )}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onUserEventClick && e.ctrlKey) {
-                            onUserEventClick(event.user_id);
-                          } else {
-                            onEditEvent?.(event);
-                          }
-                        }}
-                        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteEvent?.(event.id);
-                        }}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{event.title}</span>
-                          {getUserName && (
-                            <span className="text-xs opacity-75">
-                              {getUserName(event.user_id)}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs opacity-75 mt-1">
-                          {event.priority} priority{isOverdue ? ' - OVERDUE' : ''}
-                        </div>
-                        {event.description && (
-                          <div className="text-xs opacity-90 mt-1">{event.description}</div>
-                        )}
-                        <div className="text-xs opacity-75 mt-1">
-                          {format(new Date(event.start_time), "h:mm a")} - {format(new Date(event.end_time), "h:mm a")}
-                        </div>
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="text-xs opacity-75 mt-1">
+                        {event.priority} priority{isOverdue ? ' - OVERDUE' : ''}
+                      </div>
+                      {event.description && (
+                        <div className="text-xs opacity-90 mt-1">{event.description}</div>
+                      )}
+                      <div className="text-xs opacity-75 mt-1">
+                        {format(new Date(event.start_time), "h:mm a")} - {format(new Date(event.end_time), "h:mm a")}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
