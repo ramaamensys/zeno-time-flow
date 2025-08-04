@@ -474,14 +474,30 @@ const Calendar = () => {
                 </div>
               )}
             </div>
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="all_day"
-                checked={newEvent.all_day}
-                onChange={(e) => setNewEvent({ ...newEvent, all_day: e.target.checked })}
-              />
-              <Label htmlFor="all_day">All day event</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="all_day"
+                  checked={newEvent.all_day}
+                  onChange={(e) => setNewEvent({ ...newEvent, all_day: e.target.checked })}
+                />
+                <Label htmlFor="all_day">All day event</Label>
+              </div>
+              {editingEvent && (
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="completed"
+                    checked={editingEvent.completed}
+                    onChange={(e) => {
+                      setEditingEvent({ ...editingEvent, completed: e.target.checked });
+                      toggleEventCompletion(editingEvent.id, editingEvent.completed);
+                    }}
+                  />
+                  <Label htmlFor="completed">Mark as completed</Label>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex flex-col sm:flex-row justify-between gap-2">
