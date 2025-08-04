@@ -34,32 +34,32 @@ export const getUserColor = (userId: string): string => {
     hash = hash & hash; // Convert to 32bit integer
   }
 
-  // Use light colors for better visibility
+  // Use very light colors like Google Calendar
   const colors = [
-    'bg-blue-300',     // Light Blue
-    'bg-green-300',    // Light Green  
-    'bg-purple-300',   // Light Purple
-    'bg-pink-300',     // Light Pink
-    'bg-indigo-300',   // Light Indigo
-    'bg-teal-300',     // Light Teal
-    'bg-orange-300',   // Light Orange
-    'bg-cyan-300',     // Light Cyan
-    'bg-emerald-300',  // Light Emerald
-    'bg-violet-300',   // Light Violet
-    'bg-amber-300',    // Light Amber
-    'bg-lime-300',     // Light Lime
-    'bg-rose-300',     // Light Rose
-    'bg-fuchsia-300',  // Light Fuchsia
-    'bg-sky-300',      // Light Sky
+    'bg-blue-100',     // Very Light Blue
+    'bg-green-100',    // Very Light Green  
+    'bg-purple-100',   // Very Light Purple
+    'bg-pink-100',     // Very Light Pink
+    'bg-indigo-100',   // Very Light Indigo
+    'bg-teal-100',     // Very Light Teal
+    'bg-orange-100',   // Very Light Orange
+    'bg-cyan-100',     // Very Light Cyan
+    'bg-emerald-100',  // Very Light Emerald
+    'bg-violet-100',   // Very Light Violet
+    'bg-amber-100',    // Very Light Amber
+    'bg-lime-100',     // Very Light Lime
+    'bg-rose-100',     // Very Light Rose
+    'bg-fuchsia-100',  // Very Light Fuchsia
+    'bg-sky-100',      // Very Light Sky
   ];
 
   return colors[Math.abs(hash) % colors.length];
 };
 
-// Get a lighter variant for hover states
+// Get a slightly darker variant for hover states
 export const getUserColorHover = (userId: string): string => {
   const baseColor = getUserColor(userId);
-  return baseColor.replace('-300', '-200');
+  return baseColor.replace('-100', '-200');
 };
 
 // Get priority-specific styling that can overlay colors
