@@ -90,7 +90,7 @@ export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onD
                     <div
                       key={event.id}
                       className={cn(
-                        "p-2 rounded text-white cursor-pointer hover:opacity-80 absolute left-2 right-2 z-10",
+                        "p-2 rounded text-gray-800 cursor-pointer hover:opacity-80 absolute left-2 right-2 z-10",
                         getEventStyling(event, isOverdue)
                       )}
                       style={{ height: `${getEventHeight(event)}px` }}

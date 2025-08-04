@@ -105,7 +105,7 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, on
                       <div
                         key={event.id}
                         className={cn(
-                          "text-xs p-1 rounded text-white mb-1 truncate cursor-pointer hover:opacity-80 absolute left-1 right-1 z-10",
+                          "text-xs p-1 rounded text-gray-800 mb-1 truncate cursor-pointer hover:opacity-80 absolute left-1 right-1 z-10",
                           getEventStyling(event, isOverdue)
                         )}
                         style={{ height: `${getEventHeight(event)}px` }}
