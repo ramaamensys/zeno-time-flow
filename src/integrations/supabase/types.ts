@@ -17,6 +17,7 @@ export type Database = {
       calendar_events: {
         Row: {
           all_day: boolean | null
+          completed: boolean
           created_at: string
           description: string | null
           end_time: string
@@ -32,6 +33,7 @@ export type Database = {
         }
         Insert: {
           all_day?: boolean | null
+          completed?: boolean
           created_at?: string
           description?: string | null
           end_time: string
@@ -47,6 +49,7 @@ export type Database = {
         }
         Update: {
           all_day?: boolean | null
+          completed?: boolean
           created_at?: string
           description?: string | null
           end_time?: string

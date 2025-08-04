@@ -1,6 +1,8 @@
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isToday, eachHourOfInterval, startOfDay, endOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import { getEventColor, getPriorityOverlay } from "@/utils/userColors";
+import { Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface CalendarEvent {
   id: string;
@@ -13,6 +15,7 @@ interface CalendarEvent {
   priority: string;
   created_at: string;
   user_id: string;
+  completed: boolean;
 }
 
 interface WeekViewProps {
@@ -21,11 +24,12 @@ interface WeekViewProps {
   onTimeSlotClick: (date: Date, hour: number) => void;
   onEditEvent?: (event: CalendarEvent) => void;
   onDeleteEvent?: (eventId: string) => void;
+  onToggleComplete?: (eventId: string, currentStatus: boolean) => void;
   onUserEventClick?: (userId: string) => void;
   getUserName?: (userId: string) => string;
 }
 
-export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onDeleteEvent, onUserEventClick, getUserName }: WeekViewProps) => {
+export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onDeleteEvent, onToggleComplete, onUserEventClick, getUserName }: WeekViewProps) => {
   const weekStart = startOfWeek(currentDate);
   const weekEnd = endOfWeek(currentDate);
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
@@ -123,13 +127,29 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, on
                           onDeleteEvent?.(event.id);
                         }}
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="truncate">{event.title}</span>
-                          {getUserName && (
-                            <span className="text-xs opacity-75">
-                              {getUserName(event.user_id).split(' ')[0]}
-                            </span>
-                          )}
+                        <div className="flex items-center justify-between gap-1">
+                          <span className={cn("truncate text-xs", event.completed && "line-through opacity-60")}>{event.title}</span>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {getUserName && (
+                              <span className="text-xs opacity-75">
+                                {getUserName(event.user_id).split(' ')[0]}
+                              </span>
+                            )}
+                            <Button
+                              size="icon"
+                              variant={event.completed ? "default" : "outline"}
+                              className={cn(
+                                "h-4 w-4",
+                                event.completed && "bg-green-100 border-green-300 text-green-700 hover:bg-green-200"
+                              )}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleComplete?.(event.id, event.completed);
+                              }}
+                            >
+                              <Check className="h-2 w-2" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     );

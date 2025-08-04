@@ -1,6 +1,8 @@
 import { format, isToday } from "date-fns";
 import { cn } from "@/lib/utils";
 import { getUserColor, getPriorityOverlay } from "@/utils/userColors";
+import { Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface CalendarEvent {
   id: string;
@@ -13,6 +15,7 @@ interface CalendarEvent {
   priority: string;
   created_at: string;
   user_id: string;
+  completed: boolean;
 }
 
 interface DayViewProps {
@@ -21,11 +24,12 @@ interface DayViewProps {
   onTimeSlotClick: (hour: number) => void;
   onEditEvent?: (event: CalendarEvent) => void;
   onDeleteEvent?: (eventId: string) => void;
+  onToggleComplete?: (eventId: string, currentStatus: boolean) => void;
   onUserEventClick?: (userId: string) => void;
   getUserName?: (userId: string) => string;
 }
 
-export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onDeleteEvent, onUserEventClick, getUserName }: DayViewProps) => {
+export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onDeleteEvent, onToggleComplete, onUserEventClick, getUserName }: DayViewProps) => {
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
   const getEventsForHour = (hour: number) => {
@@ -108,15 +112,31 @@ export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onD
                       }}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-medium">{event.title}</span>
-                        {getUserName && (
-                          <span className="text-xs opacity-75">
-                            {getUserName(event.user_id)}
-                          </span>
-                        )}
+                        <span className={cn("font-medium", event.completed && "line-through opacity-60")}>{event.title}</span>
+                        <div className="flex items-center gap-1">
+                          {getUserName && (
+                            <span className="text-xs opacity-75">
+                              {getUserName(event.user_id)}
+                            </span>
+                          )}
+                          <Button
+                            size="icon"
+                            variant={event.completed ? "default" : "outline"}
+                            className={cn(
+                              "h-5 w-5 flex-shrink-0",
+                              event.completed && "bg-green-100 border-green-300 text-green-700 hover:bg-green-200"
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleComplete?.(event.id, event.completed);
+                            }}
+                          >
+                            <Check className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </div>
                       <div className="text-xs opacity-75 mt-1">
-                        {event.priority} priority{isOverdue ? ' - OVERDUE' : ''}
+                        {event.priority} priority{isOverdue ? ' - OVERDUE' : ''}{event.completed ? ' - COMPLETED' : ''}
                       </div>
                       {event.description && (
                         <div className="text-xs opacity-90 mt-1">{event.description}</div>

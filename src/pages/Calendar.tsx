@@ -27,6 +27,7 @@ interface CalendarEvent {
   priority: string;
   created_at: string;
   user_id: string;
+  completed: boolean;
 }
 
 
@@ -232,6 +233,27 @@ const Calendar = () => {
     }
   };
 
+  const toggleEventCompletion = async (eventId: string, currentStatus: boolean) => {
+    const { error } = await supabase
+      .from("calendar_events")
+      .update({ completed: !currentStatus })
+      .eq("id", eventId);
+
+    if (error) {
+      toast({
+        title: "Error updating event",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: !currentStatus ? "Event completed" : "Event marked incomplete",
+        description: !currentStatus ? "Your event has been marked as completed" : "Your event has been marked as incomplete",
+      });
+      fetchEvents();
+    }
+  };
+
   const editEvent = (event: CalendarEvent) => {
     setEditingEvent(event);
     setNewEvent({
@@ -341,6 +363,8 @@ const Calendar = () => {
           onTimeSlotClick={handleTimeSlotClick}
           onEditEvent={editEvent}
           onDeleteEvent={deleteEvent}
+          onToggleComplete={toggleEventCompletion}
+          getUserName={(userId) => userProfiles[userId]}
         />
       )}
 
@@ -351,6 +375,8 @@ const Calendar = () => {
           onTimeSlotClick={handleDayTimeSlotClick}
           onEditEvent={editEvent}
           onDeleteEvent={deleteEvent}
+          onToggleComplete={toggleEventCompletion}
+          getUserName={(userId) => userProfiles[userId]}
         />
       )}
 
