@@ -23,6 +23,7 @@ export type Database = {
           end_time: string
           event_type: string | null
           id: string
+          parent_task_id: string | null
           priority: string | null
           recurrence_rule: string | null
           start_time: string
@@ -39,6 +40,7 @@ export type Database = {
           end_time: string
           event_type?: string | null
           id?: string
+          parent_task_id?: string | null
           priority?: string | null
           recurrence_rule?: string | null
           start_time: string
@@ -55,6 +57,7 @@ export type Database = {
           end_time?: string
           event_type?: string | null
           id?: string
+          parent_task_id?: string | null
           priority?: string | null
           recurrence_rule?: string | null
           start_time?: string
@@ -64,6 +67,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "calendar_events_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "calendar_events_task_id_fkey"
             columns: ["task_id"]
