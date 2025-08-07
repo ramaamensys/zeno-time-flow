@@ -75,55 +75,13 @@ const Habits = () => {
   }, [user]);
 
   const loadHabits = async () => {
-    const mockHabits: Habit[] = [
-      {
-        id: '1',
-        title: 'Morning Workout',
-        description: '30 minutes of strength training',
-        category: 'health',
-        frequency: 'daily',
-        target_count: 1,
-        current_streak: 8,
-        best_streak: 15,
-        created_at: '2024-01-01',
-        color: 'emerald'
-      },
-      {
-        id: '2',
-        title: 'Read Books',
-        description: 'Read for 30 minutes daily',
-        category: 'learning',
-        frequency: 'daily',
-        target_count: 1,
-        current_streak: 12,
-        best_streak: 20,
-        created_at: '2024-01-01',
-        color: 'purple'
-      },
-      {
-        id: '3',
-        title: 'Meditation',
-        description: '10 minutes mindfulness practice',
-        category: 'mindfulness',
-        frequency: 'daily',
-        target_count: 1,
-        current_streak: 5,
-        best_streak: 18,
-        created_at: '2024-01-01',
-        color: 'amber'
-      }
-    ];
-    setHabits(mockHabits);
+    // Empty state for first-time user
+    setHabits([]);
   };
 
   const loadCompletions = async () => {
-    const today = new Date().toISOString().split('T')[0];
-    const mockCompletions: HabitCompletion[] = [
-      { id: '1', habit_id: '1', date: today, completed: true },
-      { id: '2', habit_id: '2', date: today, completed: true },
-      { id: '3', habit_id: '3', date: today, completed: false }
-    ];
-    setCompletions(mockCompletions);
+    // Empty state for first-time user
+    setCompletions([]);
   };
 
   const createHabit = async () => {
@@ -232,18 +190,32 @@ const Habits = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/10">
       <div className="max-w-6xl mx-auto p-6 space-y-8">
-        {/* Modern Header */}
-        <div className="text-center space-y-4">
+        {/* Welcome Header for First-Time User */}
+        <div className="text-center space-y-6">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full text-primary font-medium text-sm">
             <Star className="w-4 h-4" />
-            Build Better Habits
+            Welcome to Habits
           </div>
           <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Your Habit Journey
+            Start Your Journey
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Transform your life one habit at a time. Track progress, build streaks, and achieve your goals.
+            Welcome! Build lasting habits that transform your life. Create your first habit below to get started.
           </p>
+          <div className="flex items-center justify-center gap-8 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+              Track Daily Progress
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+              Build Streaks
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              Achieve Goals
+            </div>
+          </div>
         </div>
 
         {/* Stats Overview */}
@@ -321,28 +293,29 @@ const Habits = () => {
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-xl font-semibold">Today's Habits</CardTitle>
-                  <Dialog open={isAddingHabit} onOpenChange={setIsAddingHabit}>
-                    <DialogTrigger asChild>
-                      <Button className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 transition-opacity">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Habit
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Create New Habit</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-6">
-                        <div className="space-y-2">
-                          <Label htmlFor="title">Habit Name</Label>
-                          <Input
-                            id="title"
-                            value={newHabit.title}
-                            onChange={(e) => setNewHabit({ ...newHabit, title: e.target.value })}
-                            placeholder="e.g., Morning Workout"
-                            className="border-muted"
-                          />
-                        </div>
+                  {habits.length > 0 && (
+                    <Dialog open={isAddingHabit} onOpenChange={setIsAddingHabit}>
+                      <DialogTrigger asChild>
+                        <Button className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 transition-opacity">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Habit
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Create New Habit</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-6">
+                          <div className="space-y-2">
+                            <Label htmlFor="title">Habit Name</Label>
+                            <Input
+                              id="title"
+                              value={newHabit.title}
+                              onChange={(e) => setNewHabit({ ...newHabit, title: e.target.value })}
+                              placeholder="e.g., Morning Workout"
+                              className="border-muted"
+                            />
+                          </div>
                         
                         <div className="space-y-2">
                           <Label htmlFor="description">Description</Label>
@@ -393,17 +366,131 @@ const Habits = () => {
                       </div>
                     </DialogContent>
                   </Dialog>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {habits.filter(h => h.frequency === 'daily').length === 0 ? (
-                  <div className="text-center py-12 space-y-4">
-                    <div className="w-16 h-16 mx-auto bg-muted/50 rounded-full flex items-center justify-center">
-                      <Target className="w-8 h-8 text-muted-foreground" />
+                  <div className="text-center py-16 space-y-6">
+                    <div className="relative">
+                      <div className="w-20 h-20 mx-auto bg-gradient-to-br from-primary/20 to-secondary/20 rounded-full flex items-center justify-center">
+                        <Target className="w-10 h-10 text-primary" />
+                      </div>
+                      <div className="absolute -top-2 -right-2 w-8 h-8 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
+                        <span className="text-lg">✨</span>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-medium text-foreground">No habits yet</h3>
-                      <p className="text-sm text-muted-foreground">Create your first habit to start building better routines</p>
+                    <div className="space-y-3">
+                      <h3 className="text-xl font-semibold text-foreground">Ready to build your first habit?</h3>
+                      <p className="text-muted-foreground max-w-md mx-auto">
+                        Start with something small that you can do every day. Whether it's drinking more water, reading, or exercising - every journey begins with a single step.
+                      </p>
+                      <div className="pt-4">
+                        <Dialog open={isAddingHabit} onOpenChange={setIsAddingHabit}>
+                          <DialogTrigger asChild>
+                            <Button size="lg" className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 transition-opacity">
+                              <Plus className="w-5 h-5 mr-2" />
+                              Create Your First Habit
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-md">
+                            <DialogHeader>
+                              <DialogTitle>Create Your First Habit</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-6">
+                              <div className="text-center p-4 bg-primary/5 rounded-lg">
+                                <p className="text-sm text-muted-foreground">
+                                  💡 <strong>Tip:</strong> Start small! Choose something you can easily do every day.
+                                </p>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label htmlFor="title">Habit Name</Label>
+                                <Input
+                                  id="title"
+                                  value={newHabit.title}
+                                  onChange={(e) => setNewHabit({ ...newHabit, title: e.target.value })}
+                                  placeholder="e.g., Drink 8 glasses of water"
+                                  className="border-muted"
+                                />
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label htmlFor="description">Description</Label>
+                                <Input
+                                  id="description"
+                                  value={newHabit.description}
+                                  onChange={(e) => setNewHabit({ ...newHabit, description: e.target.value })}
+                                  placeholder="e.g., Stay hydrated throughout the day"
+                                  className="border-muted"
+                                />
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label htmlFor="category">Category</Label>
+                                <Select value={newHabit.category} onValueChange={(value) => setNewHabit({ ...newHabit, category: value })}>
+                                  <SelectTrigger className="border-muted">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {categories.map(cat => (
+                                      <SelectItem key={cat.value} value={cat.value}>
+                                        <div className="flex items-center gap-2">
+                                          <span>{cat.icon}</span>
+                                          {cat.label}
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label>Color</Label>
+                                <div className="flex flex-wrap gap-2">
+                                  {colorOptions.map(color => (
+                                    <button
+                                      key={color.name}
+                                      className={`w-8 h-8 rounded-full ${color.class} border-2 transition-all duration-200 ${newHabit.color === color.name ? 'border-foreground scale-110' : 'border-transparent hover:scale-105'}`}
+                                      onClick={() => setNewHabit({ ...newHabit, color: color.name })}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                              
+                              <Button onClick={createHabit} className="w-full bg-gradient-to-r from-primary to-secondary">
+                                Start My Habit Journey 🚀
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 text-left">
+                      <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">💪</span>
+                          <h4 className="font-medium text-emerald-700 dark:text-emerald-400">Health & Fitness</h4>
+                        </div>
+                        <p className="text-sm text-emerald-600 dark:text-emerald-500">Exercise, water, sleep, nutrition</p>
+                      </div>
+                      
+                      <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">📚</span>
+                          <h4 className="font-medium text-purple-700 dark:text-purple-400">Learning</h4>
+                        </div>
+                        <p className="text-sm text-purple-600 dark:text-purple-500">Reading, courses, practice</p>
+                      </div>
+                      
+                      <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">🧘</span>
+                          <h4 className="font-medium text-amber-700 dark:text-amber-400">Mindfulness</h4>
+                        </div>
+                        <p className="text-sm text-amber-600 dark:text-amber-500">Meditation, gratitude, reflection</p>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -505,35 +592,47 @@ const Habits = () => {
               <CardHeader>
                 <CardTitle className="text-lg font-semibold flex items-center gap-2">
                   <Trophy className="w-5 h-5 text-yellow-500" />
-                  Top Streaks
+                  {habits.length > 0 ? 'Top Streaks' : 'Your Streaks'}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {habits
-                    .sort((a, b) => b.current_streak - a.current_streak)
-                    .slice(0, 3)
-                    .map((habit, index) => {
-                      const category = categories.find(c => c.value === habit.category);
-                      const colorClass = colorOptions.find(c => c.name === habit.color)?.class || 'bg-primary';
-                      
-                      return (
-                        <div key={habit.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full ${colorClass}`} />
-                            <div>
-                              <p className="text-sm font-medium">{habit.title}</p>
-                              <p className="text-xs text-muted-foreground">{category?.label}</p>
+                {habits.length === 0 ? (
+                  <div className="text-center py-8 space-y-3">
+                    <div className="w-12 h-12 mx-auto bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
+                      <Trophy className="w-6 h-6 text-yellow-500" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-foreground">No streaks yet</h4>
+                      <p className="text-sm text-muted-foreground">Your habit streaks will appear here</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {habits
+                      .sort((a, b) => b.current_streak - a.current_streak)
+                      .slice(0, 3)
+                      .map((habit, index) => {
+                        const category = categories.find(c => c.value === habit.category);
+                        const colorClass = colorOptions.find(c => c.name === habit.color)?.class || 'bg-primary';
+                        
+                        return (
+                          <div key={habit.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-2 h-2 rounded-full ${colorClass}`} />
+                              <div>
+                                <p className="text-sm font-medium">{habit.title}</p>
+                                <p className="text-xs text-muted-foreground">{category?.label}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 text-sm font-medium">
+                              <Flame className="w-3 h-3 text-orange-500" />
+                              {habit.current_streak}
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 text-sm font-medium">
-                            <Flame className="w-3 h-3 text-orange-500" />
-                            {habit.current_streak}
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
+                        );
+                      })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
