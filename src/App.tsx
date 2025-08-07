@@ -42,11 +42,6 @@ const App = () => (
                 <Layout><Tasks /></Layout>
               </ProtectedRoute>
             } />
-            <Route path="/habits" element={
-              <ProtectedRoute>
-                <Layout><Habits /></Layout>
-              </ProtectedRoute>
-            } />
             <Route path="/user-management" element={
               <ProtectedRoute>
                 <Layout><UserManagement /></Layout>
