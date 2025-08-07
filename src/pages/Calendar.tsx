@@ -28,6 +28,7 @@ interface CalendarEvent {
   created_at: string;
   user_id: string;
   completed: boolean;
+  parent_task_id: string | null;
 }
 
 
@@ -45,6 +46,18 @@ const Calendar = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userProfiles, setUserProfiles] = useState<Record<string, string>>({});
   const [newEvent, setNewEvent] = useState({
+    title: "",
+    description: "",
+    start_time: "",
+    end_time: "",
+    all_day: false,
+    event_type: "other",
+    priority: "medium",
+    parent_task_id: null as string | null,
+  });
+  const [isSubEventDialogOpen, setIsSubEventDialogOpen] = useState(false);
+  const [parentEventForSubEvent, setParentEventForSubEvent] = useState<CalendarEvent | null>(null);
+  const [newSubEvent, setNewSubEvent] = useState({
     title: "",
     description: "",
     start_time: "",
@@ -158,6 +171,7 @@ const Calendar = () => {
       event_type: newEvent.event_type,
       priority: newEvent.priority,
       user_id: user?.id,
+      parent_task_id: newEvent.parent_task_id,
     };
 
     if (editingEvent) {
@@ -204,6 +218,7 @@ const Calendar = () => {
       all_day: false,
       event_type: "other",
       priority: "medium",
+      parent_task_id: null,
     });
     setEditingEvent(null);
     fetchEvents(); // This will refresh events with updated times and trigger re-render
@@ -264,6 +279,7 @@ const Calendar = () => {
       all_day: event.all_day,
       event_type: event.event_type,
       priority: event.priority,
+      parent_task_id: event.parent_task_id,
     });
     setIsDialogOpen(true);
   };
@@ -298,6 +314,7 @@ const Calendar = () => {
       all_day: false,
       event_type: "other",
       priority: "medium",
+      parent_task_id: null,
     };
     
     if (date) {
@@ -324,6 +341,83 @@ const Calendar = () => {
       });
     }
     setIsDialogOpen(true);
+  };
+
+  const createSubEvent = async () => {
+    if (!newSubEvent.title.trim()) {
+      toast({
+        title: "Title required",
+        description: "Please enter a sub-event title",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newSubEvent.start_time) {
+      toast({
+        title: "Start time required",
+        description: "Please select a start time",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const startTime = new Date(newSubEvent.start_time).toISOString();
+    const endTime = newSubEvent.end_time ? new Date(newSubEvent.end_time).toISOString() : startTime;
+
+    const { error } = await supabase.from("calendar_events").insert([
+      {
+        title: newSubEvent.title,
+        description: newSubEvent.description || null,
+        start_time: startTime,
+        end_time: endTime,
+        all_day: newSubEvent.all_day,
+        event_type: newSubEvent.event_type,
+        priority: newSubEvent.priority,
+        user_id: user?.id,
+        parent_task_id: parentEventForSubEvent?.id,
+      },
+    ]);
+
+    if (error) {
+      toast({
+        title: "Error creating sub-event",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Sub-event created",
+        description: "Your sub-event has been created successfully",
+      });
+      setIsSubEventDialogOpen(false);
+      setNewSubEvent({
+        title: "",
+        description: "",
+        start_time: "",
+        end_time: "",
+        all_day: false,
+        event_type: "other",
+        priority: "medium",
+      });
+      setParentEventForSubEvent(null);
+      fetchEvents();
+    }
+  };
+
+  const openSubEventDialog = (parentEvent: CalendarEvent) => {
+    setParentEventForSubEvent(parentEvent);
+    const now = new Date();
+    setNewSubEvent({
+      title: "",
+      description: "",
+      start_time: format(now, "yyyy-MM-dd'T'HH:mm"),
+      end_time: format(new Date(now.getTime() + 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
+      all_day: false,
+      event_type: "other",
+      priority: "medium",
+    });
+    setIsSubEventDialogOpen(true);
   };
 
   if (isLoading) {
@@ -531,6 +625,147 @@ const Calendar = () => {
                 Cancel
               </Button>
               <Button onClick={createEvent} className="w-full sm:w-auto">{editingEvent ? "Update Event" : "Create Event"}</Button>
+            </div>
+            
+            {!editingEvent && (
+              <div className="flex justify-center pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    // Create the event first, then open sub-event dialog
+                    const eventToCreate = {
+                      title: newEvent.title || "Primary Event",
+                      description: newEvent.description || "",
+                      start_time: newEvent.start_time || format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+                      end_time: newEvent.end_time || format(new Date(new Date().getTime() + 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
+                      all_day: newEvent.all_day,
+                      event_type: newEvent.event_type,
+                      priority: newEvent.priority,
+                      parent_task_id: null,
+                    };
+                    
+                    // Create a temporary event object for sub-event creation
+                    const tempEvent: CalendarEvent = {
+                      id: 'temp-' + Date.now(),
+                      ...eventToCreate,
+                      created_at: new Date().toISOString(),
+                      user_id: user?.id || '',
+                      completed: false,
+                    };
+                    
+                    openSubEventDialog(tempEvent);
+                  }}
+                  className="w-full"
+                >
+                  + Add Sub-Event
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sub-Event Creation Dialog */}
+      <Dialog open={isSubEventDialogOpen} onOpenChange={setIsSubEventDialogOpen}>
+        <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Sub-Event</DialogTitle>
+            <DialogDescription>
+              Creating a sub-event for: {parentEventForSubEvent?.title}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="sub-title">Title</Label>
+              <Input
+                id="sub-title"
+                value={newSubEvent.title}
+                onChange={(e) => setNewSubEvent({ ...newSubEvent, title: e.target.value })}
+                placeholder="Enter sub-event title"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="sub-description">Description</Label>
+              <Textarea
+                id="sub-description"
+                value={newSubEvent.description}
+                onChange={(e) => setNewSubEvent({ ...newSubEvent, description: e.target.value })}
+                placeholder="Enter sub-event description"
+                className="min-h-[80px]"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Event Type</Label>
+                <Select
+                  value={newSubEvent.event_type}
+                  onValueChange={(value) => setNewSubEvent({ ...newSubEvent, event_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="meeting">Meeting</SelectItem>
+                    <SelectItem value="task">Task</SelectItem>
+                    <SelectItem value="personal">Personal</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Priority</Label>
+                <Select
+                  value={newSubEvent.priority}
+                  onValueChange={(value) => setNewSubEvent({ ...newSubEvent, priority: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="sub-start-time">Start Time</Label>
+                <Input
+                  id="sub-start-time"
+                  type="datetime-local"
+                  value={newSubEvent.start_time}
+                  onChange={(e) => setNewSubEvent({ ...newSubEvent, start_time: e.target.value })}
+                />
+              </div>
+              {!newSubEvent.all_day && (
+                <div className="grid gap-2">
+                  <Label htmlFor="sub-end-time">End Time</Label>
+                  <Input
+                    id="sub-end-time"
+                    type="datetime-local"
+                    value={newSubEvent.end_time}
+                    onChange={(e) => setNewSubEvent({ ...newSubEvent, end_time: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="sub-all-day"
+                checked={newSubEvent.all_day}
+                onChange={(e) => setNewSubEvent({ ...newSubEvent, all_day: e.target.checked })}
+              />
+              <Label htmlFor="sub-all-day">All day event</Label>
+            </div>
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2">
+              <Button variant="outline" onClick={() => setIsSubEventDialogOpen(false)} className="w-full sm:w-auto">
+                Cancel
+              </Button>
+              <Button onClick={createSubEvent} className="w-full sm:w-auto">Create Sub-Event</Button>
             </div>
           </div>
         </DialogContent>
