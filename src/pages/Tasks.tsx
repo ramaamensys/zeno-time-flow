@@ -778,7 +778,7 @@ const Tasks = () => {
           {selectedEvent && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center justify-between">
+                <DialogTitle className="flex items-center justify-between pr-12">
                   {selectedEvent.title}
                   <Button
                     variant="outline"
