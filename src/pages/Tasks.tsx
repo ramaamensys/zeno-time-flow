@@ -700,12 +700,27 @@ const Tasks = () => {
                       </div>
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                         <div className="flex items-center">
-                          <Calendar className="w-4 h-4 mr-1" />
-                          {event.all_day ? (
-                            format(new Date(event.start_time), "MMM dd, yyyy")
-                          ) : (
-                            format(new Date(event.start_time), "MMM dd, h:mm a")
-                          )}
+      <Calendar className="w-4 h-4 mr-1" />
+      {event.all_day ? (
+        <>
+          {format(new Date(event.start_time), "MMM dd, yyyy")}
+          {event.end_time && event.end_time !== event.start_time && (
+            <> - {format(new Date(event.end_time), "MMM dd, yyyy")}</>
+          )}
+        </>
+      ) : (
+        <>
+          {format(new Date(event.start_time), "MMM dd, h:mm a")}
+          {event.end_time && event.end_time !== event.start_time && (
+            <>
+              {" - "}
+              {new Date(event.start_time).toDateString() === new Date(event.end_time).toDateString()
+                ? format(new Date(event.end_time), "h:mm a")
+                : format(new Date(event.end_time), "MMM dd, h:mm a")}
+            </>
+          )}
+        </>
+      )}
                         </div>
                         <div className="flex items-center">
                           <User className="w-4 h-4 mr-1" />
@@ -752,12 +767,27 @@ const Tasks = () => {
                             </div>
                             <div className="flex items-center space-x-4 text-sm text-muted-foreground ml-6">
                               <div className="flex items-center">
-                                <Calendar className="w-3 h-3 mr-1" />
-                                {subTask.all_day ? (
-                                  format(new Date(subTask.start_time), "MMM dd")
-                                ) : (
-                                  format(new Date(subTask.start_time), "MMM dd, h:mm a")
-                                )}
+        <Calendar className="w-3 h-3 mr-1" />
+        {subTask.all_day ? (
+          <>
+            {format(new Date(subTask.start_time), "MMM dd")}
+            {subTask.end_time && subTask.end_time !== subTask.start_time && (
+              <> - {format(new Date(subTask.end_time), "MMM dd")}</>
+            )}
+          </>
+        ) : (
+          <>
+            {format(new Date(subTask.start_time), "MMM dd, h:mm a")}
+            {subTask.end_time && subTask.end_time !== subTask.start_time && (
+              <>
+                {" - "}
+                {new Date(subTask.start_time).toDateString() === new Date(subTask.end_time).toDateString()
+                  ? format(new Date(subTask.end_time), "h:mm a")
+                  : format(new Date(subTask.end_time), "MMM dd, h:mm a")}
+              </>
+            )}
+          </>
+        )}
                               </div>
                             </div>
                           </div>
