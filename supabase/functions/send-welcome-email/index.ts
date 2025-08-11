@@ -1,7 +1,17 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const smtpClient = new SMTPClient({
+  connection: {
+    hostname: Deno.env.get("SMTP_HOST") || "smtp.hostinger.com",
+    port: parseInt(Deno.env.get("SMTP_PORT") || "465"),
+    tls: true,
+    auth: {
+      username: Deno.env.get("SMTP_USER") || "",
+      password: Deno.env.get("SMTP_PASSWORD") || "",
+    },
+  },
+});
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,21 +37,22 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Sending welcome email to: ${email}`);
 
-    const emailResponse = await resend.emails.send({
+    const emailResponse = await smtpClient.send({
       from: "ZenoTimeFlow <info@zenotimeflow.com>",
-      to: [email],
+      to: email,
       subject: "Welcome to Our Team - Your Account is Ready!",
+      content: "auto",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">🎉 Welcome to Our Team!</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">🎉 Welcome to ZenoTimeFlow!</h1>
           </div>
           
           <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
             <h2 style="color: #333; margin-top: 0;">Hello ${full_name || 'there'}!</h2>
             
             <p style="color: #555; line-height: 1.6; font-size: 16px;">
-              We're thrilled to welcome you to our team! 🌟 Your account has been set up and you're all ready to get started. 
+              We're thrilled to welcome you to ZenoTimeFlow! 🌟 Your account has been set up and you're all ready to get started. 
               Below are your login credentials to access the platform:
             </p>
             
@@ -60,7 +71,7 @@ const handler = async (req: Request): Promise<Response> => {
             <div style="text-align: center; margin: 30px 0;">
               <a href="${Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.lovable.app') || 'https://your-app.lovable.app'}/auth" 
                  style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-                Login to TeamSync
+                Login to ZenoTimeFlow
               </a>
             </div>
             
@@ -71,7 +82,7 @@ const handler = async (req: Request): Promise<Response> => {
             <hr style="border: none; height: 1px; background: #ddd; margin: 30px 0;">
             
             <p style="color: #999; font-size: 12px; text-align: center; margin: 0;">
-              This email was sent automatically from TeamSync. Please do not reply to this email.
+              This email was sent automatically from ZenoTimeFlow. Please do not reply to this email.
             </p>
           </div>
         </div>
