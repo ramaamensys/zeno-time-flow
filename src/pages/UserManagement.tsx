@@ -175,18 +175,22 @@ export default function UserManagement() {
 
     setIsCreating(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
+      // Create user with admin privileges using the service role
+      const { data, error } = await supabase.auth.admin.createUser({
         email: newUser.email,
         password: newUser.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            full_name: newUser.full_name,
-          }
-        }
+        user_metadata: {
+          full_name: newUser.full_name,
+        },
+        email_confirm: true // Skip email confirmation for admin-created users
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Auth admin createUser error:', error);
+        throw error;
+      }
+
+      console.log('User created successfully:', data);
 
       if (data.user) {
         // Update user role if not default
