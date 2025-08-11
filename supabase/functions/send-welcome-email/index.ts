@@ -1,74 +1,13 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { Resend } from "npm:resend@2.0.0";
+
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
-
-async function sendSMTPEmail(to: string, subject: string, htmlContent: string) {
-  const smtpHost = Deno.env.get("SMTP_HOST") || "smtp.hostinger.com";
-  const smtpPort = parseInt(Deno.env.get("SMTP_PORT") || "465");
-  const smtpUser = Deno.env.get("SMTP_USER") || "";
-  const smtpPassword = Deno.env.get("SMTP_PASSWORD") || "";
-  
-  // Create the email content
-  const boundary = "boundary_" + Math.random().toString(36).substring(2);
-  const emailContent = [
-    `From: ZenoTimeFlow <${smtpUser}>`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    `MIME-Version: 1.0`,
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    ``,
-    `--${boundary}`,
-    `Content-Type: text/html; charset=UTF-8`,
-    `Content-Transfer-Encoding: 7bit`,
-    ``,
-    htmlContent,
-    ``,
-    `--${boundary}--`
-  ].join('\r\n');
-
-  try {
-    // Use Deno's built-in TCP connection for SMTP
-    const conn = await Deno.connectTls({
-      hostname: smtpHost,
-      port: smtpPort,
-    });
-
-    const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
-
-    // Helper function to send command and read response
-    async function sendCommand(command: string): Promise<string> {
-      await conn.write(encoder.encode(command + '\r\n'));
-      const buffer = new Uint8Array(1024);
-      const n = await conn.read(buffer);
-      return decoder.decode(buffer.subarray(0, n || 0));
-    }
-
-    // SMTP conversation
-    const greeting = await sendCommand('');
-    console.log('SMTP Greeting:', greeting);
-    
-    await sendCommand('EHLO zenotimeflow.com');
-    await sendCommand(`AUTH LOGIN`);
-    await sendCommand(btoa(smtpUser));
-    await sendCommand(btoa(smtpPassword));
-    await sendCommand(`MAIL FROM:<${smtpUser}>`);
-    await sendCommand(`RCPT TO:<${to}>`);
-    await sendCommand('DATA');
-    await sendCommand(emailContent + '\r\n.');
-    await sendCommand('QUIT');
-
-    conn.close();
-    return { success: true };
-  } catch (error) {
-    console.error('SMTP Error:', error);
-    return { success: false, error: error.message };
-  }
-}
 
 interface WelcomeEmailRequest {
   email: string;
@@ -134,7 +73,12 @@ const handler = async (req: Request): Promise<Response> => {
       </div>
     `;
 
-    const emailResponse = await sendSMTPEmail(email, "Welcome to ZenoTimeFlow - Your Account is Ready!", htmlContent);
+    const emailResponse = await resend.emails.send({
+      from: "ZenoTimeFlow <onboarding@resend.dev>",
+      to: [email],
+      subject: "Welcome to ZenoTimeFlow - Your Account is Ready!",
+      html: htmlContent,
+    });
 
     console.log("Welcome email sent successfully:", emailResponse);
 
