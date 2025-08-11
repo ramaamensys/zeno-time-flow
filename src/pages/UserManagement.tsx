@@ -207,7 +207,8 @@ export default function UserManagement() {
       // Send welcome email (optional)
       let emailSent = false;
       try {
-        await supabase.functions.invoke('send-welcome-email', {
+        console.log('Attempting to send welcome email for:', newUser.email);
+        const emailResponse = await supabase.functions.invoke('send-welcome-email', {
           body: {
             email: newUser.email,
             full_name: newUser.full_name,
@@ -215,6 +216,14 @@ export default function UserManagement() {
             password: newUser.password
           }
         });
+        
+        console.log('Email function response:', emailResponse);
+        
+        if (emailResponse.error) {
+          console.error('Email function returned error:', emailResponse.error);
+          throw new Error(emailResponse.error.message || 'Email sending failed');
+        }
+        
         emailSent = true;
         console.log('Welcome email sent successfully');
       } catch (emailError) {
