@@ -243,13 +243,21 @@ export default function UserManagement() {
     }
 
     try {
+      console.log('Deleting user:', userId, userEmail);
+      
       // Mark user as deleted in profiles table
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('profiles')
         .update({ status: 'deleted' })
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Deletion error:', error);
+        throw error;
+      }
+
+      console.log('Deletion successful, updated records:', data);
 
       // Force reload users data from server
       setUsers([]);
@@ -257,7 +265,7 @@ export default function UserManagement() {
 
       toast({
         title: "Success", 
-        description: "User deleted successfully",
+        description: "User marked as deleted successfully",
       });
     } catch (error: any) {
       console.error('Error deleting user:', error);
