@@ -91,10 +91,11 @@ export default function UserManagement() {
 
   const loadUsers = async () => {
     try {
-      // First get all profiles
+      // First get all profiles that are not deleted
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
+        .neq('status', 'deleted')
         .order('created_at', { ascending: false });
 
       if (profilesError) throw profilesError;
