@@ -347,17 +347,32 @@ const Tasks = () => {
       return;
     }
 
+    // For RLS compliance: 
+    // - If current user is the parent task owner, use current user's ID
+    // - If admin is creating sub-task for another user, use admin's ID but assign to parent task
+    const currentUserId = user?.id;
+    const taskOwnerId = parentTaskForSubTask.user_id;
+    
+    // Check if current user can create sub-task for this parent
+    if (!isAdminUser && currentUserId !== taskOwnerId) {
+      toast({
+        title: "Permission denied",
+        description: "You can only create sub-tasks for your own tasks",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const subTaskData = {
       title: newSubTask.title,
       description: newSubTask.description || null,
       priority: newSubTask.priority,
-      // Convert datetime-local to proper timestamp without timezone conversion (optional now)
       start_time: newSubTask.start_time ? new Date(newSubTask.start_time).toISOString() : null,
       end_time: newSubTask.end_time ? new Date(newSubTask.end_time).toISOString() : (newSubTask.start_time ? new Date(newSubTask.start_time).toISOString() : null),
       all_day: newSubTask.all_day,
       event_type: newSubTask.event_type,
-      // Ensure the sub-task gets the same user_id as the parent task for RLS compliance
-      user_id: parentTaskForSubTask.user_id,
+      // Always use current user's ID for RLS compliance
+      user_id: currentUserId,
       parent_task_id: parentTaskForSubTask.id,
     };
 
