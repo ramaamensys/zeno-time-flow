@@ -74,7 +74,7 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     const emailResponse = await resend.emails.send({
-      from: "ZenoTimeFlow <onboarding@resend.dev>",
+      from: "ZenoTimeFlow <noreply@zenotimeflow.com>",
       to: [email],
       subject: "Welcome to ZenoTimeFlow - Your Account is Ready!",
       html: htmlContent,
