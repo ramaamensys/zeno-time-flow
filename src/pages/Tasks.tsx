@@ -1269,13 +1269,25 @@ const Tasks = () => {
                   />
                 </div>
               </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                  Cancel
+              <div className="flex justify-between">
+                <Button 
+                  variant="destructive" 
+                  onClick={() => {
+                    deleteEvent(selectedEvent.id);
+                    setIsEditDialogOpen(false);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
                 </Button>
-                <Button onClick={() => updateEvent(selectedEvent)}>
-                  Update Task
-                </Button>
+                <div className="flex space-x-2">
+                  <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => updateEvent(selectedEvent)}>
+                    Update Task
+                  </Button>
+                </div>
               </div>
             </>
           )}
