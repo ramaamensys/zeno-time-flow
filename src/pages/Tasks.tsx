@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Calendar, Clock, Flag, CheckSquare, Trash2, Filter, User, X, ChevronRight, List } from "lucide-react";
+import { Plus, Calendar, Clock, Flag, CheckSquare, Trash2, Filter, User, X, ChevronRight, List, Edit, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -26,6 +26,8 @@ interface CalendarEvent {
   created_at: string;
   user_id: string;
   parent_task_id?: string | null;
+  completed?: boolean;
+  completed_at?: string | null;
   profiles?: {
     full_name: string | null;
     email: string;
@@ -51,6 +53,7 @@ const Tasks = () => {
   const [isSubTaskDialogOpen, setIsSubTaskDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [parentTaskForSubTask, setParentTaskForSubTask] = useState<CalendarEvent | null>(null);
   const [filters, setFilters] = useState({
     teamMember: "all",
@@ -83,9 +86,15 @@ const Tasks = () => {
   useEffect(() => {
     if (user) {
       fetchUserRole();
-      fetchEvents();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user && userRole !== null) {
+      fetchEvents();
+      setupRealtimeSubscription();
+    }
+  }, [user, userRole]);
 
   useEffect(() => {
     if (userRole === 'admin' || userRole === 'super_admin') {
@@ -96,6 +105,27 @@ const Tasks = () => {
   useEffect(() => {
     applyFilters();
   }, [events, filters]);
+
+  const setupRealtimeSubscription = () => {
+    const channel = supabase
+      .channel('tasks-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'calendar_events'
+        },
+        () => {
+          fetchEvents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
 
   const fetchUserRole = async () => {
     if (!user) {
@@ -128,12 +158,14 @@ const Tasks = () => {
   };
 
   const fetchEvents = async () => {
+    if (!user || userRole === null) return;
+    
     // First get the events based on user role
     let eventsQuery = supabase.from("calendar_events").select("*");
     
     // Admin/super_admin see all tasks, regular users see only their own
     if (userRole !== 'admin' && userRole !== 'super_admin') {
-      eventsQuery = eventsQuery.eq('user_id', user?.id);
+      eventsQuery = eventsQuery.eq('user_id', user.id);
     }
     // For admins, don't filter - show all events
     
@@ -399,6 +431,63 @@ const Tasks = () => {
       });
       setIsDetailDialogOpen(false);
       setSelectedEvent(null);
+      fetchEvents();
+    }
+  };
+
+  const updateEvent = async (updatedEvent: CalendarEvent) => {
+    const { error } = await supabase
+      .from("calendar_events")
+      .update({
+        title: updatedEvent.title,
+        description: updatedEvent.description,
+        priority: updatedEvent.priority,
+        start_time: updatedEvent.start_time,
+        end_time: updatedEvent.end_time,
+        all_day: updatedEvent.all_day,
+        event_type: updatedEvent.event_type,
+      })
+      .eq("id", updatedEvent.id);
+
+    if (error) {
+      toast({
+        title: "Error updating task",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Task updated",
+        description: "The task has been updated successfully",
+      });
+      setIsEditDialogOpen(false);
+      setSelectedEvent(null);
+      fetchEvents();
+    }
+  };
+
+  const toggleTaskCompletion = async (eventId: string, completed: boolean) => {
+    const { error } = await supabase
+      .from("calendar_events")
+      .update({
+        completed: completed,
+        completed_at: completed ? new Date().toISOString() : null,
+      })
+      .eq("id", eventId);
+
+    if (error) {
+      toast({
+        title: "Error updating task",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: completed ? "Task completed" : "Task reopened",
+        description: completed 
+          ? "The task has been marked as completed" 
+          : "The task has been reopened",
+      });
       fetchEvents();
     }
   };
@@ -793,13 +882,7 @@ const Tasks = () => {
               <Card className="hover:shadow-md transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between">
-                    <div 
-                      className="space-y-1 flex-1 cursor-pointer"
-                      onClick={() => {
-                        setSelectedEvent(event);
-                        setIsDetailDialogOpen(true);
-                      }}
-                    >
+                     <div className="space-y-1 flex-1">
                        <div className="flex items-center space-x-2">
                          <CardTitle className="text-lg">{event.title}</CardTitle>
                          <Badge variant={getPriorityColor(event.priority)}>
@@ -863,19 +946,38 @@ const Tasks = () => {
                              {event.profiles?.full_name || event.profiles?.email || "Unknown"}
                            </div>
                          )}
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openSubTaskDialog(event);
-                      }}
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add Sub-task
-                    </Button>
+                       </div>
+                     </div>
+                     <div className="flex gap-2">
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         onClick={() => toggleTaskCompletion(event.id, !event.completed)}
+                         className={event.completed ? "bg-green-100 text-green-800" : ""}
+                       >
+                         <Check className="w-4 h-4 mr-1" />
+                         {event.completed ? "Completed" : "Mark Complete"}
+                       </Button>
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         onClick={() => {
+                           setSelectedEvent(event);
+                           setIsEditDialogOpen(true);
+                         }}
+                       >
+                         <Edit className="w-4 h-4 mr-1" />
+                         Edit
+                       </Button>
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         onClick={() => openSubTaskDialog(event)}
+                       >
+                         <Plus className="w-4 h-4 mr-1" />
+                         Add Sub-task
+                       </Button>
+                     </div>
                   </div>
                 </CardHeader>
               </Card>
@@ -883,25 +985,26 @@ const Tasks = () => {
               {/* Sub-tasks */}
               {event.sub_tasks && event.sub_tasks.length > 0 && (
                 <div className="ml-6 space-y-2">
-                  {event.sub_tasks.map((subTask) => (
-                    <Card 
-                      key={subTask.id} 
-                      className="cursor-pointer hover:shadow-sm transition-shadow bg-muted/30 border-l-4 border-l-primary"
-                      onClick={() => {
-                        setSelectedEvent(subTask);
-                        setIsDetailDialogOpen(true);
-                      }}
-                    >
+                   {event.sub_tasks.map((subTask) => (
+                     <Card 
+                       key={subTask.id} 
+                       className="hover:shadow-sm transition-shadow bg-muted/30 border-l-4 border-l-primary"
+                     >
                       <CardHeader className="py-3">
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-1">
-                            <div className="flex items-center space-x-2">
-                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                              <CardTitle className="text-base">{subTask.title}</CardTitle>
-                              <Badge variant={getPriorityColor(subTask.priority)} className="text-xs">
-                                {subTask.priority}
-                              </Badge>
-                            </div>
+                         <div className="flex items-start justify-between">
+                           <div className="space-y-1 flex-1">
+                             <div className="flex items-center space-x-2">
+                               <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                               <CardTitle className="text-base">{subTask.title}</CardTitle>
+                               <Badge variant={getPriorityColor(subTask.priority)} className="text-xs">
+                                 {subTask.priority}
+                               </Badge>
+                               {subTask.completed && (
+                                 <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                                   Completed
+                                 </Badge>
+                               )}
+                             </div>
                             <div className="flex items-center space-x-4 text-sm text-muted-foreground ml-6">
                               <div className="flex items-center">
          <Calendar className="w-3 h-3 mr-1" />
@@ -938,9 +1041,31 @@ const Tasks = () => {
            </>
          )}
                               </div>
-                            </div>
-                          </div>
-                        </div>
+                             </div>
+                           </div>
+                           <div className="flex gap-2">
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={() => toggleTaskCompletion(subTask.id, !subTask.completed)}
+                               className={subTask.completed ? "bg-green-100 text-green-800" : ""}
+                             >
+                               <Check className="w-4 h-4 mr-1" />
+                               {subTask.completed ? "Done" : "Complete"}
+                             </Button>
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={() => {
+                                 setSelectedEvent(subTask);
+                                 setIsEditDialogOpen(true);
+                               }}
+                             >
+                               <Edit className="w-4 h-4 mr-1" />
+                               Edit
+                             </Button>
+                           </div>
+                         </div>
                       </CardHeader>
                     </Card>
                   ))}
@@ -1046,6 +1171,101 @@ const Tasks = () => {
                     {format(new Date(selectedEvent.created_at), "MMMM dd, yyyy 'at' h:mm a")}
                   </p>
                 </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Task Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          {selectedEvent && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Edit Task</DialogTitle>
+                <DialogDescription>
+                  Update the details of "{selectedEvent.title}".
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-title">Title</Label>
+                  <Input
+                    id="edit-title"
+                    value={selectedEvent.title}
+                    onChange={(e) => setSelectedEvent({ ...selectedEvent, title: e.target.value })}
+                    placeholder="Enter task title"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-description">Description</Label>
+                  <Textarea
+                    id="edit-description"
+                    value={selectedEvent.description || ""}
+                    onChange={(e) => setSelectedEvent({ ...selectedEvent, description: e.target.value })}
+                    placeholder="Enter task description"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Priority</Label>
+                  <Select
+                    value={selectedEvent.priority}
+                    onValueChange={(value) => setSelectedEvent({ ...selectedEvent, priority: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Event Type</Label>
+                  <Select
+                    value={selectedEvent.event_type}
+                    onValueChange={(value) => setSelectedEvent({ ...selectedEvent, event_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="task">Task</SelectItem>
+                      <SelectItem value="meeting">Meeting</SelectItem>
+                      <SelectItem value="reminder">Reminder</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-start_time">Start Time</Label>
+                  <Input
+                    id="edit-start_time"
+                    type="datetime-local"
+                    value={selectedEvent.start_time ? format(new Date(selectedEvent.start_time), "yyyy-MM-dd'T'HH:mm") : ""}
+                    onChange={(e) => setSelectedEvent({ ...selectedEvent, start_time: new Date(e.target.value).toISOString() })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-end_time">End Time</Label>
+                  <Input
+                    id="edit-end_time"
+                    type="datetime-local"
+                    value={selectedEvent.end_time ? format(new Date(selectedEvent.end_time), "yyyy-MM-dd'T'HH:mm") : ""}
+                    onChange={(e) => setSelectedEvent({ ...selectedEvent, end_time: new Date(e.target.value).toISOString() })}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={() => updateEvent(selectedEvent)}>
+                  Update Task
+                </Button>
               </div>
             </>
           )}
