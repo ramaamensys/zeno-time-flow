@@ -175,14 +175,24 @@ export default function UserManagement() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
 
       console.log('User creation response:', data);
 
       toast({
         title: "Success",
-        description: data?.message || "User created successfully and welcome email sent",
+        description: "User created successfully. Welcome email will be sent shortly.",
       });
+
+      // Clear the form
+      setNewUser({ email: "", full_name: "", role: "user", password: "" });
+      setIsDialogOpen(false);
+      
+      // Reload users to show the new user
+      await loadUsers();
 
       setIsDialogOpen(false);
       setNewUser({ email: "", full_name: "", password: "", role: "user" });
@@ -247,9 +257,10 @@ export default function UserManagement() {
 
       toast({
         title: "Success",
-        description: "User marked as deleted successfully",
+        description: "User deleted successfully",
       });
 
+      // Reload users to refresh the list immediately
       await loadUsers();
     } catch (error: any) {
       console.error('Error deleting user:', error);
