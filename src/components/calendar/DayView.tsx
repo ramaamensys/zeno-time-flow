@@ -124,18 +124,18 @@ export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onD
                   // Only render the event in its starting hour to avoid duplicates
                   if (startHour !== hour) return null;
                   
-                  const width = overlappingCount > 1 ? `${100 / overlappingCount}%` : '100%';
-                  const left = overlappingCount > 1 ? `${(position * 100) / overlappingCount}%` : '0%';
+                  const width = overlappingCount > 1 ? `${90 / overlappingCount}%` : '95%';
+                  const left = overlappingCount > 1 ? `${(position * 85) / overlappingCount + 2}%` : '2%';
                   
                   return (
                     <div
                       key={event.id}
                       className={cn(
-                        "p-2 rounded text-gray-800 cursor-pointer hover:opacity-80 absolute z-10 border border-gray-300",
+                        "p-2 rounded text-gray-800 cursor-pointer hover:opacity-80 absolute z-10 border border-gray-300 overflow-hidden",
                         getEventStyling(event, isOverdue)
                       )}
                       style={{ 
-                        height: `${height}px`,
+                        height: `${Math.max(height, 25)}px`,
                         top: `${minuteOffset}px`,
                         width: width,
                         left: left,

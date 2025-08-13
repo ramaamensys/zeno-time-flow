@@ -141,19 +141,9 @@ const Calendar = () => {
       .select("*")
       .order("start_time", { ascending: true });
 
-    // Admin privacy: only show tasks (assigned/created by others) and their own events
-    // Users see only their own events
-    if (roleData?.role === "super_admin" || roleData?.role === "admin") {
-      // Admins see only:
-      // 1. Their own events (personal calendar)
-      // 2. Tasks assigned to users (event_type = 'task' and user_id != admin's id)
-      query = query.or(`user_id.eq.${user.id},and(event_type.eq.task,user_id.neq.${user.id})`);
-    } else {
-      // Regular users see:
-      // 1. Their own events
-      // 2. Tasks assigned to them by admins
-      query = query.eq("user_id", user.id);
-    }
+    // Calendar privacy: Everyone sees only their own personal events
+    // No task visibility across users in calendar
+    query = query.eq("user_id", user.id);
 
     const { data, error } = await query;
 

@@ -124,10 +124,11 @@ const Tasks = () => {
     // First get the events based on user role
     let eventsQuery = supabase.from("calendar_events").select("*");
     
-    // If user is not admin/super_admin, show their own tasks AND tasks assigned to them
+    // Admin/super_admin see all tasks, regular users see only their own
     if (userRole !== 'admin' && userRole !== 'super_admin') {
       eventsQuery = eventsQuery.eq('user_id', user?.id);
     }
+    // For admins, don't filter - show all events
     
     const { data: eventsData, error: eventsError } = await eventsQuery
       .order("start_time", { ascending: true });
