@@ -29,6 +29,11 @@ const handler = async (req: Request): Promise<Response> => {
     const { email, full_name, role, password }: WelcomeEmailRequest = await req.json();
 
     console.log(`Sending welcome email to: ${email}`);
+    console.log('Resend API Key configured:', !!Deno.env.get("RESEND_API_KEY"));
+
+    if (!Deno.env.get("RESEND_API_KEY")) {
+      throw new Error("RESEND_API_KEY is not configured");
+    }
 
     // Direct login link to ZenoTimeFlow project
     const loginLink = 'https://zenotimeflow.com/auth';
@@ -85,6 +90,11 @@ const handler = async (req: Request): Promise<Response> => {
       subject: "Welcome to ZenoTimeFlow - Your Account Details!",
       html: htmlContent,
     });
+
+    if (emailResponse.error) {
+      console.error("Resend error:", emailResponse.error);
+      throw new Error(`Email sending failed: ${emailResponse.error.message}`);
+    }
 
     console.log("Welcome email sent successfully:", emailResponse);
 

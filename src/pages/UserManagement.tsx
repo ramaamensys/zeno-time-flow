@@ -187,15 +187,11 @@ export default function UserManagement() {
         description: "User created successfully. Welcome email will be sent shortly.",
       });
 
-      // Clear the form
+      // Clear the form and close dialog
       setNewUser({ email: "", full_name: "", role: "user", password: "" });
       setIsDialogOpen(false);
       
       // Reload users to show the new user
-      await loadUsers();
-
-      setIsDialogOpen(false);
-      setNewUser({ email: "", full_name: "", password: "", role: "user" });
       await loadUsers();
     } catch (error: any) {
       console.error('Error creating user:', error);
@@ -255,13 +251,14 @@ export default function UserManagement() {
 
       if (error) throw error;
 
+      // Force reload users data from server
+      setUsers([]);
+      await loadUsers();
+
       toast({
-        title: "Success",
+        title: "Success", 
         description: "User deleted successfully",
       });
-
-      // Reload users to refresh the list immediately
-      await loadUsers();
     } catch (error: any) {
       console.error('Error deleting user:', error);
       toast({
