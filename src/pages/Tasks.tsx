@@ -45,6 +45,7 @@ const Tasks = () => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<CalendarEvent[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubTaskDialogOpen, setIsSubTaskDialogOpen] = useState(false);
@@ -79,20 +80,54 @@ const Tasks = () => {
 
   useEffect(() => {
     if (user) {
+      fetchUserRole();
       fetchEvents();
-      fetchTeamMembers();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (userRole === 'admin' || userRole === 'super_admin') {
+      fetchTeamMembers();
+    }
+  }, [userRole]);
 
   useEffect(() => {
     applyFilters();
   }, [events, filters]);
 
+  const fetchUserRole = async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+    
+    if (data && data.length > 0) {
+      // Check for highest role priority: super_admin > admin > user
+      const roles = data.map(item => item.role);
+      if (roles.includes('super_admin')) {
+        setUserRole('super_admin');
+      } else if (roles.includes('admin')) {
+        setUserRole('admin');
+      } else {
+        setUserRole('user');
+      }
+    } else {
+      setUserRole('user');
+    }
+  };
+
   const fetchEvents = async () => {
-    // First get the events
-    const { data: eventsData, error: eventsError } = await supabase
-      .from("calendar_events")
-      .select("*")
+    // First get the events based on user role
+    let eventsQuery = supabase.from("calendar_events").select("*");
+    
+    // If user is not admin/super_admin, only show their own tasks
+    if (userRole !== 'admin' && userRole !== 'super_admin') {
+      eventsQuery = eventsQuery.eq('user_id', user?.id);
+    }
+    
+    const { data: eventsData, error: eventsError } = await eventsQuery
       .order("start_time", { ascending: true });
 
     if (eventsError) {
@@ -137,6 +172,9 @@ const Tasks = () => {
   };
 
   const fetchTeamMembers = async () => {
+    // Only fetch team members for admins
+    if (userRole !== 'admin' && userRole !== 'super_admin') return;
+    
     const { data, error } = await supabase
       .from("profiles")
       .select("user_id, full_name, email");
@@ -151,40 +189,44 @@ const Tasks = () => {
   const applyFilters = () => {
     let filtered = [...events];
 
-    if (filters.teamMember && filters.teamMember !== "all") {
-      filtered = filtered.filter(event => event.user_id === filters.teamMember);
-    }
+    // Only apply filters for admins
+    if (userRole === 'admin' || userRole === 'super_admin') {
 
-    if (filters.priority && filters.priority !== "all") {
-      filtered = filtered.filter(event => event.priority === filters.priority);
-    }
+      if (filters.teamMember && filters.teamMember !== "all") {
+        filtered = filtered.filter(event => event.user_id === filters.teamMember);
+      }
 
-    if (filters.dateRange && filters.dateRange !== "all") {
-      const today = new Date();
-      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      
-      switch (filters.dateRange) {
-        case "today":
-          filtered = filtered.filter(event => {
-            const eventDate = new Date(event.start_time);
-            const startOfEventDay = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-            return startOfEventDay.getTime() === startOfToday.getTime();
-          });
-          break;
-        case "week":
-          const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-          filtered = filtered.filter(event => {
-            const eventDate = new Date(event.start_time);
-            return eventDate >= today && eventDate <= weekFromNow;
-          });
-          break;
-        case "month":
-          const monthFromNow = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
-          filtered = filtered.filter(event => {
-            const eventDate = new Date(event.start_time);
-            return eventDate >= today && eventDate <= monthFromNow;
-          });
-          break;
+      if (filters.priority && filters.priority !== "all") {
+        filtered = filtered.filter(event => event.priority === filters.priority);
+      }
+
+      if (filters.dateRange && filters.dateRange !== "all") {
+        const today = new Date();
+        const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        
+        switch (filters.dateRange) {
+          case "today":
+            filtered = filtered.filter(event => {
+              const eventDate = new Date(event.start_time);
+              const startOfEventDay = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+              return startOfEventDay.getTime() === startOfToday.getTime();
+            });
+            break;
+          case "week":
+            const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+            filtered = filtered.filter(event => {
+              const eventDate = new Date(event.start_time);
+              return eventDate >= today && eventDate <= weekFromNow;
+            });
+            break;
+          case "month":
+            const monthFromNow = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+            filtered = filtered.filter(event => {
+              const eventDate = new Date(event.start_time);
+              return eventDate >= today && eventDate <= monthFromNow;
+            });
+            break;
+        }
       }
     }
 
@@ -380,6 +422,8 @@ const Tasks = () => {
       </div>
     );
   }
+
+  const isAdminUser = userRole === 'admin' || userRole === 'super_admin';
 
   return (
     <div className="space-y-6">
@@ -582,80 +626,83 @@ const Tasks = () => {
         </Dialog>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center">
-              <Filter className="mr-2 h-4 w-4" />
-              Filters
-            </CardTitle>
-            {hasActiveFilters && (
-              <Button variant="outline" size="sm" onClick={clearFilters}>
-                <X className="mr-2 h-4 w-4" />
-                Clear Filters
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Team Member</Label>
-              <Select
-                value={filters.teamMember}
-                onValueChange={(value) => setFilters({ ...filters, teamMember: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All team members" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All team members</SelectItem>
-                  {teamMembers.map((member) => (
-                    <SelectItem key={member.user_id} value={member.user_id}>
-                      {member.full_name || member.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      
+      {/* Admin Filters - Only show for admins */}
+      {isAdminUser && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center">
+                <Filter className="mr-2 h-4 w-4" />
+                Filters
+              </CardTitle>
+              {hasActiveFilters && (
+                <Button variant="outline" size="sm" onClick={clearFilters}>
+                  <X className="mr-2 h-4 w-4" />
+                  Clear Filters
+                </Button>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label>Priority</Label>
-              <Select
-                value={filters.priority}
-                onValueChange={(value) => setFilters({ ...filters, priority: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All priorities" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All priorities</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Team Member</Label>
+                <Select
+                  value={filters.teamMember}
+                  onValueChange={(value) => setFilters({ ...filters, teamMember: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All team members" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All team members</SelectItem>
+                    {teamMembers.map((member) => (
+                      <SelectItem key={member.user_id} value={member.user_id}>
+                        {member.full_name || member.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Select
+                  value={filters.priority}
+                  onValueChange={(value) => setFilters({ ...filters, priority: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All priorities" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All priorities</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Date Range</Label>
+                <Select
+                  value={filters.dateRange}
+                  onValueChange={(value) => setFilters({ ...filters, dateRange: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All dates" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All dates</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">This Week</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Date Range</Label>
-              <Select
-                value={filters.dateRange}
-                onValueChange={(value) => setFilters({ ...filters, dateRange: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All dates" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All dates</SelectItem>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Task List */}
       <div className="grid gap-4">
@@ -721,11 +768,14 @@ const Tasks = () => {
           )}
         </>
       )}
-                        </div>
-                        <div className="flex items-center">
-                          <User className="w-4 h-4 mr-1" />
-                          {event.profiles?.full_name || event.profiles?.email || "Unknown"}
-                        </div>
+                         </div>
+                         {/* Only show user info for admins */}
+                         {isAdminUser && (
+                           <div className="flex items-center">
+                             <User className="w-4 h-4 mr-1" />
+                             {event.profiles?.full_name || event.profiles?.email || "Unknown"}
+                           </div>
+                         )}
                       </div>
                     </div>
                     <Button
@@ -864,17 +914,20 @@ const Tasks = () => {
                       </>
                     )}
                   </p>
-                </div>
+                 </div>
 
-                <div>
-                  <Label className="text-sm font-medium">Created by</Label>
-                  <div className="flex items-center mt-1">
-                    <User className="w-4 h-4 mr-2" />
-                    <span className="text-sm">
-                      {selectedEvent.profiles?.full_name || selectedEvent.profiles?.email || "Unknown"}
-                    </span>
-                  </div>
-                </div>
+                 {/* Only show creator info for admins */}
+                 {isAdminUser && (
+                   <div>
+                     <Label className="text-sm font-medium">Created by</Label>
+                     <div className="flex items-center mt-1">
+                       <User className="w-4 h-4 mr-2" />
+                       <span className="text-sm">
+                         {selectedEvent.profiles?.full_name || selectedEvent.profiles?.email || "Unknown"}
+                       </span>
+                     </div>
+                   </div>
+                 )}
 
                 <div>
                   <Label className="text-sm font-medium">Created on</Label>
