@@ -48,7 +48,7 @@ const Profile = () => {
     } else {
       setProfile({
         ...data,
-        avatar_url: data.avatar_url || null
+        avatar_url: null // Set default value since it's a new column
       });
       setFullName(data.full_name || "");
     }
