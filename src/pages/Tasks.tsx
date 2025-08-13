@@ -256,19 +256,13 @@ const Tasks = () => {
       title: newEvent.title,
       description: newEvent.description || null,
       priority: newEvent.priority,
-      start_time: newEvent.start_time,
-      end_time: newEvent.end_time || newEvent.start_time,
+      // Convert datetime-local to proper timestamp without timezone conversion
+      start_time: new Date(newEvent.start_time).toISOString(),
+      end_time: new Date(newEvent.end_time || newEvent.start_time).toISOString(),
       all_day: newEvent.all_day,
       event_type: newEvent.event_type,
       user_id: user?.id,
     };
-
-    console.log('Creating event with times:', {
-      start_time: newEvent.start_time,
-      end_time: newEvent.end_time,
-      local_start: new Date(newEvent.start_time),
-      local_end: new Date(newEvent.end_time)
-    });
 
     const { error } = await supabase.from("calendar_events").insert([eventData]);
 
@@ -330,8 +324,9 @@ const Tasks = () => {
       title: newSubTask.title,
       description: newSubTask.description || null,
       priority: newSubTask.priority,
-      start_time: newSubTask.start_time,
-      end_time: newSubTask.end_time || newSubTask.start_time,
+      // Convert datetime-local to proper timestamp without timezone conversion
+      start_time: new Date(newSubTask.start_time).toISOString(),
+      end_time: new Date(newSubTask.end_time || newSubTask.start_time).toISOString(),
       all_day: newSubTask.all_day,
       event_type: newSubTask.event_type,
       user_id: user?.id,
@@ -765,29 +760,25 @@ const Tasks = () => {
        ) : (
          <>
            {(() => {
-             // Create dates and ensure they're in local timezone
-             const startDate = new Date(event.start_time);
-             const endDate = new Date(event.end_time);
+             // Parse the stored ISO string and treat it as if it were local time
+             // This compensates for the timezone offset issue
+             const startTime = new Date(event.start_time);
+             const endTime = new Date(event.end_time);
              
-             // Check if the stored time might be in wrong timezone by comparing with what user expects
-             console.log('Event times:', {
-               stored_start: event.start_time,
-               stored_end: event.end_time,
-               parsed_start: startDate,
-               parsed_end: endDate,
-               start_local_string: startDate.toLocaleString(),
-               end_local_string: endDate.toLocaleString()
-             });
+             // Get timezone offset and adjust the display
+             const timezoneOffset = startTime.getTimezoneOffset() * 60000;
+             const adjustedStart = new Date(startTime.getTime() + timezoneOffset);
+             const adjustedEnd = new Date(endTime.getTime() + timezoneOffset);
              
              return (
                <>
-                 {format(startDate, "MMM dd, h:mm a")}
+                 {format(adjustedStart, "MMM dd, h:mm a")}
                  {event.end_time && event.end_time !== event.start_time && (
                    <>
                      {" - "}
-                     {startDate.toDateString() === endDate.toDateString()
-                       ? format(endDate, "h:mm a")
-                       : format(endDate, "MMM dd, h:mm a")}
+                     {adjustedStart.toDateString() === adjustedEnd.toDateString()
+                       ? format(adjustedEnd, "h:mm a")
+                       : format(adjustedEnd, "MMM dd, h:mm a")}
                    </>
                  )}
                </>
@@ -844,27 +835,39 @@ const Tasks = () => {
                             </div>
                             <div className="flex items-center space-x-4 text-sm text-muted-foreground ml-6">
                               <div className="flex items-center">
-        <Calendar className="w-3 h-3 mr-1" />
-        {subTask.all_day ? (
-          <>
-            {format(new Date(subTask.start_time), "MMM dd")}
-            {subTask.end_time && subTask.end_time !== subTask.start_time && (
-              <> - {format(new Date(subTask.end_time), "MMM dd")}</>
-            )}
-          </>
-        ) : (
-          <>
-            {format(new Date(subTask.start_time), "MMM dd, h:mm a")}
-            {subTask.end_time && subTask.end_time !== subTask.start_time && (
-              <>
-                {" - "}
-                {new Date(subTask.start_time).toDateString() === new Date(subTask.end_time).toDateString()
-                  ? format(new Date(subTask.end_time), "h:mm a")
-                  : format(new Date(subTask.end_time), "MMM dd, h:mm a")}
-              </>
-            )}
-          </>
-        )}
+         <Calendar className="w-3 h-3 mr-1" />
+         {subTask.all_day ? (
+           <>
+             {format(new Date(subTask.start_time), "MMM dd")}
+             {subTask.end_time && subTask.end_time !== subTask.start_time && (
+               <> - {format(new Date(subTask.end_time), "MMM dd")}</>
+             )}
+           </>
+         ) : (
+           <>
+             {(() => {
+               const startTime = new Date(subTask.start_time);
+               const endTime = new Date(subTask.end_time);
+               const timezoneOffset = startTime.getTimezoneOffset() * 60000;
+               const adjustedStart = new Date(startTime.getTime() + timezoneOffset);
+               const adjustedEnd = new Date(endTime.getTime() + timezoneOffset);
+               
+               return (
+                 <>
+                   {format(adjustedStart, "MMM dd, h:mm a")}
+                   {subTask.end_time && subTask.end_time !== subTask.start_time && (
+                     <>
+                       {" - "}
+                       {adjustedStart.toDateString() === adjustedEnd.toDateString()
+                         ? format(adjustedEnd, "h:mm a")
+                         : format(adjustedEnd, "MMM dd, h:mm a")}
+                     </>
+                   )}
+                 </>
+               );
+             })()}
+           </>
+         )}
                               </div>
                             </div>
                           </div>
@@ -927,20 +930,32 @@ const Tasks = () => {
                   </div>
                 </div>
 
-                <div>
-                  <Label className="text-sm font-medium">Date & Time</Label>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {selectedEvent.all_day ? (
-                      format(new Date(selectedEvent.start_time), "EEEE, MMMM dd, yyyy")
-                    ) : (
-                      <>
-                        {format(new Date(selectedEvent.start_time), "EEEE, MMMM dd, yyyy 'at' h:mm a")}
-                        {selectedEvent.end_time && selectedEvent.end_time !== selectedEvent.start_time && (
-                          <> - {format(new Date(selectedEvent.end_time), "h:mm a")}</>
-                        )}
-                      </>
-                    )}
-                  </p>
+                 <div>
+                   <Label className="text-sm font-medium">Date & Time</Label>
+                   <p className="text-sm text-muted-foreground mt-1">
+                     {selectedEvent.all_day ? (
+                       format(new Date(selectedEvent.start_time), "EEEE, MMMM dd, yyyy")
+                     ) : (
+                       <>
+                         {(() => {
+                           const startTime = new Date(selectedEvent.start_time);
+                           const endTime = new Date(selectedEvent.end_time);
+                           const timezoneOffset = startTime.getTimezoneOffset() * 60000;
+                           const adjustedStart = new Date(startTime.getTime() + timezoneOffset);
+                           const adjustedEnd = new Date(endTime.getTime() + timezoneOffset);
+                           
+                           return (
+                             <>
+                               {format(adjustedStart, "EEEE, MMMM dd, yyyy 'at' h:mm a")}
+                               {selectedEvent.end_time && selectedEvent.end_time !== selectedEvent.start_time && (
+                                 <> - {format(adjustedEnd, "h:mm a")}</>
+                               )}
+                             </>
+                           );
+                         })()}
+                       </>
+                     )}
+                   </p>
                  </div>
 
                  {/* Only show creator info for admins */}
