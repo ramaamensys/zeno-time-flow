@@ -62,6 +62,51 @@ export type Database = {
         }
         Relationships: []
       }
+      focus_sessions: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          duration: number | null
+          end_time: string
+          id: string
+          interruptions: number | null
+          notes: string | null
+          productivity_score: number | null
+          start_time: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          duration?: number | null
+          end_time: string
+          id?: string
+          interruptions?: number | null
+          notes?: string | null
+          productivity_score?: number | null
+          start_time: string
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          duration?: number | null
+          end_time?: string
+          id?: string
+          interruptions?: number | null
+          notes?: string | null
+          productivity_score?: number | null
+          start_time?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
