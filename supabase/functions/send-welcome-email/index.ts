@@ -37,31 +37,29 @@ const handler = async (req: Request): Promise<Response> => {
           <h2 style="color: #333; margin-top: 0;">Hello ${full_name || 'there'}!</h2>
           
           <p style="color: #555; line-height: 1.6; font-size: 16px;">
-            We're thrilled to welcome you to ZenoTimeFlow! 🌟 Your account has been set up and you're all ready to get started. 
-            Below are your login credentials to access the platform:
+            Your account has been created for ZenoTimeFlow! 🌟 To get started, you'll need to set up your password and sign in.
           </p>
           
           <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
             <p style="margin: 0; color: #333;"><strong>Email:</strong> ${email}</p>
-            <p style="margin: 10px 0 0 0; color: #333;"><strong>Temporary Password:</strong> ${password}</p>
             <p style="margin: 10px 0 0 0; color: #333;"><strong>Role:</strong> ${role.replace('_', ' ').toUpperCase()}</p>
           </div>
           
-          <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
-            <p style="margin: 0; color: #856404; font-size: 14px;">
-              <strong>Important:</strong> Please change your password after your first login for security purposes.
+          <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196f3;">
+            <p style="margin: 0; color: #0277bd; font-size: 14px;">
+              <strong>Next Steps:</strong> Click the button below to confirm your account and set up your password.
             </p>
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
             <a href="https://cnkadwvhmvwvakmpgitn.lovable.app/auth" 
                style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-              Login to ZenoTimeFlow
+              Confirm Account & Set Password
             </a>
           </div>
           
           <p style="color: #666; font-size: 14px; text-align: center; margin-top: 30px;">
-            If you have any questions, please don't hesitate to contact our support team.
+            Once you confirm your account, you'll be able to sign in and start using ZenoTimeFlow.
           </p>
           
           <hr style="border: none; height: 1px; background: #ddd; margin: 30px 0;">
