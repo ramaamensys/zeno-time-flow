@@ -40,10 +40,21 @@ export function AppSidebar() {
       const { data } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
-        .single();
+        .eq('user_id', user.id);
       
-      setUserRole(data?.role || null);
+      if (data && data.length > 0) {
+        // Check for highest role priority: super_admin > admin > user
+        const roles = data.map(item => item.role);
+        if (roles.includes('super_admin')) {
+          setUserRole('super_admin');
+        } else if (roles.includes('admin')) {
+          setUserRole('admin');
+        } else {
+          setUserRole('user');
+        }
+      } else {
+        setUserRole(null);
+      }
     };
 
     fetchUserRole();
