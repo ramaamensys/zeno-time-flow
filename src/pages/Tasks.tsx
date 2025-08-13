@@ -478,7 +478,7 @@ const Tasks = () => {
                       <SelectValue placeholder="Assign to myself" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Assign to myself</SelectItem>
+                      <SelectItem value={user?.id ?? "self"}>Assign to myself</SelectItem>
                       {teamMembers.map((member) => (
                         <SelectItem key={member.user_id} value={member.user_id}>
                           {member.full_name || member.email}
