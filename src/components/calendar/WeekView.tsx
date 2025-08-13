@@ -66,18 +66,32 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, on
 
   const getOverlappingEvents = (date: Date, hour: number) => {
     const slotEvents = getEventsForTimeSlot(date, hour);
-    return slotEvents.map((event, index) => {
-      const overlapping = slotEvents.filter((otherEvent, otherIndex) => {
-        if (otherIndex === index) return false;
+    
+    // Sort events by start time for consistent positioning
+    const sortedEvents = slotEvents.sort((a, b) => 
+      new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    );
+    
+    return sortedEvents.map((event, index) => {
+      // Find truly overlapping events (time intersection)
+      const overlapping = sortedEvents.filter((otherEvent) => {
+        if (otherEvent.id === event.id) return false;
         const eventStart = new Date(event.start_time);
         const eventEnd = new Date(event.end_time);
         const otherStart = new Date(otherEvent.start_time);
         const otherEnd = new Date(otherEvent.end_time);
         
+        // Check if times actually overlap
         return (eventStart < otherEnd && eventEnd > otherStart);
       });
       
-      return { event, overlappingCount: overlapping.length + 1, position: index };
+      const totalOverlapping = overlapping.length + 1;
+      
+      return { 
+        event, 
+        overlappingCount: totalOverlapping, 
+        position: index % totalOverlapping // Distribute positions evenly
+      };
     });
   };
 
@@ -133,8 +147,9 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, on
                     // Only render the event in its starting hour to avoid duplicates
                     if (startHour !== hour) return null;
                     
-                    const width = overlappingCount > 1 ? `${90 / overlappingCount}%` : '95%';
-                    const left = overlappingCount > 1 ? `${(position * 85) / overlappingCount + 2}%` : '2%';
+                    // Calculate width and position for side-by-side display
+                    const width = overlappingCount > 1 ? `${95 / overlappingCount}%` : '95%';
+                    const leftOffset = overlappingCount > 1 ? `${(position * 95) / overlappingCount + 1}%` : '1%';
                     
                     return (
                       <div
@@ -147,8 +162,9 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, on
                           height: `${Math.max(height, 20)}px`,
                           top: `${minuteOffset}px`,
                           width: width,
-                          left: left,
-                          right: 'auto'
+                          left: leftOffset,
+                          right: 'auto',
+                          zIndex: 10 + position // Ensure proper layering
                         }}
                         title={`${event.title} (${event.priority} priority)${isOverdue ? ' - OVERDUE' : ''}${getUserName && onUserEventClick ? ` - ${getUserName(event.user_id)}` : ''}`}
                         onClick={(e) => {
