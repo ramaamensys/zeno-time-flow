@@ -71,7 +71,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send welcome email
     try {
-      console.log('Sending welcome email...');
+      console.log('Attempting to send welcome email...');
+      console.log('Email details:', { email, full_name, role, password: '***' });
+      
       const emailResponse = await supabase.functions.invoke('send-welcome-email', {
         body: {
           email: email,
@@ -81,13 +83,17 @@ const handler = async (req: Request): Promise<Response> => {
         }
       });
 
+      console.log('Email response:', emailResponse);
+
       if (emailResponse.error) {
         console.error('Email function error:', emailResponse.error);
+        // Don't throw, just log the error
       } else {
         console.log('Welcome email sent successfully');
       }
     } catch (emailError) {
       console.error('Failed to send welcome email:', emailError);
+      console.error('Email error details:', JSON.stringify(emailError));
       // Don't fail user creation if email fails
     }
 
