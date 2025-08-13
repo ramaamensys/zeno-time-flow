@@ -102,15 +102,27 @@ export default function UserManagement() {
       // Then get roles for each user
       const usersWithRoles = await Promise.all(
         profiles.map(async (profile) => {
-          const { data: roleData } = await supabase
+          const { data: rolesData } = await supabase
             .from('user_roles')
             .select('role')
-            .eq('user_id', profile.user_id)
-            .single();
+            .eq('user_id', profile.user_id);
+
+          // Determine highest priority role
+          let highestRole = 'user';
+          if (rolesData && rolesData.length > 0) {
+            const roles = rolesData.map(r => r.role);
+            if (roles.includes('super_admin')) {
+              highestRole = 'super_admin';
+            } else if (roles.includes('admin')) {
+              highestRole = 'admin';
+            } else if (roles.includes('user')) {
+              highestRole = 'user';
+            }
+          }
 
           return {
             ...profile,
-            role: roleData?.role || 'user'
+            role: highestRole
           };
         })
       );
