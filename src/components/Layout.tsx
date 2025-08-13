@@ -23,7 +23,7 @@ const Layout = ({ children }: LayoutProps) => {
               <div className="flex items-center gap-2">
                 <SidebarTrigger />
                 <div className="flex items-center gap-3">
-                  <img src="/lovable-uploads/fa6f8e31-6e31-41cd-932c-1b8fb539d96a.png" alt="Zeno Logo" className="h-8 w-auto" />
+                  <img src="/lovable-uploads/dfd7bdde-fe82-4a7a-b7bd-d93fa625c987.png" alt="Zeno TimeFlow Logo" className="h-8 w-auto" />
                 </div>
               </div>
               
