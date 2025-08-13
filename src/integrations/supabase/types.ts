@@ -18,14 +18,15 @@ export type Database = {
         Row: {
           all_day: boolean | null
           completed: boolean | null
+          completed_at: string | null
           created_at: string | null
           description: string | null
-          end_time: string
+          end_time: string | null
           event_type: string | null
           id: string
           parent_task_id: string | null
           priority: string | null
-          start_time: string
+          start_time: string | null
           title: string
           updated_at: string | null
           user_id: string
@@ -33,14 +34,15 @@ export type Database = {
         Insert: {
           all_day?: boolean | null
           completed?: boolean | null
+          completed_at?: string | null
           created_at?: string | null
           description?: string | null
-          end_time: string
+          end_time?: string | null
           event_type?: string | null
           id?: string
           parent_task_id?: string | null
           priority?: string | null
-          start_time: string
+          start_time?: string | null
           title: string
           updated_at?: string | null
           user_id: string
@@ -48,14 +50,15 @@ export type Database = {
         Update: {
           all_day?: boolean | null
           completed?: boolean | null
+          completed_at?: string | null
           created_at?: string | null
           description?: string | null
-          end_time?: string
+          end_time?: string | null
           event_type?: string | null
           id?: string
           parent_task_id?: string | null
           priority?: string | null
-          start_time?: string
+          start_time?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string

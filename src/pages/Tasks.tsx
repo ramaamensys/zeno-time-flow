@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Calendar, Clock, Flag, CheckSquare, Trash2, Filter, User, X, ChevronRight, List, Edit, Check } from "lucide-react";
+import { Plus, Calendar, Clock, Flag, CheckSquare, Trash2, Filter, User, X, ChevronRight, List, Edit, Check, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -285,22 +286,13 @@ const Tasks = () => {
       return;
     }
 
-    if (!newEvent.start_time) {
-      toast({
-        title: "Start time required",
-        description: "Please select a start time",
-        variant: "destructive",
-      });
-      return;
-    }
-
     const eventData = {
       title: newEvent.title,
       description: newEvent.description || null,
       priority: newEvent.priority,
-      // Convert datetime-local to proper timestamp without timezone conversion
-      start_time: new Date(newEvent.start_time).toISOString(),
-      end_time: new Date(newEvent.end_time || newEvent.start_time).toISOString(),
+      // Convert datetime-local to proper timestamp without timezone conversion (optional now)
+      start_time: newEvent.start_time ? new Date(newEvent.start_time).toISOString() : null,
+      end_time: newEvent.end_time ? new Date(newEvent.end_time).toISOString() : (newEvent.start_time ? new Date(newEvent.start_time).toISOString() : null),
       all_day: newEvent.all_day,
       event_type: newEvent.event_type,
       // If admin is assigning task, use assigned_user_id, otherwise use current user
@@ -346,15 +338,6 @@ const Tasks = () => {
       return;
     }
 
-    if (!newSubTask.start_time) {
-      toast({
-        title: "Start time required",
-        description: "Please select a start time",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!parentTaskForSubTask) {
       toast({
         title: "Parent task required",
@@ -368,13 +351,13 @@ const Tasks = () => {
       title: newSubTask.title,
       description: newSubTask.description || null,
       priority: newSubTask.priority,
-      // Convert datetime-local to proper timestamp without timezone conversion
-      start_time: new Date(newSubTask.start_time).toISOString(),
-      end_time: new Date(newSubTask.end_time || newSubTask.start_time).toISOString(),
+      // Convert datetime-local to proper timestamp without timezone conversion (optional now)
+      start_time: newSubTask.start_time ? new Date(newSubTask.start_time).toISOString() : null,
+      end_time: newSubTask.end_time ? new Date(newSubTask.end_time).toISOString() : (newSubTask.start_time ? new Date(newSubTask.start_time).toISOString() : null),
       all_day: newSubTask.all_day,
       event_type: newSubTask.event_type,
-      // If admin is assigning sub-task, use assigned_user_id, otherwise use current user
-      user_id: (isAdminUser && newSubTask.assigned_user_id) ? newSubTask.assigned_user_id : user?.id,
+      // Ensure the sub-task gets the same user_id as the parent task for RLS compliance
+      user_id: parentTaskForSubTask.user_id,
       parent_task_id: parentTaskForSubTask.id,
     };
 
@@ -640,7 +623,7 @@ const Tasks = () => {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="start_time">Start Time</Label>
+                <Label htmlFor="start_time">Start Time (Optional)</Label>
                 <Input
                   id="start_time"
                   type="datetime-local"
@@ -649,7 +632,7 @@ const Tasks = () => {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="end_time">End Time</Label>
+                <Label htmlFor="end_time">End Time (Optional)</Label>
                 <Input
                   id="end_time"
                   type="datetime-local"
@@ -752,7 +735,7 @@ const Tasks = () => {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="sub-start_time">Start Time</Label>
+                <Label htmlFor="sub-start_time">Start Time (Optional)</Label>
                 <Input
                   id="sub-start_time"
                   type="datetime-local"
@@ -761,7 +744,7 @@ const Tasks = () => {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="sub-end_time">End Time</Label>
+                <Label htmlFor="sub-end_time">End Time (Optional)</Label>
                 <Input
                   id="sub-end_time"
                   type="datetime-local"
@@ -982,94 +965,106 @@ const Tasks = () => {
                 </CardHeader>
               </Card>
 
-              {/* Sub-tasks */}
+              {/* Sub-tasks Collapsible */}
               {event.sub_tasks && event.sub_tasks.length > 0 && (
-                <div className="ml-6 space-y-2">
-                   {event.sub_tasks.map((subTask) => (
-                     <Card 
-                       key={subTask.id} 
-                       className="hover:shadow-sm transition-shadow bg-muted/30 border-l-4 border-l-primary"
-                     >
-                      <CardHeader className="py-3">
-                         <div className="flex items-start justify-between">
-                           <div className="space-y-1 flex-1">
-                             <div className="flex items-center space-x-2">
-                               <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                               <CardTitle className="text-base">{subTask.title}</CardTitle>
-                               <Badge variant={getPriorityColor(subTask.priority)} className="text-xs">
-                                 {subTask.priority}
-                               </Badge>
-                               {subTask.completed && (
-                                 <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
-                                   Completed
-                                 </Badge>
-                               )}
-                             </div>
-                            <div className="flex items-center space-x-4 text-sm text-muted-foreground ml-6">
-                              <div className="flex items-center">
-         <Calendar className="w-3 h-3 mr-1" />
-         {subTask.all_day ? (
-           <>
-             {format(new Date(subTask.start_time), "MMM dd")}
-             {subTask.end_time && subTask.end_time !== subTask.start_time && (
-               <> - {format(new Date(subTask.end_time), "MMM dd")}</>
-             )}
-           </>
-         ) : (
-           <>
-             {(() => {
-               const startTime = new Date(subTask.start_time);
-               const endTime = new Date(subTask.end_time);
-               const timezoneOffset = startTime.getTimezoneOffset() * 60000;
-               const adjustedStart = new Date(startTime.getTime() + timezoneOffset);
-               const adjustedEnd = new Date(endTime.getTime() + timezoneOffset);
-               
-               return (
-                 <>
-                   {format(adjustedStart, "MMM dd, h:mm a")}
-                   {subTask.end_time && subTask.end_time !== subTask.start_time && (
-                     <>
-                       {" - "}
-                       {adjustedStart.toDateString() === adjustedEnd.toDateString()
-                         ? format(adjustedEnd, "h:mm a")
-                         : format(adjustedEnd, "MMM dd, h:mm a")}
-                     </>
-                   )}
-                 </>
-               );
-             })()}
-           </>
-         )}
+                <Collapsible className="ml-6">
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-start p-2">
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                      <span>Sub-tasks ({event.sub_tasks.length})</span>
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-2">
+                    {event.sub_tasks.map((subTask) => (
+                      <Card 
+                        key={subTask.id} 
+                        className="hover:shadow-sm transition-shadow bg-muted/30 border-l-4 border-l-primary"
+                      >
+                        <CardHeader className="py-3">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1 flex-1">
+                              <div className="flex items-center space-x-2">
+                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                <CardTitle className={`text-base ${subTask.completed ? 'line-through opacity-60' : ''}`}>
+                                  {subTask.title}
+                                </CardTitle>
+                                <Badge variant={getPriorityColor(subTask.priority)} className="text-xs">
+                                  {subTask.priority}
+                                </Badge>
+                                {subTask.completed && (
+                                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                                    Completed
+                                  </Badge>
+                                )}
                               </div>
-                             </div>
-                           </div>
-                           <div className="flex gap-2">
-                             <Button
-                               variant="outline"
-                               size="sm"
-                               onClick={() => toggleTaskCompletion(subTask.id, !subTask.completed)}
-                               className={subTask.completed ? "bg-green-100 text-green-800" : ""}
-                             >
-                               <Check className="w-4 h-4 mr-1" />
-                               {subTask.completed ? "Done" : "Complete"}
-                             </Button>
-                             <Button
-                               variant="outline"
-                               size="sm"
-                               onClick={() => {
-                                 setSelectedEvent(subTask);
-                                 setIsEditDialogOpen(true);
-                               }}
-                             >
-                               <Edit className="w-4 h-4 mr-1" />
-                               Edit
-                             </Button>
-                           </div>
-                         </div>
-                      </CardHeader>
-                    </Card>
-                  ))}
-                </div>
+                              {subTask.start_time && (
+                                <div className="flex items-center space-x-4 text-sm text-muted-foreground ml-6">
+                                  <div className="flex items-center">
+                                    <Calendar className="w-3 h-3 mr-1" />
+                                    {subTask.all_day ? (
+                                      <>
+                                        {format(new Date(subTask.start_time), "MMM dd")}
+                                        {subTask.end_time && subTask.end_time !== subTask.start_time && (
+                                          <> - {format(new Date(subTask.end_time), "MMM dd")}</>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <>
+                                        {(() => {
+                                          const startTime = new Date(subTask.start_time);
+                                          const endTime = new Date(subTask.end_time);
+                                          const timezoneOffset = startTime.getTimezoneOffset() * 60000;
+                                          const adjustedStart = new Date(startTime.getTime() + timezoneOffset);
+                                          const adjustedEnd = new Date(endTime.getTime() + timezoneOffset);
+                                          
+                                          return (
+                                            <>
+                                              {format(adjustedStart, "MMM dd, h:mm a")}
+                                              {subTask.end_time && subTask.end_time !== subTask.start_time && (
+                                                <>
+                                                  {" - "}
+                                                  {adjustedStart.toDateString() === adjustedEnd.toDateString()
+                                                    ? format(adjustedEnd, "h:mm a")
+                                                    : format(adjustedEnd, "MMM dd, h:mm a")}
+                                                </>
+                                              )}
+                                            </>
+                                          );
+                                        })()}
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleTaskCompletion(subTask.id, !subTask.completed)}
+                                className={subTask.completed ? "bg-green-100 text-green-800" : ""}
+                              >
+                                <Check className="w-4 h-4 mr-1" />
+                                {subTask.completed ? "Done" : "Complete"}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedEvent(subTask);
+                                  setIsEditDialogOpen(true);
+                                }}
+                              >
+                                <Edit className="w-4 h-4 mr-1" />
+                                Edit
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+                      </Card>
+                    ))}
+                  </CollapsibleContent>
+                </Collapsible>
               )}
             </div>
           ))
