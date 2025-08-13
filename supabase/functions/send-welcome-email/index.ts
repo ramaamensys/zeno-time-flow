@@ -30,8 +30,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Sending welcome email to: ${email}`);
 
-    // Direct login link to ZenoTimeFlow project
-    const loginLink = 'https://zenotimeflow.com/auth';
+    // Get the origin from the request headers or use a default
+    const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/') || 'https://your-app-domain.com';
+    const loginLink = `${origin}/auth`;
 
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
