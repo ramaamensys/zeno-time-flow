@@ -134,7 +134,7 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
                         </span>
                         {getUserName && (
                           <span className="text-xs opacity-80 ml-1">
-                            {getUserName(event.user_id).split(' ')[0]}
+                            {getUserName(event.user_id)?.split(' ')[0] || 'User'}
                           </span>
                         )}
                       </div>

@@ -169,7 +169,7 @@ export const WeekView = ({ currentDate, events, onTimeSlotClick, onEditEvent, on
                           <div className="flex items-center gap-1 flex-shrink-0">
                             {getUserName && (
                               <span className="text-xs opacity-75">
-                                {getUserName(event.user_id).split(' ')[0]}
+                                {getUserName(event.user_id)?.split(' ')[0] || 'User'}
                               </span>
                             )}
                             <Button

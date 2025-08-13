@@ -98,12 +98,19 @@ const Tasks = () => {
   }, [events, filters]);
 
   const fetchUserRole = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log("No user found for role fetch");
+      return;
+    }
+    
+    console.log("Fetching user role for:", user.id);
     
     const { data } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id);
+    
+    console.log("User roles data:", data);
     
     if (data && data.length > 0) {
       // Check for highest role priority: super_admin > admin > user
@@ -425,12 +432,15 @@ const Tasks = () => {
   const hasActiveFilters = filters.teamMember !== "all" || filters.priority !== "all" || filters.dateRange !== "all";
 
   if (isLoading) {
+    console.log("Tasks page loading...", { user, userRole });
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
       </div>
     );
   }
+
+  console.log("Tasks page rendering", { user, userRole, eventsCount: events.length, filteredEventsCount: filteredEvents.length });
 
   const isAdminUser = userRole === 'admin' || userRole === 'super_admin';
 
