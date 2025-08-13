@@ -56,12 +56,8 @@ const Auth = () => {
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="absolute top-4 left-4 flex items-center gap-3">
-        <div className="h-10 w-10 bg-primary rounded flex items-center justify-center">
-          <span className="text-white font-bold text-lg">Z</span>
-        </div>
-        <div className="flex flex-col">
-          <span className="font-bold text-lg leading-tight">Zeno Time Flow</span>
-        </div>
+        <img src="/lovable-uploads/dfd7bdde-fe82-4a7a-b7bd-d93fa625c987.png" alt="Zeno TimeFlow Logo" className="h-16 w-auto" />
+        <span className="text-2xl font-bold text-foreground">Zeno Time Flow</span>
       </div>
       <div className="flex items-center justify-center min-h-screen">
         <Card className="w-full max-w-md">
