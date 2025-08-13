@@ -165,13 +165,13 @@ export default function UserManagement() {
 
     setIsCreating(true);
     try {
-      // Use admin API to create confirmed users
-      const { data, error } = await supabase.auth.admin.createUser({
-        email: newUser.email,
-        password: newUser.password,
-        email_confirm: true, // This confirms the email immediately
-        user_metadata: {
+      // Call the create-user edge function
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: newUser.email,
           full_name: newUser.full_name,
+          role: newUser.role,
+          password: newUser.password
         }
       });
 
@@ -179,52 +179,9 @@ export default function UserManagement() {
 
       console.log('User creation response:', data);
 
-      if (data.user) {
-        // Update user role if not default
-        if (newUser.role !== 'user') {
-          const { error: roleError } = await supabase
-            .from('user_roles')
-            .update({ role: newUser.role })
-            .eq('user_id', data.user.id);
-
-          if (roleError) {
-            console.error('Error updating role:', roleError);
-          }
-        }
-      }
-
-      // Send welcome email (optional)
-      let emailSent = false;
-      try {
-        console.log('Attempting to send welcome email for:', newUser.email);
-        const emailResponse = await supabase.functions.invoke('send-welcome-email', {
-          body: {
-            email: newUser.email,
-            full_name: newUser.full_name,
-            role: newUser.role,
-            password: newUser.password
-          }
-        });
-        
-        console.log('Email function response:', emailResponse);
-        
-        if (emailResponse.error) {
-          console.error('Email function returned error:', emailResponse.error);
-          throw new Error(emailResponse.error.message || 'Email sending failed');
-        }
-        
-        emailSent = true;
-        console.log('Welcome email sent successfully');
-      } catch (emailError) {
-        console.error('Failed to send welcome email:', emailError);
-        // Don't fail user creation if email fails
-      }
-
       toast({
         title: "Success",
-        description: emailSent 
-          ? "User created successfully and welcome email sent"
-          : "User created successfully (email sending failed - please share credentials manually)",
+        description: data?.message || "User created successfully and welcome email sent",
       });
 
       setIsDialogOpen(false);
