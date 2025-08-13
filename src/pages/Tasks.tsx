@@ -66,6 +66,7 @@ const Tasks = () => {
     all_day: false,
     event_type: "task",
     is_primary_task: false,
+    assigned_user_id: "", // For admin task assignment
   });
 
   const [newSubTask, setNewSubTask] = useState({
@@ -76,6 +77,7 @@ const Tasks = () => {
     end_time: "",
     all_day: false,
     event_type: "task",
+    assigned_user_id: "", // For admin sub-task assignment
   });
 
   useEffect(() => {
@@ -122,7 +124,7 @@ const Tasks = () => {
     // First get the events based on user role
     let eventsQuery = supabase.from("calendar_events").select("*");
     
-    // If user is not admin/super_admin, only show their own tasks
+    // If user is not admin/super_admin, show their own tasks AND tasks assigned to them
     if (userRole !== 'admin' && userRole !== 'super_admin') {
       eventsQuery = eventsQuery.eq('user_id', user?.id);
     }
@@ -261,7 +263,8 @@ const Tasks = () => {
       end_time: new Date(newEvent.end_time || newEvent.start_time).toISOString(),
       all_day: newEvent.all_day,
       event_type: newEvent.event_type,
-      user_id: user?.id,
+      // If admin is assigning task, use assigned_user_id, otherwise use current user
+      user_id: (isAdminUser && newEvent.assigned_user_id) ? newEvent.assigned_user_id : user?.id,
     };
 
     const { error } = await supabase.from("calendar_events").insert([eventData]);
@@ -287,6 +290,7 @@ const Tasks = () => {
         all_day: false,
         event_type: "task",
         is_primary_task: false,
+        assigned_user_id: "",
       });
       fetchEvents();
     }
@@ -329,7 +333,8 @@ const Tasks = () => {
       end_time: new Date(newSubTask.end_time || newSubTask.start_time).toISOString(),
       all_day: newSubTask.all_day,
       event_type: newSubTask.event_type,
-      user_id: user?.id,
+      // If admin is assigning sub-task, use assigned_user_id, otherwise use current user
+      user_id: (isAdminUser && newSubTask.assigned_user_id) ? newSubTask.assigned_user_id : user?.id,
       parent_task_id: parentTaskForSubTask.id,
     };
 
@@ -355,6 +360,7 @@ const Tasks = () => {
         end_time: "",
         all_day: false,
         event_type: "task",
+        assigned_user_id: "",
       });
       setParentTaskForSubTask(null);
       fetchEvents();
@@ -459,6 +465,29 @@ const Tasks = () => {
                 />
                 <Label htmlFor="primary-task">Primary Task</Label>
               </div>
+
+              {/* User Assignment - Only for Admins */}
+              {isAdminUser && (
+                <div className="grid gap-2">
+                  <Label>Assign to User</Label>
+                  <Select
+                    value={newEvent.assigned_user_id}
+                    onValueChange={(value) => setNewEvent({ ...newEvent, assigned_user_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Assign to myself" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Assign to myself</SelectItem>
+                      {teamMembers.map((member) => (
+                        <SelectItem key={member.user_id} value={member.user_id}>
+                          {member.full_name || member.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="title">Title</Label>
                 <Input
@@ -548,6 +577,29 @@ const Tasks = () => {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              {/* User Assignment - Only for Admins */}
+              {isAdminUser && (
+                <div className="grid gap-2">
+                  <Label>Assign to User</Label>
+                  <Select
+                    value={newSubTask.assigned_user_id}
+                    onValueChange={(value) => setNewSubTask({ ...newSubTask, assigned_user_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Assign to myself" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Assign to myself</SelectItem>
+                      {teamMembers.map((member) => (
+                        <SelectItem key={member.user_id} value={member.user_id}>
+                          {member.full_name || member.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="grid gap-2">
                 <Label htmlFor="sub-title">Title</Label>
                 <Input
@@ -737,16 +789,22 @@ const Tasks = () => {
                         setIsDetailDialogOpen(true);
                       }}
                     >
-                      <div className="flex items-center space-x-2">
-                        <CardTitle className="text-lg">{event.title}</CardTitle>
-                        <Badge variant={getPriorityColor(event.priority)}>
-                          <Flag className="w-3 h-3 mr-1" />
-                          {event.priority}
-                        </Badge>
-                        <Badge variant={getEventTypeColor(event.event_type)}>
-                          {event.event_type}
-                        </Badge>
-                      </div>
+                       <div className="flex items-center space-x-2">
+                         <CardTitle className="text-lg">{event.title}</CardTitle>
+                         <Badge variant={getPriorityColor(event.priority)}>
+                           <Flag className="w-3 h-3 mr-1" />
+                           {event.priority}
+                         </Badge>
+                         <Badge variant={getEventTypeColor(event.event_type)}>
+                           {event.event_type}
+                         </Badge>
+                         {/* Show "Assigned" badge if task was assigned by admin */}
+                         {event.user_id !== user?.id && (
+                           <Badge variant="outline" className="text-xs">
+                             Assigned
+                           </Badge>
+                         )}
+                       </div>
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                         <div className="flex items-center">
        <Calendar className="w-4 h-4 mr-1" />
