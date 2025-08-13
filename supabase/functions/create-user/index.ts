@@ -28,10 +28,14 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Creating user with email: ${email}, role: ${role}`);
 
     // Create Supabase admin client
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    const supabaseUrl = "https://usjvqsqotpedesvldkln.supabase.co";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY");
+    
+    if (!serviceRoleKey) {
+      throw new Error("Missing Supabase service role key");
+    }
+    
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Create user with admin API
     const { data, error } = await supabase.auth.admin.createUser({
