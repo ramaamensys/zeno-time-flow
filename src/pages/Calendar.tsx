@@ -71,6 +71,27 @@ const Calendar = () => {
     if (user) {
       fetchUserRole();
       fetchEvents();
+      
+      // Set up real-time subscription for calendar events
+      const channel = supabase
+        .channel('calendar-events-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'calendar_events'
+          },
+          () => {
+            // Refetch events when any change occurs
+            fetchEvents();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [user]);
 
@@ -108,7 +129,7 @@ const Calendar = () => {
   const fetchEvents = async () => {
     if (!user) return;
 
-    // Check if user is super_admin or admin to see all events
+    // Check if user is super_admin or admin
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
@@ -120,8 +141,17 @@ const Calendar = () => {
       .select("*")
       .order("start_time", { ascending: true });
 
-    // If not super_admin or admin, only show their own events
-    if (roleData?.role !== "super_admin" && roleData?.role !== "admin") {
+    // Admin privacy: only show tasks (assigned/created by others) and their own events
+    // Users see only their own events
+    if (roleData?.role === "super_admin" || roleData?.role === "admin") {
+      // Admins see only:
+      // 1. Their own events (personal calendar)
+      // 2. Tasks assigned to users (event_type = 'task' and user_id != admin's id)
+      query = query.or(`user_id.eq.${user.id},and(event_type.eq.task,user_id.neq.${user.id})`);
+    } else {
+      // Regular users see:
+      // 1. Their own events
+      // 2. Tasks assigned to them by admins
       query = query.eq("user_id", user.id);
     }
 
@@ -447,6 +477,11 @@ const Calendar = () => {
           onDateClick={handleDateClick}
           onEditEvent={editEvent}
           onDeleteEvent={deleteEvent}
+          onUserEventClick={(userId) => {
+            // Handle user event click for admin filtering if needed
+            console.log(`User clicked: ${userId}`);
+          }}
+          getUserName={(userId) => userProfiles[userId]}
         />
       )}
 

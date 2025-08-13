@@ -34,20 +34,48 @@ export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onD
 
   const getEventsForHour = (hour: number) => {
     return events.filter(event => {
-      const eventDate = new Date(event.start_time);
-      const eventHour = eventDate.getHours();
-      const isSameDay = eventDate.toDateString() === currentDate.toDateString();
-      // Only show event in its starting hour slot
-      return isSameDay && eventHour === hour;
+      const eventStart = new Date(event.start_time);
+      const eventEnd = new Date(event.end_time);
+      const isSameDay = eventStart.toDateString() === currentDate.toDateString();
+      
+      // Show event if it starts in this hour OR spans through this hour
+      const eventStartHour = eventStart.getHours();
+      const eventEndHour = eventEnd.getHours();
+      
+      return isSameDay && eventStartHour <= hour && hour <= eventEndHour;
     });
   };
 
-  const getEventHeight = (event: CalendarEvent) => {
+  const getEventPosition = (event: CalendarEvent) => {
     const eventStart = new Date(event.start_time);
     const eventEnd = new Date(event.end_time);
-    const durationHours = (eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60);
-    // Each hour slot is 80px, so multiply duration by 80px per hour
-    return Math.max(80, durationHours * 80);
+    const startHour = eventStart.getHours();
+    const startMinutes = eventStart.getMinutes();
+    const durationMs = eventEnd.getTime() - eventStart.getTime();
+    const durationHours = durationMs / (1000 * 60 * 60);
+    
+    // Calculate position from top of hour slot (each hour = 80px)
+    const minuteOffset = (startMinutes / 60) * 80;
+    const height = Math.max(20, durationHours * 80);
+    
+    return { minuteOffset, height };
+  };
+
+  const getOverlappingEvents = (hour: number) => {
+    const hourEvents = getEventsForHour(hour);
+    return hourEvents.map((event, index) => {
+      const overlapping = hourEvents.filter((otherEvent, otherIndex) => {
+        if (otherIndex === index) return false;
+        const eventStart = new Date(event.start_time);
+        const eventEnd = new Date(event.end_time);
+        const otherStart = new Date(otherEvent.start_time);
+        const otherEnd = new Date(otherEvent.end_time);
+        
+        return (eventStart < otherEnd && eventEnd > otherStart);
+      });
+      
+      return { event, overlappingCount: overlapping.length + 1, position: index };
+    });
   };
 
   const getEventStyling = (event: CalendarEvent, isOverdue: boolean) => {
@@ -88,16 +116,31 @@ export const DayView = ({ currentDate, events, onTimeSlotClick, onEditEvent, onD
                 className="flex-1 min-h-[80px] p-2 hover:bg-muted/30 cursor-pointer transition-colors relative"
                 onClick={() => onTimeSlotClick(hour)}
               >
-                {hourEvents.map((event) => {
+                {getOverlappingEvents(hour).map(({ event, overlappingCount, position }) => {
                   const isOverdue = isEventOverdue(event);
+                  const { minuteOffset, height } = getEventPosition(event);
+                  const startHour = new Date(event.start_time).getHours();
+                  
+                  // Only render the event in its starting hour to avoid duplicates
+                  if (startHour !== hour) return null;
+                  
+                  const width = overlappingCount > 1 ? `${100 / overlappingCount}%` : '100%';
+                  const left = overlappingCount > 1 ? `${(position * 100) / overlappingCount}%` : '0%';
+                  
                   return (
                     <div
                       key={event.id}
                       className={cn(
-                        "p-2 rounded text-gray-800 cursor-pointer hover:opacity-80 absolute left-2 right-2 z-10",
+                        "p-2 rounded text-gray-800 cursor-pointer hover:opacity-80 absolute z-10 border border-gray-300",
                         getEventStyling(event, isOverdue)
                       )}
-                      style={{ height: `${getEventHeight(event)}px` }}
+                      style={{ 
+                        height: `${height}px`,
+                        top: `${minuteOffset}px`,
+                        width: width,
+                        left: left,
+                        right: 'auto'
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (onUserEventClick && e.ctrlKey) {
