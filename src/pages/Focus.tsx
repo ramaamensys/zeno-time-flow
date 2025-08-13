@@ -77,9 +77,13 @@ const Focus = () => {
     const { data, error } = await supabase
       .from("focus_sessions")
       .insert([{
+        title: "Focus Session",
         start_time: new Date().toISOString(),
+        end_time: new Date(Date.now() + 25 * 60 * 1000).toISOString(), // 25 minutes default
         user_id: user?.id,
         interruptions: 0,
+        productivity_score: 0,
+        notes: "",
       }])
       .select()
       .single();

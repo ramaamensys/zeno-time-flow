@@ -46,7 +46,10 @@ const Profile = () => {
         variant: "destructive",
       });
     } else {
-      setProfile(data);
+      setProfile({
+        ...data,
+        avatar_url: data.avatar_url || null
+      });
       setFullName(data.full_name || "");
     }
     setIsLoading(false);

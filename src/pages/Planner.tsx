@@ -136,10 +136,14 @@ const Planner = () => {
       const { data, error } = await supabase
         .from('focus_sessions')
         .insert({
+          title: newBlock.title,
           user_id: user?.id,
           start_time: startTime,
+          end_time: new Date(new Date(startTime).getTime() + newBlock.duration * 60 * 1000).toISOString(),
           duration: newBlock.duration,
           notes: newBlock.title,
+          productivity_score: 0,
+          interruptions: 0,
         })
         .select()
         .single();
