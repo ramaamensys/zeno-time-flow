@@ -14,6 +14,7 @@ import Tasks from "./pages/Tasks";
 import Calendar from "./pages/Calendar";
 import Focus from "./pages/Focus";
 import Profile from "./pages/Profile";
+import Account from "./pages/Account";
 import UserManagement from "./pages/UserManagement";
 import Planner from "./pages/Planner";
 import Habits from "./pages/Habits";
@@ -45,6 +46,11 @@ const App = () => (
             <Route path="/user-management" element={
               <ProtectedRoute>
                 <Layout><UserManagement /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/account" element={
+              <ProtectedRoute>
+                <Layout><Account /></Layout>
               </ProtectedRoute>
             } />
             <Route path="*" element={<NotFound />} />

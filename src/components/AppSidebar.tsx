@@ -9,6 +9,7 @@ import {
   Users,
   ClipboardList,
   BarChart3,
+  Settings,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,6 +64,7 @@ export function AppSidebar() {
   const items = [
     { title: "Calendar", url: "/calendar", icon: Calendar },
     { title: "Tasks", url: "/tasks", icon: CheckSquare },
+    { title: "Account", url: "/account", icon: Settings },
     ...(userRole === 'super_admin' || userRole === 'admin' ? [
       { title: "User Management", url: "/user-management", icon: Users }
     ] : [])
