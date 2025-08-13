@@ -15,7 +15,6 @@ interface WelcomeEmailRequest {
   full_name: string;
   role: string;
   password: string;
-  confirmation_url?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -25,40 +24,12 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, full_name, role, password, confirmation_url }: WelcomeEmailRequest = await req.json();
+    const { email, full_name, role, password }: WelcomeEmailRequest = await req.json();
 
     console.log(`Sending welcome email to: ${email}`);
 
-    // Create Supabase client to generate confirmation link
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
-    let confirmationLink = confirmation_url;
-
-    // If no confirmation URL provided, generate one
-    if (!confirmationLink) {
-      try {
-        const { data, error } = await supabase.auth.admin.generateLink({
-          type: 'signup',
-          email: email,
-          options: {
-            redirectTo: 'https://cnkadwvhmvwvakmpgitn.lovable.app/auth'
-          }
-        });
-
-        if (error) {
-          console.error('Error generating confirmation link:', error);
-          confirmationLink = 'https://cnkadwvhmvwvakmpgitn.lovable.app/auth';
-        } else {
-          confirmationLink = data.properties?.action_link || 'https://cnkadwvhmvwvakmpgitn.lovable.app/auth';
-        }
-      } catch (linkError) {
-        console.error('Failed to generate confirmation link:', linkError);
-        confirmationLink = 'https://cnkadwvhmvwvakmpgitn.lovable.app/auth';
-      }
-    }
+    // Direct login link to ZenoTimeFlow project
+    const loginLink = 'https://zenotimeflow.com/auth';
 
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -70,36 +41,32 @@ const handler = async (req: Request): Promise<Response> => {
           <h2 style="color: #333; margin-top: 0;">Hello ${full_name || 'there'}!</h2>
           
           <p style="color: #555; line-height: 1.6; font-size: 16px;">
-            Your account has been created for ZenoTimeFlow! 🌟 To get started, you'll need to confirm your email address and set up your password.
+            Your account has been created for ZenoTimeFlow! 🌟 Below are your login credentials to get started immediately.
           </p>
           
           <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
-            <p style="margin: 0; color: #333;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 0; color: #333;"><strong>Username:</strong> ${full_name}</p>
+            <p style="margin: 10px 0; color: #333;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 10px 0; color: #333;"><strong>Temporary Password:</strong> ${password}</p>
             <p style="margin: 10px 0 0 0; color: #333;"><strong>Role:</strong> ${role.replace('_', ' ').toUpperCase()}</p>
           </div>
           
           <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196f3;">
             <p style="margin: 0; color: #0277bd; font-size: 14px;">
-              <strong>Important:</strong> You must confirm your email address first, then you can set up your password and start using ZenoTimeFlow.
+              <strong>Important:</strong> Please change your temporary password after your first login for security purposes.
             </p>
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${confirmationLink}" 
+            <a href="${loginLink}" 
                style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-              Confirm Email & Get Started
+              Accept & Login to ZenoTimeFlow
             </a>
           </div>
           
           <p style="color: #666; font-size: 14px; text-align: center; margin-top: 30px;">
-            After confirming your email, you'll be redirected to set up your password and can start using ZenoTimeFlow immediately.
+            Click the button above to access your ZenoTimeFlow account and start managing your time effectively.
           </p>
-          
-          <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
-            <p style="margin: 0; color: #856404; font-size: 14px;">
-              <strong>Note:</strong> This confirmation link will expire in 24 hours for security reasons. If you need a new link, please contact support.
-            </p>
-          </div>
           
           <hr style="border: none; height: 1px; background: #ddd; margin: 30px 0;">
           
