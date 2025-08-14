@@ -13,7 +13,6 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -54,36 +53,6 @@ const Auth = () => {
     setIsLoading(false);
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Attempting sign up with email:", email);
-    setIsLoading(true);
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-      },
-    });
-
-    if (error) {
-      console.error("Sign up error:", error);
-      toast({
-        title: "Sign up failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Sign up successful!",
-        description: "You can now sign in with your credentials.",
-      });
-      setIsSignUp(false);
-    }
-    setIsLoading(false);
-  };
-
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="absolute top-4 left-4 flex items-center gap-3">
@@ -99,7 +68,7 @@ const Auth = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={isSignUp ? handleSignUp : handleSignIn} className="space-y-4">
+            <form onSubmit={handleSignIn} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -128,15 +97,7 @@ const Auth = () => {
                 disabled={isLoading}
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSignUp ? "Sign Up" : "Sign In"}
-              </Button>
-              <Button 
-                type="button" 
-                variant="outline"
-                className="w-full" 
-                onClick={() => setIsSignUp(!isSignUp)}
-              >
-                {isSignUp ? "Already have an account? Sign In" : "Need an account? Sign Up"}
+                Sign In
               </Button>
             </form>
           </CardContent>
