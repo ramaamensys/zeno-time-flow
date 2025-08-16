@@ -14,7 +14,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import UserTemplateTasks from "@/components/UserTemplateTasks";
 
 interface CalendarEvent {
   id: string;
@@ -856,9 +855,6 @@ const Tasks = () => {
           </CardContent>
         </Card>
       )}
-
-      {/* Learning Template Tasks */}
-      <UserTemplateTasks />
 
       {/* Task List */}
       <div className="grid gap-4">
