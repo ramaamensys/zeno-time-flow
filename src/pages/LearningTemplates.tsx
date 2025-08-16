@@ -59,6 +59,7 @@ export default function LearningTemplates() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedTemplates, setExpandedTemplates] = useState<Set<string>>(new Set());
+  const [isAdmin, setIsAdmin] = useState(false);
   
   // Dialog states
   const [showCreateTemplate, setShowCreateTemplate] = useState(false);
@@ -107,9 +108,15 @@ export default function LearningTemplates() {
   });
 
   useEffect(() => {
-    fetchTemplates();
+    checkUserRole();
     fetchTeamMembers();
   }, []);
+
+  useEffect(() => {
+    if (isAdmin !== null) {
+      fetchTemplates();
+    }
+  }, [isAdmin]);
 
   useEffect(() => {
     // Fetch data for all expanded templates
@@ -118,12 +125,49 @@ export default function LearningTemplates() {
     }
   }, [expandedTemplates]);
 
-  const fetchTemplates = async () => {
+  const checkUserRole = async () => {
+    if (!user) return;
+
     try {
       const { data, error } = await supabase
-        .from('learning_templates')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) throw error;
+      setIsAdmin(data?.role === 'admin' || data?.role === 'super_admin');
+    } catch (error) {
+      setIsAdmin(false);
+    }
+  };
+
+  const fetchTemplates = async () => {
+    if (!user) return;
+
+    try {
+      let query = supabase.from('learning_templates').select('*');
+
+      if (!isAdmin) {
+        // For regular users, only fetch templates they are assigned to
+        const { data: userAssignments, error: assignmentError } = await supabase
+          .from('template_assignments')
+          .select('template_id')
+          .eq('user_id', user.id);
+
+        if (assignmentError) throw assignmentError;
+
+        const templateIds = userAssignments?.map(a => a.template_id) || [];
+        if (templateIds.length === 0) {
+          setTemplates([]);
+          setLoading(false);
+          return;
+        }
+
+        query = query.in('id', templateIds);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       setTemplates(data || []);
@@ -149,24 +193,37 @@ export default function LearningTemplates() {
 
   const fetchAllTemplateData = async () => {
     const templateIds = Array.from(expandedTemplates);
-    if (templateIds.length === 0) return;
+    if (templateIds.length === 0 || !user) return;
 
     try {
       // Fetch assignments for expanded templates
-      const { data: assignmentsData, error: assignmentsError } = await supabase
+      let assignmentsQuery = supabase
         .from('template_assignments')
         .select('*')
         .in('template_id', templateIds);
+
+      if (!isAdmin) {
+        // For regular users, only fetch their own assignments
+        assignmentsQuery = assignmentsQuery.eq('user_id', user.id);
+      }
+
+      const { data: assignmentsData, error: assignmentsError } = await assignmentsQuery;
 
       if (assignmentsError) throw assignmentsError;
       setAssignments(assignmentsData || []);
 
       // Fetch tasks for expanded templates with hierarchical structure
-      const { data: tasksData, error: tasksError } = await supabase
+      let tasksQuery = supabase
         .from('template_tasks')
         .select('*')
-        .in('template_id', templateIds)
-        .order('created_at', { ascending: false });
+        .in('template_id', templateIds);
+
+      if (!isAdmin) {
+        // For regular users, only fetch their own tasks
+        tasksQuery = tasksQuery.eq('user_id', user.id);
+      }
+
+      const { data: tasksData, error: tasksError } = await tasksQuery.order('created_at', { ascending: false });
 
       if (tasksError) throw tasksError;
 
@@ -652,56 +709,60 @@ export default function LearningTemplates() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Learning Templates</h1>
-          <p className="text-muted-foreground">Manage employee learning templates and assignments</p>
+          <p className="text-muted-foreground">
+            {isAdmin ? 'Manage employee learning templates and assignments' : 'View your assigned learning templates and tasks'}
+          </p>
         </div>
-        <Dialog open={showCreateTemplate} onOpenChange={setShowCreateTemplate}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Template
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Create Learning Template</DialogTitle>
-              <DialogDescription>
-                Create a new learning template for employee training
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Template Name</Label>
-                <Input
-                  id="name"
-                  value={templateForm.name}
-                  onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
-                  placeholder="e.g., Java Full Stack"
-                />
-              </div>
-              <div>
-                <Label htmlFor="technology">Technology</Label>
-                <Input
-                  id="technology"
-                  value={templateForm.technology}
-                  onChange={(e) => setTemplateForm({ ...templateForm, technology: e.target.value })}
-                  placeholder="e.g., Java, Python, .NET"
-                />
-              </div>
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={templateForm.description}
-                  onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
-                  placeholder="Describe the learning template..."
-                />
-              </div>
-              <Button onClick={createTemplate} className="w-full">
+        {isAdmin && (
+          <Dialog open={showCreateTemplate} onOpenChange={setShowCreateTemplate}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
                 Create Template
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Create Learning Template</DialogTitle>
+                <DialogDescription>
+                  Create a new learning template for employee training
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Template Name</Label>
+                  <Input
+                    id="name"
+                    value={templateForm.name}
+                    onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
+                    placeholder="e.g., Java Full Stack"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="technology">Technology</Label>
+                  <Input
+                    id="technology"
+                    value={templateForm.technology}
+                    onChange={(e) => setTemplateForm({ ...templateForm, technology: e.target.value })}
+                    placeholder="e.g., Java, Python, .NET"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={templateForm.description}
+                    onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
+                    placeholder="Describe the learning template..."
+                  />
+                </div>
+                <Button onClick={createTemplate} className="w-full">
+                  Create Template
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Templates with Collapsible Structure */}
@@ -737,64 +798,68 @@ export default function LearningTemplates() {
                           </CardDescription>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {/* Assign User Dropdown */}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>
-                              <Users className="mr-2 h-4 w-4" />
-                              Assign User
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            {unassignedUsers.length > 0 ? (
-                              unassignedUsers.map((member) => (
-                                <DropdownMenuItem
-                                  key={member.user_id}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    assignUserToTemplate(template.id, member.user_id);
-                                  }}
-                                >
-                                  {member.full_name} ({member.email})
-                                </DropdownMenuItem>
-                              ))
-                            ) : (
-                              <DropdownMenuItem disabled>
-                                All users assigned
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                        
-                        {/* Template Actions */}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              openEditTemplate(template);
-                            }}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit Template
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteTemplate(template.id);
-                              }}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete Template
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                       <div className="flex items-center gap-2">
+                         {isAdmin && (
+                           <>
+                             {/* Assign User Dropdown */}
+                             <DropdownMenu>
+                               <DropdownMenuTrigger asChild>
+                                 <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>
+                                   <Users className="mr-2 h-4 w-4" />
+                                   Assign User
+                                 </Button>
+                               </DropdownMenuTrigger>
+                               <DropdownMenuContent>
+                                 {unassignedUsers.length > 0 ? (
+                                   unassignedUsers.map((member) => (
+                                     <DropdownMenuItem
+                                       key={member.user_id}
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         assignUserToTemplate(template.id, member.user_id);
+                                       }}
+                                     >
+                                       {member.full_name} ({member.email})
+                                     </DropdownMenuItem>
+                                   ))
+                                 ) : (
+                                   <DropdownMenuItem disabled>
+                                     All users assigned
+                                   </DropdownMenuItem>
+                                 )}
+                               </DropdownMenuContent>
+                             </DropdownMenu>
+                             
+                             {/* Template Actions */}
+                             <DropdownMenu>
+                               <DropdownMenuTrigger asChild>
+                                 <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                                   <Edit className="h-4 w-4" />
+                                 </Button>
+                               </DropdownMenuTrigger>
+                               <DropdownMenuContent>
+                                 <DropdownMenuItem onClick={(e) => {
+                                   e.stopPropagation();
+                                   openEditTemplate(template);
+                                 }}>
+                                   <Edit className="mr-2 h-4 w-4" />
+                                   Edit Template
+                                 </DropdownMenuItem>
+                                 <DropdownMenuItem 
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+                                     deleteTemplate(template.id);
+                                   }}
+                                   className="text-destructive"
+                                 >
+                                   <Trash2 className="mr-2 h-4 w-4" />
+                                   Delete Template
+                                 </DropdownMenuItem>
+                               </DropdownMenuContent>
+                             </DropdownMenu>
+                           </>
+                         )}
+                       </div>
                     </div>
                   </CardHeader>
                 </CollapsibleTrigger>
@@ -822,22 +887,24 @@ export default function LearningTemplates() {
                                      <Badge variant="outline" className="text-xs">
                                        {templateTasksList.filter(t => t.user_id === user.user_id).length} tasks
                                      </Badge>
-                                     <DropdownMenu>
-                                       <DropdownMenuTrigger asChild>
-                                         <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                           <MoreVertical className="h-3 w-3" />
-                                         </Button>
-                                       </DropdownMenuTrigger>
-                                       <DropdownMenuContent>
-                                         <DropdownMenuItem 
-                                           onClick={() => removeUserFromTemplate(template.id, user.user_id)}
-                                           className="text-destructive"
-                                         >
-                                           <Trash2 className="mr-2 h-4 w-4" />
-                                           Remove User from Template
-                                         </DropdownMenuItem>
-                                       </DropdownMenuContent>
-                                     </DropdownMenu>
+                                     {isAdmin && (
+                                       <DropdownMenu>
+                                         <DropdownMenuTrigger asChild>
+                                           <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                             <MoreVertical className="h-3 w-3" />
+                                           </Button>
+                                         </DropdownMenuTrigger>
+                                         <DropdownMenuContent>
+                                           <DropdownMenuItem 
+                                             onClick={() => removeUserFromTemplate(template.id, user.user_id)}
+                                             className="text-destructive"
+                                           >
+                                             <Trash2 className="mr-2 h-4 w-4" />
+                                             Remove User from Template
+                                           </DropdownMenuItem>
+                                         </DropdownMenuContent>
+                                       </DropdownMenu>
+                                     )}
                                    </div>
                                  </div>
                                </CardContent>
@@ -851,21 +918,23 @@ export default function LearningTemplates() {
 
                       {/* Template Tasks */}
                       <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                          <h3 className="font-semibold">Tasks</h3>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedTemplate(template);
-                              setShowCreateTask(true);
-                            }}
-                            disabled={assignedUsers.length === 0}
-                          >
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Task
-                          </Button>
-                        </div>
+                         <div className="flex justify-between items-center">
+                           <h3 className="font-semibold">Tasks</h3>
+                           {isAdmin && (
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={() => {
+                                 setSelectedTemplate(template);
+                                 setShowCreateTask(true);
+                               }}
+                               disabled={assignedUsers.length === 0}
+                             >
+                               <Plus className="mr-2 h-4 w-4" />
+                               Add Task
+                             </Button>
+                           )}
+                         </div>
                         <div className="space-y-2 max-h-96 overflow-y-auto">
                           {templateTasksList.map((task) => {
                             const assignedUser = assignedUsers.find(u => u.user_id === task.user_id);
@@ -889,47 +958,49 @@ export default function LearningTemplates() {
                                         )}
                                       </div>
                                     </div>
-                                    <div className="flex items-center gap-1 ml-2">
-                                      <Badge variant={getPriorityColor(task.priority)} className="text-xs px-1 py-0">
-                                        {task.priority}
-                                      </Badge>
-                                      <Switch
-                                        checked={task.status === 'completed'}
-                                        onCheckedChange={() => toggleTaskCompletion(task.id, task.status)}
-                                      />
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                            <Edit className="h-3 w-3" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent>
-                                          <DropdownMenuItem onClick={() => openEditTask(task)}>
-                                            <Edit className="mr-2 h-4 w-4" />
-                                            Edit Task
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={() => openSubTaskDialog(task)}>
-                                            <Plus className="mr-2 h-4 w-4" />
-                                            Add Sub-task
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={() => openAssignTaskDialog(task)}>
-                                            <Copy className="mr-2 h-4 w-4" />
-                                            Assign to Another User
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={() => openReassignTaskDialog(task)}>
-                                            <User className="mr-2 h-4 w-4" />
-                                            Reassign Task
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem 
-                                            onClick={() => deleteTask(task.id)}
-                                            className="text-destructive"
-                                          >
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            Delete Task
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    </div>
+                                     <div className="flex items-center gap-1 ml-2">
+                                       <Badge variant={getPriorityColor(task.priority)} className="text-xs px-1 py-0">
+                                         {task.priority}
+                                       </Badge>
+                                       <Switch
+                                         checked={task.status === 'completed'}
+                                         onCheckedChange={() => toggleTaskCompletion(task.id, task.status)}
+                                       />
+                                       {isAdmin && (
+                                         <DropdownMenu>
+                                           <DropdownMenuTrigger asChild>
+                                             <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                               <Edit className="h-3 w-3" />
+                                             </Button>
+                                           </DropdownMenuTrigger>
+                                           <DropdownMenuContent>
+                                             <DropdownMenuItem onClick={() => openEditTask(task)}>
+                                               <Edit className="mr-2 h-4 w-4" />
+                                               Edit Task
+                                             </DropdownMenuItem>
+                                             <DropdownMenuItem onClick={() => openSubTaskDialog(task)}>
+                                               <Plus className="mr-2 h-4 w-4" />
+                                               Add Sub-task
+                                             </DropdownMenuItem>
+                                             <DropdownMenuItem onClick={() => openAssignTaskDialog(task)}>
+                                               <Copy className="mr-2 h-4 w-4" />
+                                               Assign to Another User
+                                             </DropdownMenuItem>
+                                             <DropdownMenuItem onClick={() => openReassignTaskDialog(task)}>
+                                               <User className="mr-2 h-4 w-4" />
+                                               Reassign Task
+                                             </DropdownMenuItem>
+                                             <DropdownMenuItem 
+                                               onClick={() => deleteTask(task.id)}
+                                               className="text-destructive"
+                                             >
+                                               <Trash2 className="mr-2 h-4 w-4" />
+                                               Delete Task
+                                             </DropdownMenuItem>
+                                           </DropdownMenuContent>
+                                         </DropdownMenu>
+                                       )}
+                                     </div>
                                   </div>
                                   
                                   {/* Sub-tasks */}
@@ -946,39 +1017,41 @@ export default function LearningTemplates() {
                                                 <span className="text-muted-foreground">- {subTask.description}</span>
                                               )}
                                             </div>
-                                            <div className="flex items-center gap-1">
-                                              <Badge variant={getPriorityColor(subTask.priority)} className="text-xs px-1 py-0">
-                                                {subTask.priority}
-                                              </Badge>
-                                              <Switch
-                                                checked={subTask.status === 'completed'}
-                                                onCheckedChange={() => toggleTaskCompletion(subTask.id, subTask.status)}
-                                              />
-                                              <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                                    <MoreVertical className="h-3 w-3" />
-                                                  </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent>
-                                                  <DropdownMenuItem onClick={() => openReassignSubTaskDialog(subTask)}>
-                                                    <User className="mr-2 h-4 w-4" />
-                                                    Reassign Sub-task
-                                                  </DropdownMenuItem>
-                                                  <DropdownMenuItem onClick={() => openAssignTaskDialog(subTask)}>
-                                                    <Copy className="mr-2 h-4 w-4" />
-                                                    Assign to Another User
-                                                  </DropdownMenuItem>
-                                                  <DropdownMenuItem 
-                                                    onClick={() => deleteTask(subTask.id)}
-                                                    className="text-destructive"
-                                                  >
-                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                    Delete Sub-task
-                                                  </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                              </DropdownMenu>
-                                            </div>
+                                             <div className="flex items-center gap-1">
+                                               <Badge variant={getPriorityColor(subTask.priority)} className="text-xs px-1 py-0">
+                                                 {subTask.priority}
+                                               </Badge>
+                                               <Switch
+                                                 checked={subTask.status === 'completed'}
+                                                 onCheckedChange={() => toggleTaskCompletion(subTask.id, subTask.status)}
+                                               />
+                                               {isAdmin && (
+                                                 <DropdownMenu>
+                                                   <DropdownMenuTrigger asChild>
+                                                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                                       <MoreVertical className="h-3 w-3" />
+                                                     </Button>
+                                                   </DropdownMenuTrigger>
+                                                   <DropdownMenuContent>
+                                                     <DropdownMenuItem onClick={() => openReassignSubTaskDialog(subTask)}>
+                                                       <User className="mr-2 h-4 w-4" />
+                                                       Reassign Sub-task
+                                                     </DropdownMenuItem>
+                                                     <DropdownMenuItem onClick={() => openAssignTaskDialog(subTask)}>
+                                                       <Copy className="mr-2 h-4 w-4" />
+                                                       Assign to Another User
+                                                     </DropdownMenuItem>
+                                                     <DropdownMenuItem 
+                                                       onClick={() => deleteTask(subTask.id)}
+                                                       className="text-destructive"
+                                                     >
+                                                       <Trash2 className="mr-2 h-4 w-4" />
+                                                       Delete Sub-task
+                                                     </DropdownMenuItem>
+                                                   </DropdownMenuContent>
+                                                 </DropdownMenu>
+                                               )}
+                                             </div>
                                           </div>
                                         );
                                       })}
