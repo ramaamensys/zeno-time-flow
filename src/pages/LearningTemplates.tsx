@@ -89,7 +89,8 @@ export default function LearningTemplates() {
     user_id: "",
     start_time: "",
     end_time: "",
-    all_day: false
+    all_day: false,
+    status: "pending"
   });
   const [subTaskForm, setSubTaskForm] = useState({
     title: "",
@@ -182,8 +183,8 @@ export default function LearningTemplates() {
       if (tasksError) throw tasksError;
 
       // Organize tasks into hierarchical structure
-      const primaryTasks = tasksData?.filter(task => !task.parent_task_id) || [];
-      const subTasks = tasksData?.filter(task => task.parent_task_id) || [];
+      const primaryTasks = (tasksData as any[])?.filter(task => !task.parent_task_id) || [];
+      const subTasks = (tasksData as any[])?.filter(task => task.parent_task_id) || [];
 
       // Attach sub-tasks to their parent tasks
       const tasksWithSubTasks = primaryTasks.map(task => ({
@@ -507,7 +508,8 @@ export default function LearningTemplates() {
       user_id: "",
       start_time: "",
       end_time: "",
-      all_day: false
+      all_day: false,
+      status: "pending"
     });
   };
 
@@ -543,7 +545,8 @@ export default function LearningTemplates() {
       user_id: task.user_id,
       start_time: "",
       end_time: "",
-      all_day: false
+      all_day: false,
+      status: task.status
     });
     setShowEditTask(true);
   };
@@ -794,11 +797,10 @@ export default function LearningTemplates() {
                                       <Badge variant={getPriorityColor(task.priority)} className="text-xs px-1 py-0">
                                         {task.priority}
                                       </Badge>
-                                      <Switch
-                                        checked={task.status === 'completed'}
-                                        onCheckedChange={() => toggleTaskCompletion(task.id, task.status)}
-                                        size="sm"
-                                      />
+                                              <Switch
+                                                checked={task.status === 'completed'}
+                                                onCheckedChange={() => toggleTaskCompletion(task.id, task.status)}
+                                              />
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                           <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
@@ -848,7 +850,6 @@ export default function LearningTemplates() {
                                               <Switch
                                                 checked={subTask.status === 'completed'}
                                                 onCheckedChange={() => toggleTaskCompletion(subTask.id, subTask.status)}
-                                                size="sm"
                                               />
                                             </div>
                                           </div>
