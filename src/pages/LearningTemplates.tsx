@@ -9,8 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Users, BookOpen, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
+import { Plus, Users, BookOpen, CheckCircle, Clock, AlertCircle, Edit, ChevronDown, ChevronRight, Trash2, Copy } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 interface LearningTemplate {
   id: string;
@@ -37,6 +41,8 @@ interface TemplateTask {
   status: string;
   due_date: string;
   created_at: string;
+  parent_task_id?: string | null;
+  sub_tasks?: TemplateTask[];
 }
 
 interface TeamMember {
@@ -48,30 +54,51 @@ interface TeamMember {
 export default function LearningTemplates() {
   const { user } = useAuth();
   const [templates, setTemplates] = useState<LearningTemplate[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<LearningTemplate | null>(null);
   const [assignments, setAssignments] = useState<TemplateAssignment[]>([]);
   const [templateTasks, setTemplateTasks] = useState<TemplateTask[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedTemplates, setExpandedTemplates] = useState<Set<string>>(new Set());
   
   // Dialog states
   const [showCreateTemplate, setShowCreateTemplate] = useState(false);
-  const [showAssignUser, setShowAssignUser] = useState(false);
+  const [showEditTemplate, setShowEditTemplate] = useState(false);
   const [showCreateTask, setShowCreateTask] = useState(false);
+  const [showEditTask, setShowEditTask] = useState(false);
+  const [showSubTaskDialog, setShowSubTaskDialog] = useState(false);
+  const [showAssignTaskDialog, setShowAssignTaskDialog] = useState(false);
+  
+  // Selected states
+  const [selectedTemplate, setSelectedTemplate] = useState<LearningTemplate | null>(null);
+  const [selectedTask, setSelectedTask] = useState<TemplateTask | null>(null);
+  const [parentTaskForSubTask, setParentTaskForSubTask] = useState<TemplateTask | null>(null);
+  const [taskToAssign, setTaskToAssign] = useState<TemplateTask | null>(null);
   
   // Form states
-  const [newTemplate, setNewTemplate] = useState({
+  const [templateForm, setTemplateForm] = useState({
     name: "",
     description: "",
     technology: ""
   });
   const [selectedUserId, setSelectedUserId] = useState("");
-  const [newTask, setNewTask] = useState({
+  const [taskForm, setTaskForm] = useState({
     title: "",
     description: "",
     priority: "medium",
     due_date: "",
-    user_id: ""
+    user_id: "",
+    start_time: "",
+    end_time: "",
+    all_day: false
+  });
+  const [subTaskForm, setSubTaskForm] = useState({
+    title: "",
+    description: "",
+    priority: "medium",
+    due_date: "",
+    start_time: "",
+    end_time: "",
+    all_day: false
   });
 
   useEffect(() => {
@@ -80,11 +107,11 @@ export default function LearningTemplates() {
   }, []);
 
   useEffect(() => {
-    if (selectedTemplate) {
-      fetchTemplateAssignments();
-      fetchTemplateTasks();
+    // Fetch data for all expanded templates
+    if (expandedTemplates.size > 0) {
+      fetchAllTemplateData();
     }
-  }, [selectedTemplate]);
+  }, [expandedTemplates]);
 
   const fetchTemplates = async () => {
     try {
@@ -131,20 +158,42 @@ export default function LearningTemplates() {
     }
   };
 
-  const fetchTemplateTasks = async () => {
-    if (!selectedTemplate) return;
+  const fetchAllTemplateData = async () => {
+    const templateIds = Array.from(expandedTemplates);
+    if (templateIds.length === 0) return;
 
     try {
-      const { data, error } = await supabase
+      // Fetch assignments for expanded templates
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from('template_assignments')
+        .select('*')
+        .in('template_id', templateIds);
+
+      if (assignmentsError) throw assignmentsError;
+      setAssignments(assignmentsData || []);
+
+      // Fetch tasks for expanded templates with hierarchical structure
+      const { data: tasksData, error: tasksError } = await supabase
         .from('template_tasks')
         .select('*')
-        .eq('template_id', selectedTemplate.id)
+        .in('template_id', templateIds)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setTemplateTasks(data || []);
+      if (tasksError) throw tasksError;
+
+      // Organize tasks into hierarchical structure
+      const primaryTasks = tasksData?.filter(task => !task.parent_task_id) || [];
+      const subTasks = tasksData?.filter(task => task.parent_task_id) || [];
+
+      // Attach sub-tasks to their parent tasks
+      const tasksWithSubTasks = primaryTasks.map(task => ({
+        ...task,
+        sub_tasks: subTasks.filter(subTask => subTask.parent_task_id === task.id)
+      }));
+
+      setTemplateTasks(tasksWithSubTasks);
     } catch (error) {
-      toast.error('Failed to fetch template tasks');
+      toast.error('Failed to fetch template data');
     }
   };
 
@@ -155,7 +204,7 @@ export default function LearningTemplates() {
       const { error } = await supabase
         .from('learning_templates')
         .insert({
-          ...newTemplate,
+          ...templateForm,
           created_by: user.id
         });
 
@@ -163,62 +212,226 @@ export default function LearningTemplates() {
       
       toast.success('Learning template created successfully');
       setShowCreateTemplate(false);
-      setNewTemplate({ name: "", description: "", technology: "" });
+      setTemplateForm({ name: "", description: "", technology: "" });
       fetchTemplates();
     } catch (error) {
       toast.error('Failed to create learning template');
     }
   };
 
-  const assignUserToTemplate = async () => {
-    if (!user || !selectedTemplate || !selectedUserId) return;
+  const updateTemplate = async () => {
+    if (!user || !selectedTemplate) return;
+
+    try {
+      const { error } = await supabase
+        .from('learning_templates')
+        .update({
+          name: templateForm.name,
+          description: templateForm.description,
+          technology: templateForm.technology
+        })
+        .eq('id', selectedTemplate.id);
+
+      if (error) throw error;
+      
+      toast.success('Learning template updated successfully');
+      setShowEditTemplate(false);
+      setSelectedTemplate(null);
+      setTemplateForm({ name: "", description: "", technology: "" });
+      fetchTemplates();
+    } catch (error) {
+      toast.error('Failed to update learning template');
+    }
+  };
+
+  const deleteTemplate = async (templateId: string) => {
+    try {
+      const { error } = await supabase
+        .from('learning_templates')
+        .delete()
+        .eq('id', templateId);
+
+      if (error) throw error;
+      
+      toast.success('Learning template deleted successfully');
+      fetchTemplates();
+    } catch (error) {
+      toast.error('Failed to delete learning template');
+    }
+  };
+
+  const assignUserToTemplate = async (templateId: string, userId: string) => {
+    if (!user) return;
 
     try {
       const { error } = await supabase
         .from('template_assignments')
         .insert({
-          template_id: selectedTemplate.id,
-          user_id: selectedUserId,
+          template_id: templateId,
+          user_id: userId,
           assigned_by: user.id
         });
 
       if (error) throw error;
       
       toast.success('User assigned to template successfully');
-      setShowAssignUser(false);
-      setSelectedUserId("");
-      fetchTemplateAssignments();
+      fetchAllTemplateData();
     } catch (error) {
       toast.error('Failed to assign user to template');
     }
   };
 
-  const createTemplateTask = async () => {
-    if (!user || !selectedTemplate || !newTask.user_id) return;
+  const createTemplateTask = async (templateId: string) => {
+    if (!user || !taskForm.user_id || !taskForm.title.trim()) return;
 
     try {
+      const taskData = {
+        template_id: templateId,
+        title: taskForm.title,
+        description: taskForm.description || null,
+        priority: taskForm.priority,
+        due_date: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
+        user_id: taskForm.user_id,
+        created_by: user.id,
+        status: 'pending'
+      };
+
       const { error } = await supabase
         .from('template_tasks')
-        .insert({
-          template_id: selectedTemplate.id,
-          ...newTask,
-          created_by: user.id
-        });
+        .insert([taskData]);
 
       if (error) throw error;
       
       toast.success('Template task created successfully');
       setShowCreateTask(false);
-      setNewTask({
-        title: "",
-        description: "",
-        priority: "medium",
-        due_date: "",
-        user_id: ""
-      });
-      fetchTemplateTasks();
+      resetTaskForm();
+      fetchAllTemplateData();
     } catch (error) {
       toast.error('Failed to create template task');
+    }
+  };
+
+  const createSubTask = async () => {
+    if (!user || !parentTaskForSubTask || !subTaskForm.title.trim()) return;
+
+    try {
+      const subTaskData = {
+        template_id: parentTaskForSubTask.template_id,
+        title: subTaskForm.title,
+        description: subTaskForm.description || null,
+        priority: subTaskForm.priority,
+        due_date: subTaskForm.due_date ? new Date(subTaskForm.due_date).toISOString() : null,
+        user_id: parentTaskForSubTask.user_id,
+        created_by: user.id,
+        status: 'pending',
+        parent_task_id: parentTaskForSubTask.id
+      };
+
+      const { error } = await supabase
+        .from('template_tasks')
+        .insert([subTaskData]);
+
+      if (error) throw error;
+      
+      toast.success('Sub-task created successfully');
+      setShowSubTaskDialog(false);
+      resetSubTaskForm();
+      setParentTaskForSubTask(null);
+      fetchAllTemplateData();
+    } catch (error) {
+      toast.error('Failed to create sub-task');
+    }
+  };
+
+  const updateTask = async () => {
+    if (!selectedTask) return;
+
+    try {
+      const { error } = await supabase
+        .from('template_tasks')
+        .update({
+          title: taskForm.title,
+          description: taskForm.description,
+          priority: taskForm.priority,
+          due_date: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
+          status: taskForm.status || selectedTask.status
+        })
+        .eq('id', selectedTask.id);
+
+      if (error) throw error;
+      
+      toast.success('Task updated successfully');
+      setShowEditTask(false);
+      setSelectedTask(null);
+      resetTaskForm();
+      fetchAllTemplateData();
+    } catch (error) {
+      toast.error('Failed to update task');
+    }
+  };
+
+  const deleteTask = async (taskId: string) => {
+    try {
+      const { error } = await supabase
+        .from('template_tasks')
+        .delete()
+        .eq('id', taskId);
+
+      if (error) throw error;
+      
+      toast.success('Task deleted successfully');
+      fetchAllTemplateData();
+    } catch (error) {
+      toast.error('Failed to delete task');
+    }
+  };
+
+  const assignTaskToUser = async () => {
+    if (!user || !taskToAssign || !selectedUserId) return;
+
+    try {
+      const taskData = {
+        template_id: taskToAssign.template_id,
+        title: taskToAssign.title,
+        description: taskToAssign.description,
+        priority: taskToAssign.priority,
+        due_date: taskToAssign.due_date,
+        user_id: selectedUserId,
+        created_by: user.id,
+        status: 'pending'
+      };
+
+      const { error } = await supabase
+        .from('template_tasks')
+        .insert([taskData]);
+
+      if (error) throw error;
+      
+      toast.success('Task assigned to user successfully');
+      setShowAssignTaskDialog(false);
+      setTaskToAssign(null);
+      setSelectedUserId("");
+      fetchAllTemplateData();
+    } catch (error) {
+      toast.error('Failed to assign task to user');
+    }
+  };
+
+  const toggleTaskCompletion = async (taskId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+    
+    try {
+      const { error } = await supabase
+        .from('template_tasks')
+        .update({ status: newStatus })
+        .eq('id', taskId);
+
+      if (error) throw error;
+      
+      toast.success(`Task ${newStatus === 'completed' ? 'completed' : 'reopened'}`);
+      fetchAllTemplateData();
+    } catch (error) {
+      toast.error('Failed to update task status');
     }
   };
 
@@ -249,15 +462,100 @@ export default function LearningTemplates() {
     }
   };
 
-  const getAssignedUsers = () => {
-    return assignments.map(a => {
-      const profile = teamMembers.find(tm => tm.user_id === a.user_id);
-      return {
-        user_id: a.user_id,
-        full_name: profile?.full_name || 'Unknown',
-        email: profile?.email || 'Unknown'
-      };
+  const toggleTemplateExpanded = (templateId: string) => {
+    setExpandedTemplates(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(templateId)) {
+        newSet.delete(templateId);
+      } else {
+        newSet.add(templateId);
+      }
+      return newSet;
     });
+  };
+
+  const getAssignedUsers = (templateId: string) => {
+    return assignments
+      .filter(a => a.template_id === templateId)
+      .map(a => {
+        const profile = teamMembers.find(tm => tm.user_id === a.user_id);
+        return {
+          user_id: a.user_id,
+          full_name: profile?.full_name || 'Unknown',
+          email: profile?.email || 'Unknown'
+        };
+      });
+  };
+
+  const getTemplateTasks = (templateId: string) => {
+    return templateTasks.filter(task => task.template_id === templateId);
+  };
+
+  const getUnassignedUsers = (templateId: string) => {
+    const assignedUserIds = assignments
+      .filter(a => a.template_id === templateId)
+      .map(a => a.user_id);
+    return teamMembers.filter(member => !assignedUserIds.includes(member.user_id));
+  };
+
+  const resetTaskForm = () => {
+    setTaskForm({
+      title: "",
+      description: "",
+      priority: "medium",
+      due_date: "",
+      user_id: "",
+      start_time: "",
+      end_time: "",
+      all_day: false
+    });
+  };
+
+  const resetSubTaskForm = () => {
+    setSubTaskForm({
+      title: "",
+      description: "",
+      priority: "medium",
+      due_date: "",
+      start_time: "",
+      end_time: "",
+      all_day: false
+    });
+  };
+
+  const openEditTemplate = (template: LearningTemplate) => {
+    setSelectedTemplate(template);
+    setTemplateForm({
+      name: template.name,
+      description: template.description || "",
+      technology: template.technology
+    });
+    setShowEditTemplate(true);
+  };
+
+  const openEditTask = (task: TemplateTask) => {
+    setSelectedTask(task);
+    setTaskForm({
+      title: task.title,
+      description: task.description || "",
+      priority: task.priority,
+      due_date: task.due_date ? format(new Date(task.due_date), 'yyyy-MM-dd') : "",
+      user_id: task.user_id,
+      start_time: "",
+      end_time: "",
+      all_day: false
+    });
+    setShowEditTask(true);
+  };
+
+  const openSubTaskDialog = (parentTask: TemplateTask) => {
+    setParentTaskForSubTask(parentTask);
+    setShowSubTaskDialog(true);
+  };
+
+  const openAssignTaskDialog = (task: TemplateTask) => {
+    setTaskToAssign(task);
+    setShowAssignTaskDialog(true);
   };
 
   if (loading) {
@@ -282,7 +580,7 @@ export default function LearningTemplates() {
               Create Template
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Create Learning Template</DialogTitle>
               <DialogDescription>
@@ -294,8 +592,8 @@ export default function LearningTemplates() {
                 <Label htmlFor="name">Template Name</Label>
                 <Input
                   id="name"
-                  value={newTemplate.name}
-                  onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
+                  value={templateForm.name}
+                  onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
                   placeholder="e.g., Java Full Stack"
                 />
               </div>
@@ -303,8 +601,8 @@ export default function LearningTemplates() {
                 <Label htmlFor="technology">Technology</Label>
                 <Input
                   id="technology"
-                  value={newTemplate.technology}
-                  onChange={(e) => setNewTemplate({ ...newTemplate, technology: e.target.value })}
+                  value={templateForm.technology}
+                  onChange={(e) => setTemplateForm({ ...templateForm, technology: e.target.value })}
                   placeholder="e.g., Java, Python, .NET"
                 />
               </div>
@@ -312,8 +610,8 @@ export default function LearningTemplates() {
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
-                  value={newTemplate.description}
-                  onChange={(e) => setNewTemplate({ ...newTemplate, description: e.target.value })}
+                  value={templateForm.description}
+                  onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
                   placeholder="Describe the learning template..."
                 />
               </div>
@@ -325,214 +623,524 @@ export default function LearningTemplates() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Templates List */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Templates</h2>
-          {templates.map((template) => (
-            <Card 
-              key={template.id} 
-              className={`cursor-pointer transition-colors ${
-                selectedTemplate?.id === template.id ? 'ring-2 ring-primary' : ''
-              }`}
-              onClick={() => setSelectedTemplate(template)}
-            >
-              <CardHeader>
-                <CardTitle className="text-lg">{template.name}</CardTitle>
-                <CardDescription>{template.technology}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{template.description}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      {/* Templates with Collapsible Structure */}
+      <div className="space-y-4">
+        {templates.map((template) => {
+          const isExpanded = expandedTemplates.has(template.id);
+          const assignedUsers = getAssignedUsers(template.id);
+          const templateTasksList = getTemplateTasks(template.id);
+          const unassignedUsers = getUnassignedUsers(template.id);
 
-        {/* Template Details */}
-        {selectedTemplate && (
-          <>
-            {/* Assigned Users */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold">Assigned Users</h2>
-                <Dialog open={showAssignUser} onOpenChange={setShowAssignUser}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <Users className="mr-2 h-4 w-4" />
-                      Assign User
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Assign User to Template</DialogTitle>
-                      <DialogDescription>
-                        Assign a team member to {selectedTemplate.name}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="user">Select User</Label>
-                        <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a user" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {teamMembers
-                              .filter(member => !getAssignedUsers().some(u => u.user_id === member.user_id))
-                              .map((member) => (
-                                <SelectItem key={member.user_id} value={member.user_id}>
-                                  {member.full_name} ({member.email})
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button onClick={assignUserToTemplate} className="w-full">
-                        Assign User
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-              <div className="space-y-2">
-                {getAssignedUsers().map((user) => (
-                  <Card key={user.user_id}>
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-center">
+          return (
+            <Card key={template.id} className="w-full">
+              <Collapsible 
+                open={isExpanded} 
+                onOpenChange={() => toggleTemplateExpanded(template.id)}
+              >
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
                         <div>
-                          <p className="font-medium">{user.full_name}</p>
-                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                          <CardTitle className="text-lg">{template.name}</CardTitle>
+                          <CardDescription className="flex items-center gap-2">
+                            <Badge variant="outline">{template.technology}</Badge>
+                            <span className="text-sm">
+                              {assignedUsers.length} user{assignedUsers.length !== 1 ? 's' : ''} assigned
+                            </span>
+                          </CardDescription>
                         </div>
-                        <Badge variant="outline">
-                          {templateTasks.filter(t => t.user_id === user.user_id).length} tasks
-                        </Badge>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-
-            {/* Template Tasks */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold">Template Tasks</h2>
-                <Dialog open={showCreateTask} onOpenChange={setShowCreateTask}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      Create Task
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create Template Task</DialogTitle>
-                      <DialogDescription>
-                        Create a task for a user in {selectedTemplate.name}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="task-user">Assign to User</Label>
-                        <Select value={newTask.user_id} onValueChange={(value) => setNewTask({ ...newTask, user_id: value })}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a user" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {getAssignedUsers().map((user) => (
-                              <SelectItem key={user.user_id} value={user.user_id}>
-                                {user.full_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="task-title">Task Title</Label>
-                        <Input
-                          id="task-title"
-                          value={newTask.title}
-                          onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                          placeholder="e.g., Learn Spring Boot"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="task-description">Description</Label>
-                        <Textarea
-                          id="task-description"
-                          value={newTask.description}
-                          onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                          placeholder="Describe the task..."
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="task-priority">Priority</Label>
-                        <Select value={newTask.priority} onValueChange={(value) => setNewTask({ ...newTask, priority: value })}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="low">Low</SelectItem>
-                            <SelectItem value="medium">Medium</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="task-due-date">Due Date</Label>
-                        <Input
-                          id="task-due-date"
-                          type="date"
-                          value={newTask.due_date}
-                          onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-                        />
-                      </div>
-                      <Button onClick={createTemplateTask} className="w-full">
-                        Create Task
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-              <div className="space-y-2">
-                {templateTasks.map((task) => {
-                  const assignedUser = getAssignedUsers().find(u => u.user_id === task.user_id);
-                  const StatusIcon = getStatusIcon(task.status);
-                  return (
-                    <Card key={task.id}>
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <StatusIcon className="h-4 w-4" />
-                              <h3 className="font-medium">{task.title}</h3>
-                            </div>
-                            <p className="text-sm text-muted-foreground mb-2">{task.description}</p>
-                            <p className="text-sm font-medium">Assigned to: {assignedUser?.full_name || 'Unknown'}</p>
-                            {task.due_date && (
-                              <p className="text-sm text-muted-foreground">
-                                Due: {new Date(task.due_date).toLocaleDateString()}
-                              </p>
+                      <div className="flex items-center gap-2">
+                        {/* Assign User Dropdown */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>
+                              <Users className="mr-2 h-4 w-4" />
+                              Assign User
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            {unassignedUsers.length > 0 ? (
+                              unassignedUsers.map((member) => (
+                                <DropdownMenuItem
+                                  key={member.user_id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    assignUserToTemplate(template.id, member.user_id);
+                                  }}
+                                >
+                                  {member.full_name} ({member.email})
+                                </DropdownMenuItem>
+                              ))
+                            ) : (
+                              <DropdownMenuItem disabled>
+                                All users assigned
+                              </DropdownMenuItem>
                             )}
-                          </div>
-                          <div className="flex flex-col gap-2">
-                            <Badge variant={getPriorityColor(task.priority)}>
-                              {task.priority}
-                            </Badge>
-                            <Badge variant={getStatusColor(task.status)}>
-                              {task.status}
-                            </Badge>
-                          </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        
+                        {/* Template Actions */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              openEditTemplate(template);
+                            }}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit Template
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteTemplate(template.id);
+                              }}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Template
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent>
+                  <CardContent className="pt-0">
+                    {template.description && (
+                      <p className="text-sm text-muted-foreground mb-4">{template.description}</p>
+                    )}
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Assigned Users */}
+                      <div className="space-y-3">
+                        <h3 className="font-semibold">Assigned Users</h3>
+                        <div className="space-y-2">
+                          {assignedUsers.map((user) => (
+                            <Card key={user.user_id}>
+                              <CardContent className="p-3">
+                                <div className="flex justify-between items-center">
+                                  <div>
+                                    <p className="font-medium text-sm">{user.full_name}</p>
+                                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                                  </div>
+                                  <Badge variant="outline" className="text-xs">
+                                    {templateTasksList.filter(t => t.user_id === user.user_id).length} tasks
+                                  </Badge>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                          {assignedUsers.length === 0 && (
+                            <p className="text-sm text-muted-foreground">No users assigned yet</p>
+                          )}
                         </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                      </div>
+
+                      {/* Template Tasks */}
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <h3 className="font-semibold">Tasks</h3>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedTemplate(template);
+                              setShowCreateTask(true);
+                            }}
+                            disabled={assignedUsers.length === 0}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Task
+                          </Button>
+                        </div>
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                          {templateTasksList.map((task) => {
+                            const assignedUser = assignedUsers.find(u => u.user_id === task.user_id);
+                            const StatusIcon = getStatusIcon(task.status);
+                            return (
+                              <Card key={task.id} className="border-l-4 border-l-primary/20">
+                                <CardContent className="p-3">
+                                  <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <StatusIcon className="h-3 w-3" />
+                                        <h4 className="font-medium text-sm">{task.title}</h4>
+                                      </div>
+                                      {task.description && (
+                                        <p className="text-xs text-muted-foreground mb-1">{task.description}</p>
+                                      )}
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <span>{assignedUser?.full_name || 'Unknown'}</span>
+                                        {task.due_date && (
+                                          <span>• Due: {format(new Date(task.due_date), 'MMM dd')}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1 ml-2">
+                                      <Badge variant={getPriorityColor(task.priority)} className="text-xs px-1 py-0">
+                                        {task.priority}
+                                      </Badge>
+                                      <Switch
+                                        checked={task.status === 'completed'}
+                                        onCheckedChange={() => toggleTaskCompletion(task.id, task.status)}
+                                        size="sm"
+                                      />
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                            <Edit className="h-3 w-3" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent>
+                                          <DropdownMenuItem onClick={() => openEditTask(task)}>
+                                            <Edit className="mr-2 h-4 w-4" />
+                                            Edit Task
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => openSubTaskDialog(task)}>
+                                            <Plus className="mr-2 h-4 w-4" />
+                                            Add Sub-task
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => openAssignTaskDialog(task)}>
+                                            <Copy className="mr-2 h-4 w-4" />
+                                            Assign to Another User
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem 
+                                            onClick={() => deleteTask(task.id)}
+                                            className="text-destructive"
+                                          >
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Delete Task
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Sub-tasks */}
+                                  {task.sub_tasks && task.sub_tasks.length > 0 && (
+                                    <div className="mt-2 pl-4 border-l-2 border-muted space-y-1">
+                                      {task.sub_tasks.map((subTask) => {
+                                        const SubStatusIcon = getStatusIcon(subTask.status);
+                                        return (
+                                          <div key={subTask.id} className="flex items-center justify-between text-xs">
+                                            <div className="flex items-center gap-2">
+                                              <SubStatusIcon className="h-3 w-3" />
+                                              <span>{subTask.title}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                              <Badge variant={getPriorityColor(subTask.priority)} className="text-xs px-1 py-0">
+                                                {subTask.priority}
+                                              </Badge>
+                                              <Switch
+                                                checked={subTask.status === 'completed'}
+                                                onCheckedChange={() => toggleTaskCompletion(subTask.id, subTask.status)}
+                                                size="sm"
+                                              />
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                          {templateTasksList.length === 0 && (
+                            <p className="text-sm text-muted-foreground">No tasks created yet</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Edit Template Dialog */}
+      <Dialog open={showEditTemplate} onOpenChange={setShowEditTemplate}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Learning Template</DialogTitle>
+            <DialogDescription>
+              Update the learning template details
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-name">Template Name</Label>
+              <Input
+                id="edit-name"
+                value={templateForm.name}
+                onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
+                placeholder="e.g., Java Full Stack"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-technology">Technology</Label>
+              <Input
+                id="edit-technology"
+                value={templateForm.technology}
+                onChange={(e) => setTemplateForm({ ...templateForm, technology: e.target.value })}
+                placeholder="e.g., Java, Python, .NET"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={templateForm.description}
+                onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
+                placeholder="Describe the learning template..."
+              />
+            </div>
+            <Button onClick={updateTemplate} className="w-full">
+              Update Template
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Task Dialog */}
+      <Dialog open={showCreateTask} onOpenChange={setShowCreateTask}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Template Task</DialogTitle>
+            <DialogDescription>
+              Create a task for a user in {selectedTemplate?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="task-user">Assign to User</Label>
+              <Select value={taskForm.user_id} onValueChange={(value) => setTaskForm({ ...taskForm, user_id: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a user" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getAssignedUsers(selectedTemplate?.id || '').map((user) => (
+                    <SelectItem key={user.user_id} value={user.user_id}>
+                      {user.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="task-title">Task Title</Label>
+              <Input
+                id="task-title"
+                value={taskForm.title}
+                onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
+                placeholder="e.g., Learn Spring Boot"
+              />
+            </div>
+            <div>
+              <Label htmlFor="task-description">Description</Label>
+              <Textarea
+                id="task-description"
+                value={taskForm.description}
+                onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
+                placeholder="Describe the task..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="task-priority">Priority</Label>
+                <Select value={taskForm.priority} onValueChange={(value) => setTaskForm({ ...taskForm, priority: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="task-due-date">Due Date</Label>
+                <Input
+                  id="task-due-date"
+                  type="date"
+                  value={taskForm.due_date}
+                  onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })}
+                />
               </div>
             </div>
-          </>
-        )}
-      </div>
+            <Button onClick={() => createTemplateTask(selectedTemplate?.id || '')} className="w-full">
+              Create Task
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Task Dialog */}
+      <Dialog open={showEditTask} onOpenChange={setShowEditTask}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+            <DialogDescription>
+              Update the task details
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-task-title">Task Title</Label>
+              <Input
+                id="edit-task-title"
+                value={taskForm.title}
+                onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
+                placeholder="e.g., Learn Spring Boot"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-task-description">Description</Label>
+              <Textarea
+                id="edit-task-description"
+                value={taskForm.description}
+                onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
+                placeholder="Describe the task..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-task-priority">Priority</Label>
+                <Select value={taskForm.priority} onValueChange={(value) => setTaskForm({ ...taskForm, priority: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-task-due-date">Due Date</Label>
+                <Input
+                  id="edit-task-due-date"
+                  type="date"
+                  value={taskForm.due_date}
+                  onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })}
+                />
+              </div>
+            </div>
+            <Button onClick={updateTask} className="w-full">
+              Update Task
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Sub-task Dialog */}
+      <Dialog open={showSubTaskDialog} onOpenChange={setShowSubTaskDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Sub-task</DialogTitle>
+            <DialogDescription>
+              Create a sub-task for "{parentTaskForSubTask?.title}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="subtask-title">Sub-task Title</Label>
+              <Input
+                id="subtask-title"
+                value={subTaskForm.title}
+                onChange={(e) => setSubTaskForm({ ...subTaskForm, title: e.target.value })}
+                placeholder="e.g., Learn Spring Boot Basics"
+              />
+            </div>
+            <div>
+              <Label htmlFor="subtask-description">Description</Label>
+              <Textarea
+                id="subtask-description"
+                value={subTaskForm.description}
+                onChange={(e) => setSubTaskForm({ ...subTaskForm, description: e.target.value })}
+                placeholder="Describe the sub-task..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="subtask-priority">Priority</Label>
+                <Select value={subTaskForm.priority} onValueChange={(value) => setSubTaskForm({ ...subTaskForm, priority: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="subtask-due-date">Due Date</Label>
+                <Input
+                  id="subtask-due-date"
+                  type="date"
+                  value={subTaskForm.due_date}
+                  onChange={(e) => setSubTaskForm({ ...subTaskForm, due_date: e.target.value })}
+                />
+              </div>
+            </div>
+            <Button onClick={createSubTask} className="w-full">
+              Create Sub-task
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Task to Another User Dialog */}
+      <Dialog open={showAssignTaskDialog} onOpenChange={setShowAssignTaskDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Task to Another User</DialogTitle>
+            <DialogDescription>
+              Assign "{taskToAssign?.title}" to another user in the same template
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="assign-user">Select User</Label>
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a user" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getAssignedUsers(taskToAssign?.template_id || '').map((user) => (
+                    <SelectItem key={user.user_id} value={user.user_id}>
+                      {user.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={assignTaskToUser} className="w-full">
+              Assign Task
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
