@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Users, BookOpen, CheckCircle, Clock, AlertCircle, Edit, ChevronDown, ChevronRight, Trash2, Copy } from "lucide-react";
+import { Plus, Users, BookOpen, CheckCircle, Clock, AlertCircle, Edit, ChevronDown, ChevronRight, Trash2, Copy, User, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -67,12 +67,16 @@ export default function LearningTemplates() {
   const [showEditTask, setShowEditTask] = useState(false);
   const [showSubTaskDialog, setShowSubTaskDialog] = useState(false);
   const [showAssignTaskDialog, setShowAssignTaskDialog] = useState(false);
+  const [showReassignTaskDialog, setShowReassignTaskDialog] = useState(false);
+  const [showReassignSubTaskDialog, setShowReassignSubTaskDialog] = useState(false);
   
   // Selected states
   const [selectedTemplate, setSelectedTemplate] = useState<LearningTemplate | null>(null);
   const [selectedTask, setSelectedTask] = useState<TemplateTask | null>(null);
   const [parentTaskForSubTask, setParentTaskForSubTask] = useState<TemplateTask | null>(null);
   const [taskToAssign, setTaskToAssign] = useState<TemplateTask | null>(null);
+  const [taskToReassign, setTaskToReassign] = useState<TemplateTask | null>(null);
+  const [subTaskToReassign, setSubTaskToReassign] = useState<TemplateTask | null>(null);
   
   // Form states
   const [templateForm, setTemplateForm] = useState({
@@ -418,6 +422,48 @@ export default function LearningTemplates() {
     }
   };
 
+  const reassignTask = async () => {
+    if (!user || !taskToReassign || !selectedUserId) return;
+
+    try {
+      const { error } = await supabase
+        .from('template_tasks')
+        .update({ user_id: selectedUserId })
+        .eq('id', taskToReassign.id);
+
+      if (error) throw error;
+      
+      toast.success('Task reassigned successfully');
+      setShowReassignTaskDialog(false);
+      setTaskToReassign(null);
+      setSelectedUserId("");
+      fetchAllTemplateData();
+    } catch (error) {
+      toast.error('Failed to reassign task');
+    }
+  };
+
+  const reassignSubTask = async () => {
+    if (!user || !subTaskToReassign || !selectedUserId) return;
+
+    try {
+      const { error } = await supabase
+        .from('template_tasks')
+        .update({ user_id: selectedUserId })
+        .eq('id', subTaskToReassign.id);
+
+      if (error) throw error;
+      
+      toast.success('Sub-task reassigned successfully');
+      setShowReassignSubTaskDialog(false);
+      setSubTaskToReassign(null);
+      setSelectedUserId("");
+      fetchAllTemplateData();
+    } catch (error) {
+      toast.error('Failed to reassign sub-task');
+    }
+  };
+
   const toggleTaskCompletion = async (taskId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
     
@@ -559,6 +605,16 @@ export default function LearningTemplates() {
   const openAssignTaskDialog = (task: TemplateTask) => {
     setTaskToAssign(task);
     setShowAssignTaskDialog(true);
+  };
+
+  const openReassignTaskDialog = (task: TemplateTask) => {
+    setTaskToReassign(task);
+    setShowReassignTaskDialog(true);
+  };
+
+  const openReassignSubTaskDialog = (subTask: TemplateTask) => {
+    setSubTaskToReassign(subTask);
+    setShowReassignSubTaskDialog(true);
   };
 
   if (loading) {
@@ -820,6 +876,10 @@ export default function LearningTemplates() {
                                             <Copy className="mr-2 h-4 w-4" />
                                             Assign to Another User
                                           </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => openReassignTaskDialog(task)}>
+                                            <User className="mr-2 h-4 w-4" />
+                                            Reassign Task
+                                          </DropdownMenuItem>
                                           <DropdownMenuItem 
                                             onClick={() => deleteTask(task.id)}
                                             className="text-destructive"
@@ -838,10 +898,13 @@ export default function LearningTemplates() {
                                       {task.sub_tasks.map((subTask) => {
                                         const SubStatusIcon = getStatusIcon(subTask.status);
                                         return (
-                                          <div key={subTask.id} className="flex items-center justify-between text-xs">
-                                            <div className="flex items-center gap-2">
+                                          <div key={subTask.id} className="flex items-center justify-between text-xs p-2 bg-muted/30 rounded">
+                                            <div className="flex items-center gap-2 flex-1">
                                               <SubStatusIcon className="h-3 w-3" />
-                                              <span>{subTask.title}</span>
+                                              <span className="font-medium">{subTask.title}</span>
+                                              {subTask.description && (
+                                                <span className="text-muted-foreground">- {subTask.description}</span>
+                                              )}
                                             </div>
                                             <div className="flex items-center gap-1">
                                               <Badge variant={getPriorityColor(subTask.priority)} className="text-xs px-1 py-0">
@@ -851,6 +914,30 @@ export default function LearningTemplates() {
                                                 checked={subTask.status === 'completed'}
                                                 onCheckedChange={() => toggleTaskCompletion(subTask.id, subTask.status)}
                                               />
+                                              <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                                    <MoreVertical className="h-3 w-3" />
+                                                  </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent>
+                                                  <DropdownMenuItem onClick={() => openReassignSubTaskDialog(subTask)}>
+                                                    <User className="mr-2 h-4 w-4" />
+                                                    Reassign Sub-task
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuItem onClick={() => openAssignTaskDialog(subTask)}>
+                                                    <Copy className="mr-2 h-4 w-4" />
+                                                    Assign to Another User
+                                                  </DropdownMenuItem>
+                                                  <DropdownMenuItem 
+                                                    onClick={() => deleteTask(subTask.id)}
+                                                    className="text-destructive"
+                                                  >
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    Delete Sub-task
+                                                  </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                              </DropdownMenu>
                                             </div>
                                           </div>
                                         );
@@ -1111,24 +1198,24 @@ export default function LearningTemplates() {
         </DialogContent>
       </Dialog>
 
-      {/* Assign Task to Another User Dialog */}
-      <Dialog open={showAssignTaskDialog} onOpenChange={setShowAssignTaskDialog}>
+      {/* Reassign Task Dialog */}
+      <Dialog open={showReassignTaskDialog} onOpenChange={setShowReassignTaskDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign Task to Another User</DialogTitle>
+            <DialogTitle>Reassign Task</DialogTitle>
             <DialogDescription>
-              Assign "{taskToAssign?.title}" to another user in the same template
+              Reassign "{taskToReassign?.title}" to a different user
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="assign-user">Select User</Label>
+              <Label htmlFor="reassign-user">Select New User</Label>
               <Select value={selectedUserId} onValueChange={setSelectedUserId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a user" />
                 </SelectTrigger>
                 <SelectContent>
-                  {getAssignedUsers(taskToAssign?.template_id || '').map((user) => (
+                  {getAssignedUsers(taskToReassign?.template_id || '').map((user) => (
                     <SelectItem key={user.user_id} value={user.user_id}>
                       {user.full_name}
                     </SelectItem>
@@ -1136,8 +1223,40 @@ export default function LearningTemplates() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={assignTaskToUser} className="w-full">
-              Assign Task
+            <Button onClick={reassignTask} className="w-full">
+              Reassign Task
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reassign Sub-task Dialog */}
+      <Dialog open={showReassignSubTaskDialog} onOpenChange={setShowReassignSubTaskDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reassign Sub-task</DialogTitle>
+            <DialogDescription>
+              Reassign "{subTaskToReassign?.title}" to a different user
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="reassign-subtask-user">Select New User</Label>
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a user" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getAssignedUsers(subTaskToReassign?.template_id || '').map((user) => (
+                    <SelectItem key={user.user_id} value={user.user_id}>
+                      {user.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={reassignSubTask} className="w-full">
+              Reassign Sub-task
             </Button>
           </div>
         </DialogContent>
