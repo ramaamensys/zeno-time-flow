@@ -448,6 +448,44 @@ export default function LearningTemplates() {
     }
   };
 
+  const removeUserFromTemplate = async (templateId: string, userId: string) => {
+    try {
+      // Remove template assignment
+      const { error: assignmentError } = await supabase
+        .from('template_assignments')
+        .delete()
+        .eq('template_id', templateId)
+        .eq('user_id', userId);
+
+      if (assignmentError) throw assignmentError;
+
+      // Get all tasks for this template and user (including subtasks)
+      const { data: userTasks, error: tasksError } = await supabase
+        .from('template_tasks')
+        .select('id')
+        .eq('template_id', templateId)
+        .eq('user_id', userId);
+
+      if (tasksError) throw tasksError;
+
+      // Remove user's tasks (this will only remove the user's link to the task)
+      if (userTasks && userTasks.length > 0) {
+        const taskIds = userTasks.map(task => task.id);
+        const { error: deleteTasksError } = await supabase
+          .from('template_tasks')
+          .delete()
+          .in('id', taskIds);
+
+        if (deleteTasksError) throw deleteTasksError;
+      }
+      
+      toast.success('User removed from template successfully');
+      fetchAllTemplateData();
+    } catch (error) {
+      toast.error('Failed to remove user from template');
+    }
+  };
+
   const toggleTaskCompletion = async (taskId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
     
@@ -768,30 +806,48 @@ export default function LearningTemplates() {
                     )}
                     
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Assigned Users */}
-                      <div className="space-y-3">
-                        <h3 className="font-semibold">Assigned Users</h3>
-                        <div className="space-y-2">
-                          {assignedUsers.map((user) => (
-                            <Card key={user.user_id}>
-                              <CardContent className="p-3">
-                                <div className="flex justify-between items-center">
-                                  <div>
-                                    <p className="font-medium text-sm">{user.full_name}</p>
-                                    <p className="text-xs text-muted-foreground">{user.email}</p>
-                                  </div>
-                                  <Badge variant="outline" className="text-xs">
-                                    {templateTasksList.filter(t => t.user_id === user.user_id).length} tasks
-                                  </Badge>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                          {assignedUsers.length === 0 && (
-                            <p className="text-sm text-muted-foreground">No users assigned yet</p>
-                          )}
-                        </div>
-                      </div>
+                       {/* Assigned Users */}
+                       <div className="space-y-3">
+                         <h3 className="font-semibold">Assigned Users</h3>
+                         <div className="space-y-2">
+                           {assignedUsers.map((user) => (
+                             <Card key={user.user_id}>
+                               <CardContent className="p-3">
+                                 <div className="flex justify-between items-center">
+                                   <div>
+                                     <p className="font-medium text-sm">{user.full_name}</p>
+                                     <p className="text-xs text-muted-foreground">{user.email}</p>
+                                   </div>
+                                   <div className="flex items-center gap-2">
+                                     <Badge variant="outline" className="text-xs">
+                                       {templateTasksList.filter(t => t.user_id === user.user_id).length} tasks
+                                     </Badge>
+                                     <DropdownMenu>
+                                       <DropdownMenuTrigger asChild>
+                                         <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                           <MoreVertical className="h-3 w-3" />
+                                         </Button>
+                                       </DropdownMenuTrigger>
+                                       <DropdownMenuContent>
+                                         <DropdownMenuItem 
+                                           onClick={() => removeUserFromTemplate(template.id, user.user_id)}
+                                           className="text-destructive"
+                                         >
+                                           <Trash2 className="mr-2 h-4 w-4" />
+                                           Remove User from Template
+                                         </DropdownMenuItem>
+                                       </DropdownMenuContent>
+                                     </DropdownMenu>
+                                   </div>
+                                 </div>
+                               </CardContent>
+                             </Card>
+                           ))}
+                           {assignedUsers.length === 0 && (
+                             <p className="text-sm text-muted-foreground">No users assigned yet</p>
+                           )}
+                         </div>
+                       </div>
 
                       {/* Template Tasks */}
                       <div className="space-y-3">
