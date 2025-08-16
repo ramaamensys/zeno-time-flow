@@ -18,6 +18,7 @@ import Account from "./pages/Account";
 import UserManagement from "./pages/UserManagement";
 import Planner from "./pages/Planner";
 import Habits from "./pages/Habits";
+import LearningTemplates from "./pages/LearningTemplates";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,11 @@ const App = () => (
             <Route path="/user-management" element={
               <ProtectedRoute>
                 <Layout><UserManagement /></Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/learning-templates" element={
+              <ProtectedRoute>
+                <Layout><LearningTemplates /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/account" element={
