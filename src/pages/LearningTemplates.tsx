@@ -147,22 +147,6 @@ export default function LearningTemplates() {
     }
   };
 
-  const fetchTemplateAssignments = async () => {
-    if (!selectedTemplate) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('template_assignments')
-        .select('*')
-        .eq('template_id', selectedTemplate.id);
-
-      if (error) throw error;
-      setAssignments(data || []);
-    } catch (error) {
-      toast.error('Failed to fetch template assignments');
-    }
-  };
-
   const fetchAllTemplateData = async () => {
     const templateIds = Array.from(expandedTemplates);
     if (templateIds.length === 0) return;
@@ -482,33 +466,6 @@ export default function LearningTemplates() {
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'destructive';
-      case 'medium': return 'secondary';
-      case 'low': return 'outline';
-      default: return 'secondary';
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'default';
-      case 'in_progress': return 'secondary';
-      case 'pending': return 'outline';
-      default: return 'outline';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed': return CheckCircle;
-      case 'in_progress': return Clock;
-      case 'pending': return AlertCircle;
-      default: return AlertCircle;
-    }
-  };
-
   const toggleTemplateExpanded = (templateId: string) => {
     setExpandedTemplates(prev => {
       const newSet = new Set(prev);
@@ -615,6 +572,33 @@ export default function LearningTemplates() {
   const openReassignSubTaskDialog = (subTask: TemplateTask) => {
     setSubTaskToReassign(subTask);
     setShowReassignSubTaskDialog(true);
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'destructive';
+      case 'medium': return 'secondary';
+      case 'low': return 'outline';
+      default: return 'secondary';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'default';
+      case 'in_progress': return 'secondary';
+      case 'pending': return 'outline';
+      default: return 'outline';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed': return CheckCircle;
+      case 'in_progress': return Clock;
+      case 'pending': return AlertCircle;
+      default: return AlertCircle;
+    }
   };
 
   if (loading) {
@@ -853,10 +837,10 @@ export default function LearningTemplates() {
                                       <Badge variant={getPriorityColor(task.priority)} className="text-xs px-1 py-0">
                                         {task.priority}
                                       </Badge>
-                                              <Switch
-                                                checked={task.status === 'completed'}
-                                                onCheckedChange={() => toggleTaskCompletion(task.id, task.status)}
-                                              />
+                                      <Switch
+                                        checked={task.status === 'completed'}
+                                        onCheckedChange={() => toggleTaskCompletion(task.id, task.status)}
+                                      />
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                           <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
@@ -1193,6 +1177,38 @@ export default function LearningTemplates() {
             </div>
             <Button onClick={createSubTask} className="w-full">
               Create Sub-task
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Task to Another User Dialog */}
+      <Dialog open={showAssignTaskDialog} onOpenChange={setShowAssignTaskDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Task to Another User</DialogTitle>
+            <DialogDescription>
+              Assign "{taskToAssign?.title}" to another user in the same template
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="assign-user">Select User</Label>
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a user" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getAssignedUsers(taskToAssign?.template_id || '').map((user) => (
+                    <SelectItem key={user.user_id} value={user.user_id}>
+                      {user.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={assignTaskToUser} className="w-full">
+              Assign Task
             </Button>
           </div>
         </DialogContent>
