@@ -18,7 +18,7 @@ import Account from "./pages/Account";
 import UserManagement from "./pages/UserManagement";
 import Planner from "./pages/Planner";
 import Habits from "./pages/Habits";
-import LearningTemplates from "./pages/LearningTemplates";
+import Template from "./pages/Template";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -49,9 +49,9 @@ const App = () => (
                 <Layout><UserManagement /></Layout>
               </ProtectedRoute>
             } />
-            <Route path="/learning-templates" element={
+            <Route path="/template" element={
               <ProtectedRoute>
-                <Layout><LearningTemplates /></Layout>
+                <Layout><Template /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/account" element={
