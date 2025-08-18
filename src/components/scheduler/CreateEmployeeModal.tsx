@@ -25,7 +25,7 @@ export default function CreateEmployeeModal({ open, onOpenChange, companyId }: C
     phone: "",
     hire_date: "",
     hourly_rate: "",
-    department_id: "",
+    department_id: "none", // Use placeholder value instead of empty string
     position: "",
     emergency_contact_name: "",
     emergency_contact_phone: "",
@@ -47,7 +47,7 @@ export default function CreateEmployeeModal({ open, onOpenChange, companyId }: C
         company_id: companyId,
         hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : undefined,
         hire_date: formData.hire_date || undefined,
-        department_id: formData.department_id || undefined,
+        department_id: formData.department_id !== "none" ? formData.department_id : undefined,
         position: formData.position || undefined,
         emergency_contact_name: formData.emergency_contact_name || undefined,
         emergency_contact_phone: formData.emergency_contact_phone || undefined,
@@ -62,7 +62,7 @@ export default function CreateEmployeeModal({ open, onOpenChange, companyId }: C
         phone: "",
         hire_date: "",
         hourly_rate: "",
-        department_id: "",
+        department_id: "none", // Use placeholder value instead of empty string
         position: "",
         emergency_contact_name: "",
         emergency_contact_phone: "",
@@ -150,6 +150,7 @@ export default function CreateEmployeeModal({ open, onOpenChange, companyId }: C
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">Select department</SelectItem>
                   {departments.map((department) => (
                     <SelectItem key={department.id} value={department.id}>
                       {department.name}

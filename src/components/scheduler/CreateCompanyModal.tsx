@@ -26,7 +26,7 @@ export default function CreateCompanyModal({ open, onOpenChange }: CreateCompany
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    type: "",
+    type: "motel", // Default to first option to avoid empty string
     color: "#3b82f6",
     address: "",
     phone: "",
@@ -46,7 +46,7 @@ export default function CreateCompanyModal({ open, onOpenChange }: CreateCompany
       onOpenChange(false);
       setFormData({
         name: "",
-        type: "",
+        type: "motel", // Default to first option to avoid empty string
         color: "#3b82f6",
         address: "",
         phone: "",
