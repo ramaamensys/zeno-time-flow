@@ -4,21 +4,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import Layout from "@/components/Layout";
+import AppRouter from "@/components/AppRouter";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import AdminAuth from "./pages/AdminAuth";
-import Dashboard from "./pages/Dashboard";
-import Tasks from "./pages/Tasks";
-import Calendar from "./pages/Calendar";
-import Focus from "./pages/Focus";
-import Profile from "./pages/Profile";
-import Account from "./pages/Account";
-import UserManagement from "./pages/UserManagement";
-import Planner from "./pages/Planner";
-import Habits from "./pages/Habits";
-import Template from "./pages/Template";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,32 +23,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/admin" element={<AdminAuth />} />
-            <Route path="/calendar" element={
-              <ProtectedRoute>
-                <Layout><Calendar /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/tasks" element={
-              <ProtectedRoute>
-                <Layout><Tasks /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/user-management" element={
-              <ProtectedRoute>
-                <Layout><UserManagement /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/template" element={
-              <ProtectedRoute>
-                <Layout><Template /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/account" element={
-              <ProtectedRoute>
-                <Layout><Account /></Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="*" element={<NotFound />} />
+            <Route path="/*" element={<AppRouter />} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>

@@ -270,18 +270,21 @@ export type Database = {
       }
       user_roles: {
         Row: {
+          app_type: Database["public"]["Enums"]["app_type"] | null
           created_at: string | null
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
+          app_type?: Database["public"]["Enums"]["app_type"] | null
           created_at?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
+          app_type?: Database["public"]["Enums"]["app_type"] | null
           created_at?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
@@ -294,6 +297,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_user_app_type: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_type"]
+      }
+      has_app_access: {
+        Args: {
+          _app_type: Database["public"]["Enums"]["app_type"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -304,6 +318,7 @@ export type Database = {
     }
     Enums: {
       app_role: "user" | "admin" | "super_admin"
+      app_type: "calendar" | "scheduler"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -432,6 +447,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["user", "admin", "super_admin"],
+      app_type: ["calendar", "scheduler"],
     },
   },
 } as const

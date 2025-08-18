@@ -12,6 +12,7 @@ interface CreateUserRequest {
   full_name: string;
   role: string;
   password: string;
+  app_type?: 'calendar' | 'scheduler';
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -23,9 +24,9 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, full_name, role, password }: CreateUserRequest = await req.json();
+    const { email, full_name, role, password, app_type = 'calendar' }: CreateUserRequest = await req.json();
 
-    console.log(`Creating user with email: ${email}, role: ${role}`);
+    console.log(`Creating user with email: ${email}, role: ${role}, app_type: ${app_type}`);
 
     // Create Supabase admin client
     const supabaseUrl = "https://usjvqsqotpedesvldkln.supabase.co";
@@ -54,18 +55,30 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('User created successfully:', data.user?.id);
 
-    // Update user role if not default
-    if (data.user && role !== 'user') {
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .update({ role: role })
-        .eq('user_id', data.user.id);
+    // Update user role and app_type
+    if (data.user) {
+      const updateData: any = {};
+      
+      if (role !== 'user') {
+        updateData.role = role;
+      }
+      
+      if (app_type !== 'calendar') {
+        updateData.app_type = app_type;
+      }
 
-      if (roleError) {
-        console.error('Error updating role:', roleError);
-        // Don't throw here, user is already created
-      } else {
-        console.log('User role updated successfully');
+      if (Object.keys(updateData).length > 0) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .update(updateData)
+          .eq('user_id', data.user.id);
+
+        if (roleError) {
+          console.error('Error updating user role/app_type:', roleError);
+          // Don't throw here, user is already created
+        } else {
+          console.log('User role and app_type updated successfully');
+        }
       }
     }
 
@@ -79,7 +92,8 @@ const handler = async (req: Request): Promise<Response> => {
           email: email,
           full_name: full_name,
           role: role,
-          password: password
+          password: password,
+          app_type: app_type
         }
       });
 
