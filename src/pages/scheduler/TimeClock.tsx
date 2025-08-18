@@ -18,31 +18,101 @@ import { supabase } from "@/integrations/supabase/client";
 
 export default function SchedulerTimeClock() {
   const [selectedPeriod, setSelectedPeriod] = useState<string>("today");
+  const [selectedCompany, setSelectedCompany] = useState<string>("");
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [timeEntries, setTimeEntries] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
 
   useEffect(() => {
-    loadTimeClockData();
-  }, [selectedPeriod]);
+    loadCompanies();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCompany) {
+      loadLocations();
+      loadTimeClockData();
+    }
+  }, [selectedCompany, selectedLocation, selectedPeriod]);
+
+  const loadCompanies = async () => {
+    try {
+      const { data } = await (supabase as any)
+        .from('companies')
+        .select('id, name, type')
+        .order('name');
+      
+      setCompanies(data || []);
+      
+      // Auto-select first company if available
+      if (data && data.length > 0 && !selectedCompany) {
+        setSelectedCompany(data[0].id);
+      }
+    } catch (error) {
+      console.error('Error loading companies:', error);
+    }
+  };
+
+  const loadLocations = async () => {
+    if (!selectedCompany) return;
+    
+    try {
+      const { data } = await (supabase as any)
+        .from('departments')
+        .select('id, name')
+        .eq('company_id', selectedCompany)
+        .order('name');
+      
+      setLocations(data || []);
+      
+      // Reset location selection when company changes
+      setSelectedLocation("");
+    } catch (error) {
+      console.error('Error loading locations:', error);
+    }
+  };
 
   const loadTimeClockData = async () => {
+    if (!selectedCompany) return;
+    
+    setLoading(true);
     try {
-      // Load time clock entries
-      const { data: timeData } = await (supabase as any)
+      let timeQuery = (supabase as any)
         .from('time_clock')
         .select(`
           *,
-          employees!inner(first_name, last_name)
+          employees!inner(
+            first_name, 
+            last_name, 
+            company_id,
+            department_id
+          )
         `)
+        .eq('employees.company_id', selectedCompany)
         .order('created_at', { ascending: false });
 
-      // Load employees for quick clock in
-      const { data: employeesData } = await (supabase as any)
+      // Filter by location if selected
+      if (selectedLocation) {
+        timeQuery = timeQuery.eq('employees.department_id', selectedLocation);
+      }
+
+      const { data: timeData } = await timeQuery;
+
+      let employeesQuery = (supabase as any)
         .from('employees')
-        .select('id, first_name, last_name, status')
+        .select('id, first_name, last_name, status, company_id, department_id')
         .eq('status', 'active')
+        .eq('company_id', selectedCompany)
         .limit(5);
+
+      // Filter employees by location if selected
+      if (selectedLocation) {
+        employeesQuery = employeesQuery.eq('department_id', selectedLocation);
+      }
+
+      const { data: employeesData } = await employeesQuery;
 
       setTimeEntries(timeData || []);
       setEmployees(employeesData || []);
@@ -93,7 +163,71 @@ export default function SchedulerTimeClock() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      {/* Company and Location Filters */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Select Company</label>
+          <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+            <SelectTrigger>
+              <SelectValue placeholder="Choose a company..." />
+            </SelectTrigger>
+            <SelectContent>
+              {companies.map((company) => (
+                <SelectItem key={company.id} value={company.id}>
+                  {company.name} ({company.type})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Select Location</label>
+          <Select 
+            value={selectedLocation} 
+            onValueChange={setSelectedLocation}
+            disabled={!selectedCompany || locations.length === 0}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={locations.length === 0 ? "No locations available" : "All locations"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Locations</SelectItem>
+              {locations.map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  {location.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Time Period</label>
+          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">This Week</SelectItem>
+              <SelectItem value="month">This Month</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {!selectedCompany ? (
+        <div className="text-center py-12">
+          <Clock className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-medium mb-2">Select a Company</h3>
+          <p className="text-muted-foreground mb-4">
+            Choose a company above to view time clock data and manage employee attendance.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Currently Clocked In</CardTitle>
@@ -255,28 +389,25 @@ export default function SchedulerTimeClock() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Time Entries</CardTitle>
-            <div className="flex items-center gap-2">
-              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
-              </Button>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>
+                Time Entries
+                {selectedLocation && (
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    - {locations.find(l => l.id === selectedLocation)?.name}
+                  </span>
+                )}
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filter
+                </Button>
+              </div>
             </div>
-          </div>
-        </CardHeader>
+          </CardHeader>
         <CardContent>
           {loading ? (
             <div className="space-y-2">
@@ -356,6 +487,8 @@ export default function SchedulerTimeClock() {
           )}
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   );
 }

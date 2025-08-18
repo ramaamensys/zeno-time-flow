@@ -7,10 +7,15 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function SchedulerDashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [selectedCompany, setSelectedCompany] = useState<string>("");
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
   const [stats, setStats] = useState({
     totalEmployees: 0,
     activeShifts: 0,
@@ -20,27 +25,88 @@ export default function SchedulerDashboard() {
   const [todayShifts, setTodayShifts] = useState<any[]>([]);
 
   useEffect(() => {
-    loadDashboardData();
+    loadCompanies();
   }, []);
 
-  const loadDashboardData = async () => {
-    try {
-      // Get total employees count
-      const { count: employeeCount } = await (supabase as any)
-        .from('employees')
-        .select('*', { count: 'exact', head: true });
+  useEffect(() => {
+    if (selectedCompany) {
+      loadLocations();
+      loadDashboardData();
+    }
+  }, [selectedCompany, selectedLocation]);
 
-      // Get today's shifts
+  const loadCompanies = async () => {
+    try {
+      const { data } = await (supabase as any)
+        .from('companies')
+        .select('id, name, type')
+        .order('name');
+      
+      setCompanies(data || []);
+      
+      // Auto-select first company if available
+      if (data && data.length > 0 && !selectedCompany) {
+        setSelectedCompany(data[0].id);
+      }
+    } catch (error) {
+      console.error('Error loading companies:', error);
+    }
+  };
+
+  const loadLocations = async () => {
+    if (!selectedCompany) return;
+    
+    try {
+      const { data } = await (supabase as any)
+        .from('departments')
+        .select('id, name')
+        .eq('company_id', selectedCompany)
+        .order('name');
+      
+      setLocations(data || []);
+      
+      // Reset location selection when company changes
+      setSelectedLocation("");
+    } catch (error) {
+      console.error('Error loading locations:', error);
+    }
+  };
+
+  const loadDashboardData = async () => {
+    if (!selectedCompany) return;
+    
+    setLoading(true);
+    try {
+      // Get total employees count for selected company
+      let employeeQuery = (supabase as any)
+        .from('employees')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', selectedCompany);
+
+      if (selectedLocation) {
+        employeeQuery = employeeQuery.eq('department_id', selectedLocation);
+      }
+
+      const { count: employeeCount } = await employeeQuery;
+
+      // Get today's shifts for selected company
       const today = new Date().toISOString().split('T')[0];
-      const { data: shifts } = await (supabase as any)
+      let shiftsQuery = (supabase as any)
         .from('shifts')
         .select(`
           *,
-          employees!inner(first_name, last_name),
+          employees!inner(first_name, last_name, company_id, department_id),
           departments(name)
         `)
+        .eq('employees.company_id', selectedCompany)
         .gte('start_time', `${today}T00:00:00.000Z`)
         .lt('start_time', `${today}T23:59:59.999Z`);
+
+      if (selectedLocation) {
+        shiftsQuery = shiftsQuery.eq('employees.department_id', selectedLocation);
+      }
+
+      const { data: shifts } = await shiftsQuery;
 
       // Calculate active shifts and total hours
       const now = new Date();
@@ -96,140 +162,199 @@ export default function SchedulerDashboard() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-16" /> : stats.totalEmployees}</div>
-            <p className="text-xs text-muted-foreground">
-              Total registered employees
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Shifts</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-16" /> : stats.activeShifts}</div>
-            <p className="text-xs text-muted-foreground">
-              Currently in progress
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Hours This Week</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-16" /> : stats.totalHours}</div>
-            <p className="text-xs text-muted-foreground">
-              Scheduled for today
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Requests</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.pendingRequests}</div>
-            <p className="text-xs text-muted-foreground">
-              Need approval
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
+      {/* Company and Location Filters */}
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Today's Shifts</CardTitle>
-            <CardDescription>
-              Overview of scheduled shifts for today
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {loading ? (
-              Array(2).fill(0).map((_, i) => (
-                <div key={i} className="flex items-center space-x-4">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="flex-1">
-                    <Skeleton className="h-4 w-24 mb-1" />
-                    <Skeleton className="h-3 w-16" />
-                  </div>
-                  <div className="text-right">
-                    <Skeleton className="h-4 w-20 mb-1" />
-                    <Skeleton className="h-5 w-16" />
-                  </div>
-                </div>
-              ))
-            ) : todayShifts.length > 0 ? (
-              todayShifts.map((shift) => (
-                <div key={shift.id} className="flex items-center space-x-4">
-                  <Avatar>
-                    <AvatarFallback>{shift.employee.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{shift.employee}</p>
-                    <p className="text-xs text-muted-foreground">{shift.department}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm">{shift.time}</p>
-                    <Badge variant={shift.status === 'in_progress' ? 'default' : 'secondary'}>
-                      {shift.status === 'in_progress' ? 'Active' : 'Scheduled'}
-                    </Badge>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No shifts scheduled for today</p>
-                <Button 
-                  variant="outline" 
-                  className="mt-2" 
-                  onClick={() => navigate('/scheduler/schedule')}
-                >
-                  Create Schedule
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Select Company</label>
+          <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+            <SelectTrigger>
+              <SelectValue placeholder="Choose a company..." />
+            </SelectTrigger>
+            <SelectContent>
+              {companies.map((company) => (
+                <SelectItem key={company.id} value={company.id}>
+                  {company.name} ({company.type})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>
-              Frequently used actions for schedule management
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/scheduler/schedule')}>
-              <Calendar className="h-4 w-4 mr-2" />
-              View Full Schedule
-            </Button>
-            <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/scheduler/employees')}>
-              <Users className="h-4 w-4 mr-2" />
-              Manage Employees
-            </Button>
-            <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/scheduler/time-clock')}>
-              <Clock className="h-4 w-4 mr-2" />
-              Time Clock Reports
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Select Location</label>
+          <Select 
+            value={selectedLocation} 
+            onValueChange={setSelectedLocation}
+            disabled={!selectedCompany || locations.length === 0}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={locations.length === 0 ? "No locations available" : "All locations"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Locations</SelectItem>
+              {locations.map((location) => (
+                <SelectItem key={location.id} value={location.id}>
+                  {location.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+
+      {!selectedCompany ? (
+        <div className="text-center py-12">
+          <Calendar className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-medium mb-2">Select a Company</h3>
+          <p className="text-muted-foreground mb-4">
+            Choose a company above to view dashboard data and manage schedules.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-16" /> : stats.totalEmployees}</div>
+                <p className="text-xs text-muted-foreground">
+                  Total registered employees
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active Shifts</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-16" /> : stats.activeShifts}</div>
+                <p className="text-xs text-muted-foreground">
+                  Currently in progress
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Hours This Week</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-16" /> : stats.totalHours}</div>
+                <p className="text-xs text-muted-foreground">
+                  Scheduled for today
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pending Requests</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.pendingRequests}</div>
+                <p className="text-xs text-muted-foreground">
+                  Need approval
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  Today's Shifts
+                  {selectedLocation && (
+                    <span className="text-sm font-normal text-muted-foreground ml-2">
+                      - {locations.find(l => l.id === selectedLocation)?.name}
+                    </span>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Overview of scheduled shifts for today
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {loading ? (
+                  Array(2).fill(0).map((_, i) => (
+                    <div key={i} className="flex items-center space-x-4">
+                      <Skeleton className="h-10 w-10 rounded-full" />
+                      <div className="flex-1">
+                        <Skeleton className="h-4 w-24 mb-1" />
+                        <Skeleton className="h-3 w-16" />
+                      </div>
+                      <div className="text-right">
+                        <Skeleton className="h-4 w-20 mb-1" />
+                        <Skeleton className="h-5 w-16" />
+                      </div>
+                    </div>
+                  ))
+                ) : todayShifts.length > 0 ? (
+                  todayShifts.map((shift) => (
+                    <div key={shift.id} className="flex items-center space-x-4">
+                      <Avatar>
+                        <AvatarFallback>{shift.employee.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{shift.employee}</p>
+                        <p className="text-xs text-muted-foreground">{shift.department}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm">{shift.time}</p>
+                        <Badge variant={shift.status === 'in_progress' ? 'default' : 'secondary'}>
+                          {shift.status === 'in_progress' ? 'Active' : 'Scheduled'}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No shifts scheduled for today</p>
+                    <Button 
+                      variant="outline" 
+                      className="mt-2" 
+                      onClick={() => navigate('/scheduler/schedule')}
+                    >
+                      Create Schedule
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+                <CardDescription>
+                  Frequently used actions for schedule management
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/scheduler/schedule')}>
+                  <Calendar className="h-4 w-4 mr-2" />
+                  View Full Schedule
+                </Button>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/scheduler/employees')}>
+                  <Users className="h-4 w-4 mr-2" />
+                  Manage Employees
+                </Button>
+                <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/scheduler/time-clock')}>
+                  <Clock className="h-4 w-4 mr-2" />
+                  Time Clock Reports
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
     </div>
   );
 }
