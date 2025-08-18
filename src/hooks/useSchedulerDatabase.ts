@@ -59,7 +59,7 @@ export function useCompanies() {
 
   const fetchCompanies = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('companies')
         .select('*')
         .order('created_at', { ascending: false });
@@ -76,7 +76,7 @@ export function useCompanies() {
 
   const createCompany = async (companyData: Omit<Company, 'id' | 'created_at'>) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('companies')
         .insert([companyData])
         .select()
@@ -96,7 +96,7 @@ export function useCompanies() {
 
   const updateCompany = async (id: string, updates: Partial<Company>) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('companies')
         .update(updates)
         .eq('id', id)
@@ -117,7 +117,7 @@ export function useCompanies() {
 
   const deleteCompany = async (id: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('companies')
         .delete()
         .eq('id', id);
@@ -153,7 +153,7 @@ export function useDepartments(companyId?: string) {
 
   const fetchDepartments = async () => {
     try {
-      let query = supabase.from('departments').select('*');
+      let query = (supabase as any).from('departments').select('*');
       
       if (companyId) {
         query = query.eq('company_id', companyId);
@@ -173,7 +173,7 @@ export function useDepartments(companyId?: string) {
 
   const createDepartment = async (departmentData: Omit<Department, 'id' | 'created_at'>) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('departments')
         .insert([departmentData])
         .select()
@@ -209,7 +209,7 @@ export function useEmployees(companyId?: string) {
 
   const fetchEmployees = async () => {
     try {
-      let query = supabase.from('employees').select('*');
+      let query = (supabase as any).from('employees').select('*');
       
       if (companyId) {
         query = query.eq('company_id', companyId);
@@ -229,7 +229,7 @@ export function useEmployees(companyId?: string) {
 
   const createEmployee = async (employeeData: Omit<Employee, 'id' | 'created_at'>) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('employees')
         .insert([employeeData])
         .select()
@@ -249,7 +249,7 @@ export function useEmployees(companyId?: string) {
 
   const updateEmployee = async (id: string, updates: Partial<Employee>) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('employees')
         .update(updates)
         .eq('id', id)
@@ -270,7 +270,7 @@ export function useEmployees(companyId?: string) {
 
   const deleteEmployee = async (id: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('employees')
         .delete()
         .eq('id', id);
@@ -306,7 +306,7 @@ export function useShifts(companyId?: string, weekStart?: Date) {
 
   const fetchShifts = async () => {
     try {
-      let query = supabase.from('shifts').select('*');
+      let query = (supabase as any).from('shifts').select('*');
       
       if (companyId) {
         query = query.eq('company_id', companyId);
@@ -334,7 +334,7 @@ export function useShifts(companyId?: string, weekStart?: Date) {
 
   const createShift = async (shiftData: Omit<Shift, 'id' | 'created_at'>) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('shifts')
         .insert([shiftData])
         .select()
@@ -354,7 +354,7 @@ export function useShifts(companyId?: string, weekStart?: Date) {
 
   const updateShift = async (id: string, updates: Partial<Shift>) => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('shifts')
         .update(updates)
         .eq('id', id)
@@ -375,7 +375,7 @@ export function useShifts(companyId?: string, weekStart?: Date) {
 
   const deleteShift = async (id: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('shifts')
         .delete()
         .eq('id', id);
