@@ -66,8 +66,8 @@ export function AppSidebar() {
     { title: "Calendar", url: "/calendar", icon: Calendar },
     { title: "Tasks", url: "/tasks", icon: CheckSquare },
     { title: "Account", url: "/account", icon: Settings },
-    { title: "Template", url: "/template", icon: GraduationCap },
     ...(userRole === 'super_admin' || userRole === 'admin' ? [
+      { title: "Template", url: "/template", icon: GraduationCap },
       { title: "User Management", url: "/user-management", icon: Users }
     ] : [])
   ];

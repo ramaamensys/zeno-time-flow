@@ -60,6 +60,7 @@ export default function LearningTemplates() {
   const [loading, setLoading] = useState(true);
   const [expandedTemplates, setExpandedTemplates] = useState<Set<string>>(new Set());
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   
   // Dialog states
   const [showCreateTemplate, setShowCreateTemplate] = useState(false);
@@ -136,9 +137,12 @@ export default function LearningTemplates() {
         .single();
 
       if (error) throw error;
-      setIsAdmin(data?.role === 'admin' || data?.role === 'super_admin');
+      const adminStatus = data?.role === 'admin' || data?.role === 'super_admin';
+      setIsAdmin(adminStatus);
+      setIsAuthorized(adminStatus);
     } catch (error) {
       setIsAdmin(false);
+      setIsAuthorized(false);
     }
   };
 
@@ -700,6 +704,16 @@ export default function LearningTemplates() {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (isAuthorized === false) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 space-y-4">
+        <BookOpen className="h-16 w-16 text-muted-foreground" />
+        <h2 className="text-2xl font-bold">Access Denied</h2>
+        <p className="text-muted-foreground">You don't have permission to access this page.</p>
       </div>
     );
   }
