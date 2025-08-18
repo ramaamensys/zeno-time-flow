@@ -39,7 +39,10 @@ const handler = async (req: Request): Promise<Response> => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Create user with admin API
-    const { data, error } = await supabase.auth.admin.createUser({
+    let data;
+    let error;
+    
+    const createResult = await supabase.auth.admin.createUser({
       email: email,
       password: password,
       email_confirm: true, // This confirms the email immediately
@@ -48,38 +51,57 @@ const handler = async (req: Request): Promise<Response> => {
       }
     });
 
+    data = createResult.data;
+    error = createResult.error;
+
     if (error) {
       console.error('Error creating user:', error);
-      throw error;
+      
+      // Check if user already exists
+      if (error.message?.includes('already been registered') || error.code === 'email_exists') {
+        // Try to get existing user and update their profile/role instead
+        console.log('User already exists, attempting to update profile and role...');
+        
+        const { data: existingUser, error: getUserError } = await supabase.auth.admin.getUserByEmail(email);
+        
+        if (existingUser?.user && !getUserError) {
+          console.log('Successfully found existing user, will update profile and role');
+          
+          // Use existing user data for response
+          data = { user: existingUser.user };
+          error = null; // Clear the error since we handled it
+        } else {
+          throw new Error(`User with email ${email} already exists but cannot be accessed. Please use a different email or contact admin.`);
+        }
+      } else {
+        throw error;
+      }
     }
 
-    console.log('User created successfully:', data.user?.id);
+    console.log('User processed successfully:', data.user?.id);
 
-    // Update user role and app_type
+    // Ensure user has proper profile and role (for both new and existing users)
     if (data.user) {
-      const updateData: any = {};
-      
-      if (role !== 'user') {
-        updateData.role = role;
-      }
-      
-      if (app_type !== 'calendar') {
-        updateData.app_type = app_type;
-      }
-
-      if (Object.keys(updateData).length > 0) {
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .update(updateData)
-          .eq('user_id', data.user.id);
-
-        if (roleError) {
-          console.error('Error updating user role/app_type:', roleError);
-          // Don't throw here, user is already created
-        } else {
-          console.log('User role and app_type updated successfully');
-        }
-      }
+      // Create/update profile
+      await supabase
+        .from('profiles')
+        .upsert({
+          user_id: data.user.id,
+          full_name: full_name,
+          email: email,
+          status: 'active'
+        });
+        
+      // Create/update user role and app_type
+      await supabase
+        .from('user_roles')
+        .upsert({
+          user_id: data.user.id,
+          role: role,
+          app_type: app_type
+        });
+        
+      console.log('User profile and role set successfully');
     }
 
     // Send welcome email
