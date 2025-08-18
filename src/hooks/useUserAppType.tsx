@@ -32,11 +32,18 @@ export const useUserAppType = () => {
           const isAdmin = data.some(role => role.role === 'admin' || role.role === 'super_admin');
           
           if (isAdmin) {
-            // Admin gets app selector to choose
+            // Admin gets app selector to choose - always show selector for admins
             setAppType(null);
           } else {
-            // Regular user gets their assigned app
-            setAppType(data[0].app_type as AppType);
+            // Check if regular user has multiple app access
+            const uniqueAppTypes = [...new Set(data.map(role => role.app_type))];
+            if (uniqueAppTypes.length > 1) {
+              // User has access to multiple apps, show selector
+              setAppType(null);
+            } else {
+              // Regular user gets their single assigned app
+              setAppType(data[0].app_type as AppType);
+            }
           }
         } else {
           // No role found, show app selector

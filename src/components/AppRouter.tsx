@@ -50,6 +50,7 @@ const AppRouter = () => {
         <Route path="/*" element={
           <ProtectedRoute>
             <Routes>
+              <Route index element={<AppSelector />} />
               <Route path="/" element={<AppSelector />} />
               <Route path="/app-selector" element={<AppSelector />} />
               
