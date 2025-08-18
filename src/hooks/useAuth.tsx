@@ -19,15 +19,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
+        console.log('Auth state change:', event, session?.user?.email);
+        
         setSession(session);
         setUser(session?.user ?? null);
         setIsLoading(false);
+        
+        // Handle sign out event
+        if (event === 'SIGNED_OUT') {
+          console.log('User signed out, cleaning up...');
+          setUser(null);
+          setSession(null);
+          
+          // Use setTimeout to avoid potential routing conflicts
+          setTimeout(() => {
+            window.location.replace('/auth');
+          }, 100);
+        }
       }
     );
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
@@ -52,30 +67,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
+    console.log('Signing out user...');
+    
     try {
       // Clean up auth state first
       cleanupAuthState();
       
-      // Attempt global sign out (fallback if it fails)
-      try {
-        await supabase.auth.signOut({ scope: 'global' });
-      } catch (err) {
-        console.warn('Sign out failed, but continuing with cleanup:', err);
-      }
-      
-      // Clear local state
+      // Clear local state immediately
       setUser(null);
       setSession(null);
       
-      // Force page reload for a clean state
-      window.location.href = '/';
+      // Perform Supabase sign out (this will trigger the auth state change)
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      
+      if (error) {
+        console.warn('Sign out error (continuing anyway):', error);
+      }
+      
+      console.log('Sign out completed');
+      
+      // The auth state change listener will handle the redirect
     } catch (error) {
       console.error('Error during sign out:', error);
+      
       // Force cleanup and redirect even if signOut fails
       cleanupAuthState();
       setUser(null);
       setSession(null);
-      window.location.href = '/';
+      
+      // Fallback redirect
+      setTimeout(() => {
+        window.location.replace('/auth');
+      }, 100);
     }
   };
 
