@@ -54,7 +54,8 @@ export default function UserManagement() {
     email: "",
     full_name: "",
     password: "",
-    role: "user" as "user" | "admin" | "super_admin"
+    role: "user" as "user" | "admin" | "super_admin",
+    app_type: "calendar" as "calendar" | "scheduler"
   });
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -183,7 +184,8 @@ export default function UserManagement() {
           email: newUser.email,
           full_name: newUser.full_name,
           role: newUser.role,
-          password: newUser.password
+          password: newUser.password,
+          app_type: newUser.app_type
         }
       });
 
@@ -200,7 +202,7 @@ export default function UserManagement() {
       });
 
       // Clear the form and close dialog
-      setNewUser({ email: "", full_name: "", role: "user", password: "" });
+      setNewUser({ email: "", full_name: "", role: "user", password: "", app_type: "calendar" });
       setIsDialogOpen(false);
       
       // Reload users to show the new user
@@ -519,6 +521,20 @@ export default function UserManagement() {
                         <SelectItem value="user">User</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
                         <SelectItem value="super_admin">Super Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="app_type" className="text-right">
+                      App Type
+                    </Label>
+                    <Select value={newUser.app_type} onValueChange={(value: "calendar" | "scheduler") => setNewUser({ ...newUser, app_type: value })}>
+                      <SelectTrigger className="col-span-3">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="calendar">Zeno Time Flow (Calendar)</SelectItem>
+                        <SelectItem value="scheduler">Roster Joy (Scheduler)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
