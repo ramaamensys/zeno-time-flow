@@ -125,7 +125,7 @@ export default function SchedulerEmployees() {
             <CardTitle className="text-sm font-medium">Departments</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{departments.length - 1}</div>
+            <div className="text-2xl font-bold">{departments.length}</div>
           </CardContent>
         </Card>
 
@@ -135,7 +135,15 @@ export default function SchedulerEmployees() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${(employees.reduce((sum, e) => sum + e.hourly_rate, 0) / employees.length).toFixed(2)}
+              {employees.length > 0 && employees.some(e => e.hourly_rate) ? (
+                `$${(employees
+                  .filter(e => e.hourly_rate)
+                  .reduce((sum, e) => sum + (e.hourly_rate || 0), 0) / 
+                  employees.filter(e => e.hourly_rate).length
+                ).toFixed(2)}`
+              ) : (
+                'N/A'
+              )}
             </div>
           </CardContent>
         </Card>

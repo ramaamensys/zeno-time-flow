@@ -32,6 +32,7 @@ export default function SchedulerSchedule() {
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [preSelectedDate, setPreSelectedDate] = useState<Date | undefined>();
   const [preSelectedSlot, setPreSelectedSlot] = useState<{ id: string; startHour: number; endHour: number } | undefined>();
+  const [draggedEmployee, setDraggedEmployee] = useState<string | null>(null);
   
   // Database hooks
   const { companies, loading: companiesLoading } = useCompanies();
@@ -111,7 +112,61 @@ export default function SchedulerSchedule() {
     setShowEditShift(true);
   };
 
-  const isLoading = companiesLoading || departmentsLoading || employeesLoading || shiftsLoading;
+  // Drag and Drop handlers
+  const handleDragStart = (e: React.DragEvent, employeeId: string) => {
+    e.dataTransfer.setData('employeeId', employeeId);
+    setDraggedEmployee(employeeId);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, dayIndex: number, slotId: string) => {
+    e.preventDefault();
+    const employeeId = e.dataTransfer.getData('employeeId');
+    
+    if (employeeId && selectedCompany) {
+      const date = weekDates[dayIndex];
+      const slot = SHIFT_SLOTS.find(s => s.id === slotId);
+      
+      if (slot) {
+        // Create shift automatically when employee is dropped
+        const startDateTime = new Date(date);
+        startDateTime.setHours(slot.startHour, 0, 0, 0);
+        
+        const endDateTime = new Date(date);
+        endDateTime.setHours(slot.endHour, 0, 0, 0);
+        
+        // If night shift crosses midnight, adjust end date
+        if (slot.endHour < slot.startHour) {
+          endDateTime.setDate(endDateTime.getDate() + 1);
+        }
+
+        const employee = employees.find(e => e.id === employeeId);
+        
+        createShift({
+          employee_id: employeeId,
+          company_id: selectedCompany,
+          department_id: employee?.department_id || undefined,
+          start_time: startDateTime.toISOString(),
+          end_time: endDateTime.toISOString(),
+          break_minutes: 30,
+          hourly_rate: employee?.hourly_rate || undefined,
+          status: 'scheduled'
+        });
+      }
+    }
+    
+    setDraggedEmployee(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedEmployee(null);
+  };
+
+  const isLoading = companiesLoading || departmentsLoading || shiftsLoading;
+  const { createShift } = useShifts();
 
   return (
     <div className="space-y-6 p-6">
@@ -222,8 +277,17 @@ export default function SchedulerSchedule() {
                 </div>
                 {days.map((_, dayIndex) => {
                   const dayShifts = getShiftsForDayAndSlot(dayIndex, slot.id);
+                  const isDropTarget = draggedEmployee !== null;
+                  
                   return (
-                    <div key={dayIndex} className="min-h-[100px] border rounded p-2 space-y-1">
+                    <div 
+                      key={dayIndex} 
+                      className={`min-h-[100px] border rounded p-2 space-y-1 transition-colors ${
+                        isDropTarget ? 'border-primary/50 bg-primary/5' : ''
+                      }`}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, dayIndex, slot.id)}
+                    >
                       {dayShifts.map((shift) => {
                         const employeeName = getEmployeeName(shift.employee_id);
                         const startTime = new Date(shift.start_time);
@@ -284,15 +348,30 @@ export default function SchedulerSchedule() {
                         );
                       })}
                       {dayShifts.length === 0 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full h-full min-h-[60px] border-2 border-dashed border-muted-foreground/25 text-muted-foreground hover:border-primary hover:text-primary"
-                          onClick={() => handleAddShift(dayIndex, slot.id)}
-                          disabled={!selectedCompany}
+                        <div
+                          className={`w-full h-full min-h-[60px] border-2 border-dashed rounded flex items-center justify-center transition-colors ${
+                            isDropTarget 
+                              ? 'border-primary bg-primary/10 text-primary' 
+                              : 'border-muted-foreground/25 text-muted-foreground hover:border-primary hover:text-primary'
+                          }`}
                         >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                          {isDropTarget ? (
+                            <div className="text-xs text-center">
+                              Drop employee here<br/>
+                              <span className="text-xs opacity-70">{slot.time}</span>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full h-full"
+                              onClick={() => handleAddShift(dayIndex, slot.id)}
+                              disabled={!selectedCompany}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       )}
                     </div>
                   );
@@ -303,53 +382,117 @@ export default function SchedulerSchedule() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Available Employees
-            </CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {isLoading ? (
-                <div className="text-center text-muted-foreground py-4">Loading employees...</div>
-              ) : employees.length === 0 ? (
-                <div className="text-center text-muted-foreground py-4">
-                  {!selectedCompany ? 'Select a company to view employees' : 'No employees found'}
-                </div>
-              ) : (
-                employees
-                  .filter(employee => selectedDepartment === "all" || employee.department_id === selectedDepartment)
-                  .map((employee) => {
-                    const department = departments.find(d => d.id === employee.department_id);
-                    return (
-                      <div key={employee.id} className="flex items-center gap-3 p-2 rounded border">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback>
-                            {employee.first_name[0]}{employee.last_name[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">{employee.first_name} {employee.last_name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {employee.position}{department && ` • ${department.name}`}
-                          </div>
-                        </div>
-                        <Badge 
-                          variant={employee.status === 'active' ? 'default' : 'secondary'} 
-                          className="text-xs"
-                        >
-                          {employee.status}
-                        </Badge>
-                      </div>
-                    );
-                  })
-              )}
+            <div className="text-2xl font-bold">{employees.length}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Active Employees</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {employees.filter(e => e.status === 'active').length}
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">This Week's Shifts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{shifts.length}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-4">
+          {/* Available Employees - now moved above */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Available Employees
+                <Badge variant="outline" className="ml-auto">
+                  Drag to schedule
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {isLoading ? (
+                  <div className="text-center text-muted-foreground py-4">Loading employees...</div>
+                ) : employees.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-4">
+                    {!selectedCompany ? 'Select a company to view employees' : 'No employees found'}
+                    <div className="mt-2">
+                      <Button 
+                        size="sm" 
+                        onClick={() => setShowCreateEmployee(true)}
+                        disabled={!selectedCompany}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add Employee
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  employees
+                    .filter(employee => selectedDepartment === "all" || employee.department_id === selectedDepartment)
+                    .map((employee) => {
+                      const department = departments.find(d => d.id === employee.department_id);
+                      const isDragging = draggedEmployee === employee.id;
+                      
+                      return (
+                        <div 
+                          key={employee.id} 
+                          className={`flex items-center gap-3 p-2 rounded border cursor-grab active:cursor-grabbing transition-opacity ${
+                            isDragging ? 'opacity-50' : ''
+                          }`}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, employee.id)}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback>
+                              {employee.first_name[0]}{employee.last_name[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{employee.first_name} {employee.last_name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {employee.position}{department && ` • ${department.name}`}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge 
+                              variant={employee.status === 'active' ? 'default' : 'secondary'} 
+                              className="text-xs"
+                            >
+                              {employee.status}
+                            </Badge>
+                            {employee.hourly_rate && (
+                              <span className="text-xs text-muted-foreground">
+                                ${employee.hourly_rate}/hr
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         <Card>
           <CardHeader>
