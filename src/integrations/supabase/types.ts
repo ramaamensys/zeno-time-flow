@@ -14,6 +14,72 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          admin_email: string | null
+          allow_mobile_clock_in: boolean | null
+          auto_approve_time_off: boolean | null
+          break_duration: number | null
+          clock_in_grace_period: number | null
+          clock_in_reminders: boolean | null
+          company_name: string | null
+          created_at: string
+          data_retention_period: number | null
+          id: string
+          overtime_alerts: boolean | null
+          overtime_threshold: number | null
+          require_clock_in_location: boolean | null
+          schedule_changes: boolean | null
+          shift_reminders: boolean | null
+          timezone: string | null
+          updated_at: string
+          user_id: string
+          week_start_day: string | null
+        }
+        Insert: {
+          admin_email?: string | null
+          allow_mobile_clock_in?: boolean | null
+          auto_approve_time_off?: boolean | null
+          break_duration?: number | null
+          clock_in_grace_period?: number | null
+          clock_in_reminders?: boolean | null
+          company_name?: string | null
+          created_at?: string
+          data_retention_period?: number | null
+          id?: string
+          overtime_alerts?: boolean | null
+          overtime_threshold?: number | null
+          require_clock_in_location?: boolean | null
+          schedule_changes?: boolean | null
+          shift_reminders?: boolean | null
+          timezone?: string | null
+          updated_at?: string
+          user_id: string
+          week_start_day?: string | null
+        }
+        Update: {
+          admin_email?: string | null
+          allow_mobile_clock_in?: boolean | null
+          auto_approve_time_off?: boolean | null
+          break_duration?: number | null
+          clock_in_grace_period?: number | null
+          clock_in_reminders?: boolean | null
+          company_name?: string | null
+          created_at?: string
+          data_retention_period?: number | null
+          id?: string
+          overtime_alerts?: boolean | null
+          overtime_threshold?: number | null
+          require_clock_in_location?: boolean | null
+          schedule_changes?: boolean | null
+          shift_reminders?: boolean | null
+          timezone?: string | null
+          updated_at?: string
+          user_id?: string
+          week_start_day?: string | null
+        }
+        Relationships: []
+      }
       calendar_events: {
         Row: {
           all_day: boolean | null
@@ -64,6 +130,191 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      companies: {
+        Row: {
+          address: string | null
+          color: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          color?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          color?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      departments: {
+        Row: {
+          color: string | null
+          company_id: string | null
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "departments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_skills: {
+        Row: {
+          created_at: string
+          employee_id: string | null
+          id: string
+          proficiency_level: string | null
+          skill_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          employee_id?: string | null
+          id?: string
+          proficiency_level?: string | null
+          skill_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string | null
+          id?: string
+          proficiency_level?: string | null
+          skill_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_skills_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_skills_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employees: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          department_id: string | null
+          email: string
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          first_name: string
+          hire_date: string | null
+          hourly_rate: number | null
+          id: string
+          last_name: string
+          notes: string | null
+          phone: string | null
+          position: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          department_id?: string | null
+          email: string
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          first_name: string
+          hire_date?: string | null
+          hourly_rate?: number | null
+          id?: string
+          last_name: string
+          notes?: string | null
+          phone?: string | null
+          position?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          department_id?: string | null
+          email?: string
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          first_name?: string
+          hire_date?: string | null
+          hourly_rate?: number | null
+          id?: string
+          last_name?: string
+          notes?: string | null
+          phone?: string | null
+          position?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       focus_sessions: {
         Row: {
@@ -176,6 +427,138 @@ export type Database = {
         }
         Relationships: []
       }
+      schedule_templates: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          template_data: Json | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          template_data?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          template_data?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shifts: {
+        Row: {
+          break_minutes: number | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          employee_id: string | null
+          end_time: string
+          hourly_rate: number | null
+          id: string
+          notes: string | null
+          start_time: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          break_minutes?: number | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          employee_id?: string | null
+          end_time: string
+          hourly_rate?: number | null
+          id?: string
+          notes?: string | null
+          start_time: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          break_minutes?: number | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          employee_id?: string | null
+          end_time?: string
+          hourly_rate?: number | null
+          id?: string
+          notes?: string | null
+          start_time?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shifts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      skills: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       template_assignments: {
         Row: {
           assigned_at: string
@@ -264,6 +647,66 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "learning_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      time_clock: {
+        Row: {
+          break_end: string | null
+          break_start: string | null
+          clock_in: string | null
+          clock_out: string | null
+          created_at: string
+          employee_id: string | null
+          id: string
+          notes: string | null
+          overtime_hours: number | null
+          shift_id: string | null
+          total_hours: number | null
+          updated_at: string
+        }
+        Insert: {
+          break_end?: string | null
+          break_start?: string | null
+          clock_in?: string | null
+          clock_out?: string | null
+          created_at?: string
+          employee_id?: string | null
+          id?: string
+          notes?: string | null
+          overtime_hours?: number | null
+          shift_id?: string | null
+          total_hours?: number | null
+          updated_at?: string
+        }
+        Update: {
+          break_end?: string | null
+          break_start?: string | null
+          clock_in?: string | null
+          clock_out?: string | null
+          created_at?: string
+          employee_id?: string | null
+          id?: string
+          notes?: string | null
+          overtime_hours?: number | null
+          shift_id?: string | null
+          total_hours?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_clock_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_clock_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
             referencedColumns: ["id"]
           },
         ]

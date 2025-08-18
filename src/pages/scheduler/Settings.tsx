@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Save, Bell, Clock, Users, Shield, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +8,17 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SchedulerSettings() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [settings, setSettings] = useState({
-    companyName: "",
+    companyName: "zenotimeflow",
     timezone: "America/New_York",
     weekStartDay: "monday",
     clockInGracePeriod: 5,
@@ -30,9 +37,109 @@ export default function SchedulerSettings() {
     allowMobileClockIn: true
   });
 
-  const handleSave = () => {
-    // In a real app, this would save to Supabase
-    console.log("Saving settings:", settings);
+  // Load settings from Supabase
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (!user) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('app_settings')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error loading settings:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load settings. Using defaults.",
+            variant: "destructive"
+          });
+        } else if (data) {
+          setSettings({
+            companyName: data.company_name || "zenotimeflow",
+            timezone: data.timezone || "America/New_York",
+            weekStartDay: data.week_start_day || "monday",
+            clockInGracePeriod: data.clock_in_grace_period || 5,
+            overtimeThreshold: data.overtime_threshold || 40,
+            breakDuration: data.break_duration || 30,
+            adminEmail: data.admin_email || "",
+            dataRetentionPeriod: data.data_retention_period || 365,
+            notifications: {
+              shiftReminders: data.shift_reminders ?? true,
+              overtimeAlerts: data.overtime_alerts ?? true,
+              clockInReminders: data.clock_in_reminders ?? false,
+              scheduleChanges: data.schedule_changes ?? true
+            },
+            autoApproveTimeOff: data.auto_approve_time_off ?? false,
+            requireClockInLocation: data.require_clock_in_location ?? false,
+            allowMobileClockIn: data.allow_mobile_clock_in ?? true
+          });
+        }
+      } catch (error) {
+        console.error('Error in loadSettings:', error);
+      } finally {
+        setInitialLoad(false);
+      }
+    };
+
+    loadSettings();
+  }, [user, toast]);
+
+  const handleSave = async () => {
+    if (!user) return;
+
+    setLoading(true);
+    try {
+      const settingsData = {
+        user_id: user.id,
+        company_name: settings.companyName,
+        timezone: settings.timezone,
+        week_start_day: settings.weekStartDay,
+        clock_in_grace_period: settings.clockInGracePeriod,
+        overtime_threshold: settings.overtimeThreshold,
+        break_duration: settings.breakDuration,
+        admin_email: settings.adminEmail,
+        data_retention_period: settings.dataRetentionPeriod,
+        shift_reminders: settings.notifications.shiftReminders,
+        overtime_alerts: settings.notifications.overtimeAlerts,
+        clock_in_reminders: settings.notifications.clockInReminders,
+        schedule_changes: settings.notifications.scheduleChanges,
+        auto_approve_time_off: settings.autoApproveTimeOff,
+        require_clock_in_location: settings.requireClockInLocation,
+        allow_mobile_clock_in: settings.allowMobileClockIn
+      };
+
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert(settingsData, {
+          onConflict: 'user_id'
+        });
+
+      if (error) {
+        console.error('Error saving settings:', error);
+        toast({
+          title: "Error",
+          description: "Failed to save settings. Please try again.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Settings saved successfully!",
+        });
+      }
+    } catch (error) {
+      console.error('Error in handleSave:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateSetting = (path: string, value: any) => {
@@ -60,9 +167,9 @@ export default function SchedulerSettings() {
             Configure your roster management system
           </p>
         </div>
-        <Button onClick={handleSave}>
+        <Button onClick={handleSave} disabled={loading || initialLoad}>
           <Save className="h-4 w-4 mr-2" />
-          Save Changes
+          {loading ? "Saving..." : "Save Changes"}
         </Button>
       </div>
 
@@ -311,9 +418,9 @@ export default function SchedulerSettings() {
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={handleSave} size="lg">
+        <Button onClick={handleSave} size="lg" disabled={loading || initialLoad}>
           <Save className="h-4 w-4 mr-2" />
-          Save All Settings
+          {loading ? "Saving..." : "Save All Settings"}
         </Button>
       </div>
     </div>
