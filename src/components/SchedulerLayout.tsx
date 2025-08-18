@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Calendar, Users, Clock, Settings, LogOut, Menu, BarChart3 } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { Calendar, Users, Clock, Settings, LogOut, Menu, BarChart3, ArrowLeftRight } from "lucide-react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface SchedulerLayoutProps {
   children: React.ReactNode;
@@ -11,7 +18,29 @@ interface SchedulerLayoutProps {
 const SchedulerLayout = ({ children }: SchedulerLayoutProps) => {
   const { user, signOut } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [hasMultipleApps, setHasMultipleApps] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkMultiAppAccess = async () => {
+      if (!user) return;
+
+      try {
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id);
+
+        const isAdmin = roles?.some(r => r.role === 'admin' || r.role === 'super_admin') || false;
+        setHasMultipleApps(isAdmin);
+      } catch (error) {
+        console.error('Error checking multi-app access:', error);
+      }
+    };
+
+    checkMultiAppAccess();
+  }, [user]);
 
   const navigation = [
     { name: "Dashboard", href: "/scheduler", icon: BarChart3 },
@@ -94,14 +123,35 @@ const SchedulerLayout = ({ children }: SchedulerLayoutProps) => {
               <Menu className="h-4 w-4" />
             </Button>
             
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={signOut}
-              className="h-8 w-8 p-0"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              {hasMultipleApps && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-2">
+                      <ArrowLeftRight className="h-4 w-4" />
+                      Switch App
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => navigate('/calendar')}>
+                      📝 Zeno Time Flow (Calendar)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/app-selector')}>
+                      🏠 App Selector
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={signOut}
+                className="h-8 w-8 p-0"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </header>
 

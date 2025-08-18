@@ -17,23 +17,34 @@ export const useUserAppType = () => {
       }
 
       try {
-        // Get user's app type from user_roles table
+        // Get user's roles to determine app access
         const { data, error } = await supabase
           .from('user_roles')
-          .select('app_type')
-          .eq('user_id', user.id)
-          .single();
+          .select('app_type, role')
+          .eq('user_id', user.id);
 
         if (error) {
           console.error('Error fetching user app type:', error);
-          // Default to calendar app if no role found
-          setAppType('calendar');
+          // Default to showing app selector
+          setAppType(null);
+        } else if (data && data.length > 0) {
+          // Check if user is admin (gets access to both apps)
+          const isAdmin = data.some(role => role.role === 'admin' || role.role === 'super_admin');
+          
+          if (isAdmin) {
+            // Admin gets app selector to choose
+            setAppType(null);
+          } else {
+            // Regular user gets their assigned app
+            setAppType(data[0].app_type as AppType);
+          }
         } else {
-          setAppType(data.app_type as AppType);
+          // No role found, show app selector
+          setAppType(null);
         }
       } catch (error) {
         console.error('Error in fetchUserAppType:', error);
-        setAppType('calendar');
+        setAppType(null);
       } finally {
         setIsLoading(false);
       }

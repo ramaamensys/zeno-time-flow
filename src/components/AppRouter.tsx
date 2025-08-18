@@ -4,6 +4,7 @@ import { useUserAppType } from "@/hooks/useUserAppType";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Layout from "@/components/Layout";
 import SchedulerLayout from "@/components/SchedulerLayout";
+import AppSelector from "@/pages/AppSelector";
 
 // Calendar App Pages
 import Dashboard from "@/pages/Dashboard";
@@ -39,6 +40,60 @@ const AppRouter = () => {
   // If no user, show not found (auth should handle redirects)
   if (!user) {
     return <NotFound />;
+  }
+
+  // If appType is null, show app selector (admin or multi-app users)
+  if (appType === null) {
+    return (
+      <Routes>
+        <Route path="/*" element={
+          <ProtectedRoute>
+            <Routes>
+              <Route path="/" element={<AppSelector />} />
+              <Route path="/app-selector" element={<AppSelector />} />
+              
+              {/* Calendar App Routes */}
+              <Route path="/calendar" element={<Layout><Calendar /></Layout>} />
+              <Route path="/tasks" element={<Layout><Tasks /></Layout>} />
+              <Route path="/user-management" element={<Layout><UserManagement /></Layout>} />
+              <Route path="/template" element={<Layout><Template /></Layout>} />
+              <Route path="/account" element={<Layout><Account /></Layout>} />
+              <Route path="/profile" element={<Layout><Profile /></Layout>} />
+              <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+              
+              {/* Scheduler App Routes */}
+              <Route path="/scheduler" element={
+                <SchedulerLayout>
+                  <SchedulerDashboard />
+                </SchedulerLayout>
+              } />
+              <Route path="/scheduler/schedule" element={
+                <SchedulerLayout>
+                  <SchedulerSchedule />
+                </SchedulerLayout>
+              } />
+              <Route path="/scheduler/employees" element={
+                <SchedulerLayout>
+                  <SchedulerEmployees />
+                </SchedulerLayout>
+              } />
+              <Route path="/scheduler/time-clock" element={
+                <SchedulerLayout>
+                  <SchedulerTimeClock />
+                </SchedulerLayout>
+              } />
+              <Route path="/scheduler/settings" element={
+                <SchedulerLayout>
+                  <SchedulerSettings />
+                </SchedulerLayout>
+              } />
+              
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </ProtectedRoute>
+        } />
+      </Routes>
+    );
   }
 
   // Render scheduler app routes
