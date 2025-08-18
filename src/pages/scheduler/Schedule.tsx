@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar, ChevronLeft, ChevronRight, Plus, Users, Clock, LayoutTemplate, Building, Edit, Trash2, MoreHorizontal } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Plus, Users, Clock, Building, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +38,7 @@ export default function SchedulerSchedule() {
   const { companies, loading: companiesLoading } = useCompanies();
   const { departments, loading: departmentsLoading } = useDepartments(selectedCompany);
   const { employees, loading: employeesLoading } = useEmployees(selectedCompany);
-  const { shifts, loading: shiftsLoading } = useShifts(selectedCompany, getWeekStart(selectedWeek));
+  const { shifts, loading: shiftsLoading, createShift } = useShifts(selectedCompany, getWeekStart(selectedWeek));
 
   // Set first company as default when companies load
   useEffect(() => {
@@ -166,7 +166,6 @@ export default function SchedulerSchedule() {
   };
 
   const isLoading = companiesLoading || departmentsLoading || shiftsLoading;
-  const { createShift } = useShifts();
 
   return (
     <div className="space-y-6 p-6">
@@ -249,140 +248,8 @@ export default function SchedulerSchedule() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Weekly Schedule</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-8 gap-2">
-            {/* Header row */}
-            <div className="font-medium text-sm text-muted-foreground p-2">
-              Shift / Day
-            </div>
-            {days.map((day, index) => (
-              <div key={day} className="font-medium text-sm text-center p-2 border rounded">
-                <div>{day}</div>
-                <div className="text-xs text-muted-foreground">
-                  {weekDates[index].getDate()}
-                </div>
-              </div>
-            ))}
-
-            {/* Shift rows */}
-            {SHIFT_SLOTS.map((slot) => (
-              <div key={slot.id} className="contents">
-                <div className="font-medium text-sm p-3 border rounded bg-muted/50">
-                  <div>{slot.name}</div>
-                  <div className="text-xs text-muted-foreground">{slot.time}</div>
-                </div>
-                {days.map((_, dayIndex) => {
-                  const dayShifts = getShiftsForDayAndSlot(dayIndex, slot.id);
-                  const isDropTarget = draggedEmployee !== null;
-                  
-                  return (
-                    <div 
-                      key={dayIndex} 
-                      className={`min-h-[100px] border rounded p-2 space-y-1 transition-colors ${
-                        isDropTarget ? 'border-primary/50 bg-primary/5' : ''
-                      }`}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, dayIndex, slot.id)}
-                    >
-                      {dayShifts.map((shift) => {
-                        const employeeName = getEmployeeName(shift.employee_id);
-                        const startTime = new Date(shift.start_time);
-                        const endTime = new Date(shift.end_time);
-                        
-                        return (
-                          <div
-                            key={shift.id}
-                            className="group relative flex items-center gap-2 p-2 rounded bg-primary/10 border border-primary/20 cursor-pointer hover:bg-primary/20"
-                            onClick={() => handleEditShift(shift)}
-                          >
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="text-xs">
-                                {employeeName.split(' ').map(n => n[0]).join('')}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-xs font-medium truncate">
-                                {employeeName}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {startTime.toLocaleTimeString('en-US', { 
-                                  hour: 'numeric', 
-                                  minute: '2-digit',
-                                  hour12: true 
-                                })} - {endTime.toLocaleTimeString('en-US', { 
-                                  hour: 'numeric', 
-                                  minute: '2-digit',
-                                  hour12: true 
-                                })}
-                              </div>
-                            </div>
-                            <Badge 
-                              variant={shift.status === 'confirmed' ? 'default' : 
-                                      shift.status === 'scheduled' ? 'secondary' : 
-                                      shift.status === 'pending' ? 'outline' : 'destructive'}
-                              className="text-xs"
-                            >
-                              {shift.status}
-                            </Badge>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100">
-                                  <MoreHorizontal className="h-3 w-3" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditShift(shift);
-                                }}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit Shift
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        );
-                      })}
-                      {dayShifts.length === 0 && (
-                        <div
-                          className={`w-full h-full min-h-[60px] border-2 border-dashed rounded flex items-center justify-center transition-colors ${
-                            isDropTarget 
-                              ? 'border-primary bg-primary/10 text-primary' 
-                              : 'border-muted-foreground/25 text-muted-foreground hover:border-primary hover:text-primary'
-                          }`}
-                        >
-                          {isDropTarget ? (
-                            <div className="text-xs text-center">
-                              Drop employee here<br/>
-                              <span className="text-xs opacity-70">{slot.time}</span>
-                            </div>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="w-full h-full"
-                              onClick={() => handleAddShift(dayIndex, slot.id)}
-                              disabled={!selectedCompany}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
@@ -413,36 +280,274 @@ export default function SchedulerSchedule() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-4">
-          {/* Available Employees - now moved above */}
+      {/* Main Layout: Schedule Grid + Employee Sidebar */}
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        {/* Schedule Grid - Takes 3/4 of the space */}
+        <div className="xl:col-span-3">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Available Employees
-                <Badge variant="outline" className="ml-auto">
-                  Drag to schedule
-                </Badge>
+              <CardTitle className="flex items-center justify-between">
+                <span>Weekly Schedule</span>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm">
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit Schedule
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Duplicate Week
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>
+                        <Calendar className="h-4 w-4 mr-2" />
+                        Copy from Template
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Clear Week
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                {isLoading ? (
-                  <div className="text-center text-muted-foreground py-4">Loading employees...</div>
-                ) : employees.length === 0 ? (
-                  <div className="text-center text-muted-foreground py-4">
-                    {!selectedCompany ? 'Select a company to view employees' : 'No employees found'}
-                    <div className="mt-2">
-                      <Button 
-                        size="sm" 
-                        onClick={() => setShowCreateEmployee(true)}
-                        disabled={!selectedCompany}
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Add Employee
-                      </Button>
+              <div className="grid grid-cols-8 gap-2">
+                {/* Header row */}
+                <div className="font-medium text-sm text-muted-foreground p-2">
+                  Shift / Day
+                </div>
+                {days.map((day, index) => (
+                  <div key={day} className="font-medium text-sm text-center p-2 border rounded relative group">
+                    <div>{day}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {weekDates[index].getDate()}
                     </div>
+                    {/* Day edit button */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                        >
+                          <MoreHorizontal className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Day Schedule
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Multiple Shifts
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Clear Day
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ))}
+
+                {/* Shift rows */}
+                {SHIFT_SLOTS.map((slot) => (
+                  <div key={slot.id} className="contents">
+                    <div className="font-medium text-sm p-3 border rounded bg-muted/50 relative group">
+                      <div>{slot.name}</div>
+                      <div className="text-xs text-muted-foreground">{slot.time}</div>
+                      {/* Slot edit button */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                          >
+                            <MoreHorizontal className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Slot Times
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Bulk Assign
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    
+                    {days.map((_, dayIndex) => {
+                      const dayShifts = getShiftsForDayAndSlot(dayIndex, slot.id);
+                      const isDropTarget = draggedEmployee !== null;
+                      
+                      return (
+                        <div 
+                          key={dayIndex} 
+                          className={`min-h-[100px] border rounded p-2 space-y-1 transition-colors ${
+                            isDropTarget ? 'border-primary/50 bg-primary/5' : ''
+                          }`}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, dayIndex, slot.id)}
+                        >
+                          {dayShifts.map((shift) => {
+                            const employeeName = getEmployeeName(shift.employee_id);
+                            const startTime = new Date(shift.start_time);
+                            const endTime = new Date(shift.end_time);
+                            
+                            return (
+                              <div
+                                key={shift.id}
+                                className="group relative flex items-center gap-2 p-2 rounded bg-primary/10 border border-primary/20 cursor-pointer hover:bg-primary/20"
+                                onClick={() => handleEditShift(shift)}
+                              >
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="text-xs">
+                                    {employeeName.split(' ').map(n => n[0]).join('')}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs font-medium truncate">
+                                    {employeeName}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {startTime.toLocaleTimeString('en-US', { 
+                                      hour: 'numeric', 
+                                      minute: '2-digit',
+                                      hour12: true 
+                                    })} - {endTime.toLocaleTimeString('en-US', { 
+                                      hour: 'numeric', 
+                                      minute: '2-digit',
+                                      hour12: true 
+                                    })}
+                                  </div>
+                                </div>
+                                <Badge 
+                                  variant={shift.status === 'confirmed' ? 'default' : 
+                                          shift.status === 'scheduled' ? 'secondary' : 
+                                          shift.status === 'pending' ? 'outline' : 'destructive'}
+                                  className="text-xs"
+                                >
+                                  {shift.status}
+                                </Badge>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100">
+                                      <MoreHorizontal className="h-3 w-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEditShift(shift);
+                                    }}>
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Edit Shift
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem>
+                                      <Users className="h-4 w-4 mr-2" />
+                                      Change Employee
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem>
+                                      <Clock className="h-4 w-4 mr-2" />
+                                      Adjust Times
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            );
+                          })}
+                          {dayShifts.length === 0 && (
+                            <div
+                              className={`w-full h-full min-h-[60px] border-2 border-dashed rounded flex items-center justify-center transition-colors ${
+                                isDropTarget 
+                                  ? 'border-primary bg-primary/10 text-primary' 
+                                  : 'border-muted-foreground/25 text-muted-foreground hover:border-primary hover:text-primary'
+                              }`}
+                            >
+                              {isDropTarget ? (
+                                <div className="text-xs text-center">
+                                  Drop employee here<br/>
+                                  <span className="text-xs opacity-70">{slot.time}</span>
+                                </div>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="w-full h-full"
+                                  onClick={() => handleAddShift(dayIndex, slot.id)}
+                                  disabled={!selectedCompany}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Sidebar - Available Employees */}
+        <div className="xl:col-span-1">
+          <Card className="sticky top-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Users className="h-5 w-5" />
+                Employees
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Drag to schedule slots
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                {isLoading ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    Loading...
+                  </div>
+                ) : employees.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    {!selectedCompany ? (
+                      <div>
+                        <p className="mb-2">Select a company</p>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => setShowCreateCompany(true)}
+                        >
+                          <Building className="h-3 w-3 mr-1" />
+                          Add Company
+                        </Button>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="mb-2">No employees found</p>
+                        <Button 
+                          size="sm" 
+                          onClick={() => setShowCreateEmployee(true)}
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Add Employee
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   employees
@@ -454,33 +559,66 @@ export default function SchedulerSchedule() {
                       return (
                         <div 
                           key={employee.id} 
-                          className={`flex items-center gap-3 p-2 rounded border cursor-grab active:cursor-grabbing transition-opacity ${
-                            isDragging ? 'opacity-50' : ''
-                          }`}
+                          className={`group flex flex-col gap-2 p-3 rounded border cursor-grab active:cursor-grabbing transition-all hover:shadow-sm ${
+                            isDragging ? 'opacity-50 scale-95' : ''
+                          } ${employee.status === 'active' ? 'border-green-200 bg-green-50/50' : 'border-gray-200'}`}
                           draggable
                           onDragStart={(e) => handleDragStart(e, employee.id)}
                           onDragEnd={handleDragEnd}
                         >
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback>
-                              {employee.first_name[0]}{employee.last_name[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <div className="font-medium text-sm">{employee.first_name} {employee.last_name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {employee.position}{department && ` • ${department.name}`}
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="text-xs">
+                                {employee.first_name[0]}{employee.last_name[0]}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm truncate">
+                                {employee.first_name} {employee.last_name}
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {employee.position || 'Employee'}
+                              </div>
                             </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                                >
+                                  <MoreHorizontal className="h-3 w-3" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit Employee
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                  <Calendar className="h-4 w-4 mr-2" />
+                                  View Schedule
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <Badge 
-                              variant={employee.status === 'active' ? 'default' : 'secondary'} 
-                              className="text-xs"
-                            >
-                              {employee.status}
-                            </Badge>
+                          
+                          <div className="flex items-center justify-between">
+                            <div className="flex gap-1">
+                              <Badge 
+                                variant={employee.status === 'active' ? 'default' : 'secondary'} 
+                                className="text-xs"
+                              >
+                                {employee.status}
+                              </Badge>
+                              {department && (
+                                <Badge variant="outline" className="text-xs">
+                                  {department.name}
+                                </Badge>
+                              )}
+                            </div>
                             {employee.hourly_rate && (
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-xs font-medium text-green-600">
                                 ${employee.hourly_rate}/hr
                               </span>
                             )}
@@ -493,47 +631,50 @@ export default function SchedulerSchedule() {
             </CardContent>
           </Card>
         </div>
+      </div>
 
+      {/* Schedule Summary */}
+      <div className="mt-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
-              Schedule Summary
+              Week Summary
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Total Shifts</span>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Shifts:</span>
                 <span className="font-medium">{shifts.length}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Confirmed</span>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Confirmed:</span>
                 <span className="font-medium text-green-600">
                   {shifts.filter(s => s.status === 'confirmed').length}
                 </span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Scheduled</span>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Scheduled:</span>
                 <span className="font-medium text-blue-600">
                   {shifts.filter(s => s.status === 'scheduled').length}
                 </span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Pending</span>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Pending:</span>
                 <span className="font-medium text-yellow-600">
                   {shifts.filter(s => s.status === 'pending').length}
                 </span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Total Hours</span>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Hours:</span>
                 <span className="font-medium">
                   {shifts.reduce((total, shift) => {
                     const start = new Date(shift.start_time);
                     const end = new Date(shift.end_time);
                     const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
                     return total + hours;
-                  }, 0).toFixed(1)}
+                  }, 0).toFixed(1)}h
                 </span>
               </div>
             </div>
