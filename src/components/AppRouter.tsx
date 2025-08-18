@@ -20,6 +20,7 @@ import SchedulerDashboard from "@/pages/scheduler/Dashboard";
 import SchedulerSchedule from "@/pages/scheduler/Schedule";
 import SchedulerEmployees from "@/pages/scheduler/Employees";
 import SchedulerTimeClock from "@/pages/scheduler/TimeClock";
+import SchedulerUserManagement from "@/pages/scheduler/UserManagement";
 import SchedulerSettings from "@/pages/scheduler/Settings";
 
 import NotFound from "@/pages/NotFound";
@@ -82,6 +83,11 @@ const AppRouter = () => {
                   <SchedulerTimeClock />
                 </SchedulerLayout>
               } />
+              <Route path="/scheduler/user-management" element={
+                <SchedulerLayout>
+                  <SchedulerUserManagement />
+                </SchedulerLayout>
+              } />
               <Route path="/scheduler/settings" element={
                 <SchedulerLayout>
                   <SchedulerSettings />
@@ -109,6 +115,7 @@ const AppRouter = () => {
                 <Route path="/scheduler/schedule" element={<SchedulerSchedule />} />
                 <Route path="/scheduler/employees" element={<SchedulerEmployees />} />
                 <Route path="/scheduler/time-clock" element={<SchedulerTimeClock />} />
+                <Route path="/scheduler/user-management" element={<SchedulerUserManagement />} />
                 <Route path="/scheduler/settings" element={<SchedulerSettings />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

@@ -47,6 +47,7 @@ const SchedulerLayout = ({ children }: SchedulerLayoutProps) => {
     { name: "Schedule", href: "/scheduler/schedule", icon: Calendar },
     { name: "Employees", href: "/scheduler/employees", icon: Users },
     { name: "Time Clock", href: "/scheduler/time-clock", icon: Clock },
+    { name: "User Management", href: "/scheduler/user-management", icon: Users },
     { name: "Settings", href: "/scheduler/settings", icon: Settings },
   ];
 
