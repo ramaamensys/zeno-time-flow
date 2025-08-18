@@ -19,7 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 export default function SchedulerTimeClock() {
   const [selectedPeriod, setSelectedPeriod] = useState<string>("today");
   const [selectedCompany, setSelectedCompany] = useState<string>("");
-  const [selectedLocation, setSelectedLocation] = useState<string>("");
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [timeEntries, setTimeEntries] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -68,7 +68,7 @@ export default function SchedulerTimeClock() {
       setLocations(data || []);
       
       // Reset location selection when company changes
-      setSelectedLocation("");
+      setSelectedLocation("all");
     } catch (error) {
       console.error('Error loading locations:', error);
     }
@@ -94,7 +94,7 @@ export default function SchedulerTimeClock() {
         .order('created_at', { ascending: false });
 
       // Filter by location if selected
-      if (selectedLocation) {
+      if (selectedLocation && selectedLocation !== "all") {
         timeQuery = timeQuery.eq('employees.department_id', selectedLocation);
       }
 
@@ -108,7 +108,7 @@ export default function SchedulerTimeClock() {
         .limit(5);
 
       // Filter employees by location if selected
-      if (selectedLocation) {
+      if (selectedLocation && selectedLocation !== "all") {
         employeesQuery = employeesQuery.eq('department_id', selectedLocation);
       }
 
@@ -192,7 +192,7 @@ export default function SchedulerTimeClock() {
               <SelectValue placeholder={locations.length === 0 ? "No locations available" : "All locations"} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Locations</SelectItem>
+              <SelectItem value="all">All Locations</SelectItem>
               {locations.map((location) => (
                 <SelectItem key={location.id} value={location.id}>
                   {location.name}
@@ -394,7 +394,7 @@ export default function SchedulerTimeClock() {
             <div className="flex items-center justify-between">
               <CardTitle>
                 Time Entries
-                {selectedLocation && (
+                {selectedLocation && selectedLocation !== "all" && (
                   <span className="text-sm font-normal text-muted-foreground ml-2">
                     - {locations.find(l => l.id === selectedLocation)?.name}
                   </span>

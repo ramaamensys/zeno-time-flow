@@ -13,7 +13,7 @@ export default function SchedulerDashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [selectedCompany, setSelectedCompany] = useState<string>("");
-  const [selectedLocation, setSelectedLocation] = useState<string>("");
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [companies, setCompanies] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [stats, setStats] = useState({
@@ -66,7 +66,7 @@ export default function SchedulerDashboard() {
       setLocations(data || []);
       
       // Reset location selection when company changes
-      setSelectedLocation("");
+      setSelectedLocation("all");
     } catch (error) {
       console.error('Error loading locations:', error);
     }
@@ -83,7 +83,7 @@ export default function SchedulerDashboard() {
         .select('*', { count: 'exact', head: true })
         .eq('company_id', selectedCompany);
 
-      if (selectedLocation) {
+      if (selectedLocation && selectedLocation !== "all") {
         employeeQuery = employeeQuery.eq('department_id', selectedLocation);
       }
 
@@ -102,7 +102,7 @@ export default function SchedulerDashboard() {
         .gte('start_time', `${today}T00:00:00.000Z`)
         .lt('start_time', `${today}T23:59:59.999Z`);
 
-      if (selectedLocation) {
+      if (selectedLocation && selectedLocation !== "all") {
         shiftsQuery = shiftsQuery.eq('employees.department_id', selectedLocation);
       }
 
@@ -191,7 +191,7 @@ export default function SchedulerDashboard() {
               <SelectValue placeholder={locations.length === 0 ? "No locations available" : "All locations"} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Locations</SelectItem>
+              <SelectItem value="all">All Locations</SelectItem>
               {locations.map((location) => (
                 <SelectItem key={location.id} value={location.id}>
                   {location.name}
@@ -271,7 +271,7 @@ export default function SchedulerDashboard() {
               <CardHeader>
                 <CardTitle>
                   Today's Shifts
-                  {selectedLocation && (
+                  {selectedLocation && selectedLocation !== "all" && (
                     <span className="text-sm font-normal text-muted-foreground ml-2">
                       - {locations.find(l => l.id === selectedLocation)?.name}
                     </span>
