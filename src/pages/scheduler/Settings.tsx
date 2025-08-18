@@ -11,12 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export default function SchedulerSettings() {
   const [settings, setSettings] = useState({
-    companyName: "Roster Joy Company",
+    companyName: "",
     timezone: "America/New_York",
     weekStartDay: "monday",
     clockInGracePeriod: 5,
     overtimeThreshold: 40,
     breakDuration: 30,
+    adminEmail: "",
+    dataRetentionPeriod: 365,
     notifications: {
       shiftReminders: true,
       overtimeAlerts: true,
@@ -282,19 +284,23 @@ export default function SchedulerSettings() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Admin Contact Email</Label>
+              <Label htmlFor="adminEmail">Admin Contact Email</Label>
               <Input
+                id="adminEmail"
                 type="email"
                 placeholder="admin@company.com"
-                value="admin@rosterjoy.com"
+                value={settings.adminEmail}
+                onChange={(e) => updateSetting('adminEmail', e.target.value)}
               />
             </div>
             
             <div className="space-y-2">
-              <Label>Data Retention Period (days)</Label>
+              <Label htmlFor="dataRetentionPeriod">Data Retention Period (days)</Label>
               <Input
+                id="dataRetentionPeriod"
                 type="number"
-                value="365"
+                value={settings.dataRetentionPeriod}
+                onChange={(e) => updateSetting('dataRetentionPeriod', Number(e.target.value))}
               />
               <div className="text-sm text-muted-foreground">
                 How long to keep employee time and schedule data

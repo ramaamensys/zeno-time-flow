@@ -1,26 +1,85 @@
+import { useState, useEffect } from "react";
 import { Calendar, Users, Clock, TrendingUp, AlertTriangle, Plus } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 export default function SchedulerDashboard() {
-  const [createScheduleModalOpen, setCreateScheduleModalOpen] = useState(false);
-  
-  // Placeholder data - will integrate with actual Supabase later
-  const stats = {
-    totalEmployees: 24,
-    activeShifts: 8,
-    totalHours: 156,
-    pendingRequests: 3
-  };
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalEmployees: 0,
+    activeShifts: 0,
+    totalHours: 0,
+    pendingRequests: 0
+  });
+  const [todayShifts, setTodayShifts] = useState<any[]>([]);
 
-  const todayShifts = [
-    { id: 1, employee: "John Doe", department: "Kitchen", time: "6:00 AM - 2:00 PM", status: "in_progress" },
-    { id: 2, employee: "Jane Smith", department: "Service", time: "2:00 PM - 10:00 PM", status: "scheduled" }
-  ];
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      // Get total employees count
+      const { count: employeeCount } = await (supabase as any)
+        .from('employees')
+        .select('*', { count: 'exact', head: true });
+
+      // Get today's shifts
+      const today = new Date().toISOString().split('T')[0];
+      const { data: shifts } = await (supabase as any)
+        .from('shifts')
+        .select(`
+          *,
+          employees!inner(first_name, last_name),
+          departments(name)
+        `)
+        .gte('start_time', `${today}T00:00:00.000Z`)
+        .lt('start_time', `${today}T23:59:59.999Z`);
+
+      // Calculate active shifts and total hours
+      const now = new Date();
+      const activeShifts = shifts?.filter(shift => {
+        const startTime = new Date(shift.start_time);
+        const endTime = new Date(shift.end_time);
+        return startTime <= now && endTime >= now;
+      }) || [];
+
+      const totalHours = shifts?.reduce((sum, shift) => {
+        const start = new Date(shift.start_time);
+        const end = new Date(shift.end_time);
+        const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+        return sum + hours;
+      }, 0) || 0;
+
+      setStats({
+        totalEmployees: employeeCount || 0,
+        activeShifts: activeShifts.length,
+        totalHours: Math.round(totalHours),
+        pendingRequests: 0 // Placeholder for future implementation
+      });
+
+      // Format today's shifts for display
+      const formattedShifts = shifts?.slice(0, 5).map(shift => ({
+        id: shift.id,
+        employee: `${shift.employees?.first_name} ${shift.employees?.last_name}`,
+        department: shift.departments?.name || 'Unassigned',
+        time: `${new Date(shift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(shift.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        status: activeShifts.find(active => active.id === shift.id) ? 'in_progress' : 'scheduled'
+      })) || [];
+
+      setTodayShifts(formattedShifts);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -31,7 +90,7 @@ export default function SchedulerDashboard() {
             Welcome to Roster Joy - your employee scheduling hub
           </p>
         </div>
-        <Button onClick={() => setCreateScheduleModalOpen(true)}>
+        <Button onClick={() => navigate('/scheduler/schedule')}>
           <Plus className="h-4 w-4 mr-2" />
           Create Schedule
         </Button>
@@ -44,9 +103,9 @@ export default function SchedulerDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalEmployees}</div>
+            <div className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-16" /> : stats.totalEmployees}</div>
             <p className="text-xs text-muted-foreground">
-              +2 from last month
+              Total registered employees
             </p>
           </CardContent>
         </Card>
@@ -57,7 +116,7 @@ export default function SchedulerDashboard() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.activeShifts}</div>
+            <div className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-16" /> : stats.activeShifts}</div>
             <p className="text-xs text-muted-foreground">
               Currently in progress
             </p>
@@ -70,9 +129,9 @@ export default function SchedulerDashboard() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalHours}</div>
+            <div className="text-2xl font-bold">{loading ? <Skeleton className="h-8 w-16" /> : stats.totalHours}</div>
             <p className="text-xs text-muted-foreground">
-              +12% from last week
+              Scheduled for today
             </p>
           </CardContent>
         </Card>
@@ -100,23 +159,51 @@ export default function SchedulerDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {todayShifts.map((shift) => (
-              <div key={shift.id} className="flex items-center space-x-4">
-                <Avatar>
-                  <AvatarFallback>{shift.employee.split(' ').map(n => n[0]).join('')}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{shift.employee}</p>
-                  <p className="text-xs text-muted-foreground">{shift.department}</p>
+            {loading ? (
+              Array(2).fill(0).map((_, i) => (
+                <div key={i} className="flex items-center space-x-4">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="flex-1">
+                    <Skeleton className="h-4 w-24 mb-1" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                  <div className="text-right">
+                    <Skeleton className="h-4 w-20 mb-1" />
+                    <Skeleton className="h-5 w-16" />
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm">{shift.time}</p>
-                  <Badge variant={shift.status === 'in_progress' ? 'default' : 'secondary'}>
-                    {shift.status === 'in_progress' ? 'Active' : 'Scheduled'}
-                  </Badge>
+              ))
+            ) : todayShifts.length > 0 ? (
+              todayShifts.map((shift) => (
+                <div key={shift.id} className="flex items-center space-x-4">
+                  <Avatar>
+                    <AvatarFallback>{shift.employee.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{shift.employee}</p>
+                    <p className="text-xs text-muted-foreground">{shift.department}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm">{shift.time}</p>
+                    <Badge variant={shift.status === 'in_progress' ? 'default' : 'secondary'}>
+                      {shift.status === 'in_progress' ? 'Active' : 'Scheduled'}
+                    </Badge>
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No shifts scheduled for today</p>
+                <Button 
+                  variant="outline" 
+                  className="mt-2" 
+                  onClick={() => navigate('/scheduler/schedule')}
+                >
+                  Create Schedule
+                </Button>
               </div>
-            ))}
+            )}
           </CardContent>
         </Card>
 
@@ -128,15 +215,15 @@ export default function SchedulerDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <Button variant="outline" className="w-full justify-start">
+            <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/scheduler/schedule')}>
               <Calendar className="h-4 w-4 mr-2" />
               View Full Schedule
             </Button>
-            <Button variant="outline" className="w-full justify-start">
+            <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/scheduler/employees')}>
               <Users className="h-4 w-4 mr-2" />
               Manage Employees
             </Button>
-            <Button variant="outline" className="w-full justify-start">
+            <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/scheduler/time-clock')}>
               <Clock className="h-4 w-4 mr-2" />
               Time Clock Reports
             </Button>
