@@ -18,15 +18,27 @@ const Auth = () => {
 
   useEffect(() => {
     console.log("Auth page loaded");
-    // Check if user is already logged in
+    // Check if user is already logged in and redirect
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         console.log("User already logged in, redirecting to dashboard");
-        navigate("/");
+        window.location.href = '/';
       }
     };
     checkUser();
+
+    // Set up auth state listener to handle sign in redirects
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          console.log("Sign in detected, redirecting to dashboard");
+          window.location.href = '/';
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -47,8 +59,8 @@ const Auth = () => {
         variant: "destructive",
       });
     } else {
-      console.log("Sign in successful, redirecting to dashboard");
-      navigate("/");
+      console.log("Sign in successful, auth state change will handle redirect");
+      // Don't navigate here, let the auth state change handle it
     }
     setIsLoading(false);
   };
