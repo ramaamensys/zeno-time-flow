@@ -78,31 +78,43 @@ const Habits = () => {
   const checkUserRole = async () => {
     if (!user) return;
 
-    const { data: roles } = await supabase
+    const { data: roles, error } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
+    if (error) {
+      console.error('Error checking user role:', error);
+    }
+    
+    console.log('User role set to:', roles?.role || 'user', 'for user:', user?.email);
     setUserRole(roles?.role || 'user');
   };
 
   const loadUsers = async () => {
     if (!user) return;
 
-    const { data: roles } = await supabase
+    const { data: roles, error } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error checking user role for loading users:', error);
+      return;
+    }
 
     if (roles?.role === 'admin' || roles?.role === 'super_admin') {
-      const { data: profiles } = await supabase
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('user_id, full_name, email')
         .order('full_name');
 
-      if (profiles) {
+      if (profilesError) {
+        console.error('Error loading profiles:', profilesError);
+      } else if (profiles) {
         setUsers(profiles.map(p => ({ id: p.user_id, full_name: p.full_name || p.email || 'Unknown', email: p.email || '' })));
       }
     }
