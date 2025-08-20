@@ -29,6 +29,7 @@ interface CalendarEvent {
   user_id: string;
   completed: boolean;
   parent_task_id: string | null;
+  template_id?: string | null;
 }
 
 
@@ -141,8 +142,7 @@ const Calendar = () => {
       .select("*")
       .order("start_time", { ascending: true });
 
-    // Calendar privacy: Everyone sees only their own personal events
-    // No task visibility across users in calendar
+    // Show all events assigned to the user (including those created by admins)
     query = query.eq("user_id", user.id);
 
     const { data, error } = await query;

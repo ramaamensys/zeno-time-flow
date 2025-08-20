@@ -1076,36 +1076,41 @@ const Tasks = () => {
                          )}
                        </div>
                      </div>
-                     <div className="flex gap-2">
-                       <Button
-                         variant="outline"
-                         size="sm"
-                         onClick={() => toggleTaskCompletion(event.id, !event.completed)}
-                         className={event.completed ? "bg-green-100 text-green-800" : ""}
-                       >
-                         <Check className="w-4 h-4 mr-1" />
-                         {event.completed ? "Completed" : "Mark Complete"}
-                       </Button>
-                       <Button
-                         variant="outline"
-                         size="sm"
-                         onClick={() => {
-                           setSelectedEvent(event);
-                           setIsEditDialogOpen(true);
-                         }}
-                       >
-                         <Edit className="w-4 h-4 mr-1" />
-                         Edit
-                       </Button>
-                       <Button
-                         variant="outline"
-                         size="sm"
-                         onClick={() => openSubTaskDialog(event)}
-                       >
-                         <Plus className="w-4 h-4 mr-1" />
-                         Add Sub-task
-                       </Button>
-                     </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleTaskCompletion(event.id, !event.completed)}
+                          className={event.completed ? "bg-green-100 text-green-800" : ""}
+                        >
+                          <Check className="w-4 h-4 mr-1" />
+                          {event.completed ? "Completed" : "Mark Complete"}
+                        </Button>
+                        {/* Only show edit/delete options if user is admin or task owner */}
+                        {(isAdminUser || event.user_id === user?.id) && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedEvent(event);
+                                setIsEditDialogOpen(true);
+                              }}
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openSubTaskDialog(event)}
+                            >
+                              <Plus className="w-4 h-4 mr-1" />
+                              Add Sub-task
+                            </Button>
+                          </>
+                        )}
+                      </div>
                   </div>
                 </CardHeader>
               </Card>
@@ -1182,28 +1187,31 @@ const Tasks = () => {
                                 </div>
                               )}
                             </div>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => toggleTaskCompletion(subTask.id, !subTask.completed)}
-                                className={subTask.completed ? "bg-green-100 text-green-800" : ""}
-                              >
-                                <Check className="w-4 h-4 mr-1" />
-                                {subTask.completed ? "Done" : "Complete"}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedEvent(subTask);
-                                  setIsEditDialogOpen(true);
-                                }}
-                              >
-                                <Edit className="w-4 h-4 mr-1" />
-                                Edit
-                              </Button>
-                            </div>
+                             <div className="flex gap-2">
+                               <Button
+                                 variant="outline"
+                                 size="sm"
+                                 onClick={() => toggleTaskCompletion(subTask.id, !subTask.completed)}
+                                 className={subTask.completed ? "bg-green-100 text-green-800" : ""}
+                               >
+                                 <Check className="w-4 h-4 mr-1" />
+                                 {subTask.completed ? "Done" : "Complete"}
+                               </Button>
+                               {/* Only show edit options if user is admin or task owner */}
+                               {(isAdminUser || subTask.user_id === user?.id) && (
+                                 <Button
+                                   variant="outline"
+                                   size="sm"
+                                   onClick={() => {
+                                     setSelectedEvent(subTask);
+                                     setIsEditDialogOpen(true);
+                                   }}
+                                 >
+                                   <Edit className="w-4 h-4 mr-1" />
+                                   Edit
+                                 </Button>
+                               )}
+                             </div>
                           </div>
                         </CardHeader>
                       </Card>
