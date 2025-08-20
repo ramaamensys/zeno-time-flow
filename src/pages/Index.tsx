@@ -1,8 +1,30 @@
 import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { CheckSquare } from "lucide-react";
 
 const Index = () => {
+  const { user, isLoading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // If user is authenticated, redirect to calendar
+    if (!isLoading && user) {
+      console.log("User is authenticated, redirecting to calendar");
+      navigate("/calendar");
+    }
+  }, [user, isLoading, navigate]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="absolute top-4 left-4 flex items-center gap-3">
@@ -17,7 +39,7 @@ const Index = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
             <Button asChild size="lg">
-              <Link to="/auth">Login</Link>
+              <Link to="/auth">Get Started</Link>
             </Button>
           </div>
           <div className="flex justify-center">

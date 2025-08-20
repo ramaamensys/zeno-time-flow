@@ -23,8 +23,8 @@ const Auth = () => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        console.log("User already authenticated, redirecting");
-        navigate("/");
+        console.log("User already authenticated, redirecting to calendar");
+        navigate("/calendar");
         return;
       }
     };
@@ -35,8 +35,8 @@ const Auth = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === 'SIGNED_IN' && session) {
-          console.log("Sign in successful, redirecting to dashboard");
-          navigate("/");
+          console.log("Sign in successful, redirecting to calendar");
+          navigate("/calendar");
         }
       }
     );

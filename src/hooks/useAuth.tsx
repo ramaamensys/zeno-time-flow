@@ -84,10 +84,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.warn('Sign out error (continuing anyway):', error);
       }
       
-      console.log('Sign out completed, redirecting...');
+      console.log('Sign out completed, redirecting to home...');
       
-      // Force redirect immediately
-      window.location.href = '/auth';
+      // Force redirect to home page (Index)
+      window.location.href = '/';
     } catch (error) {
       console.error('Error during sign out:', error);
       
@@ -96,8 +96,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(null);
       setSession(null);
       
-      // Fallback redirect
-      window.location.href = '/auth';
+      // Fallback redirect to home page
+      window.location.href = '/';
     }
   };
 
