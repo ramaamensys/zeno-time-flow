@@ -10,6 +10,8 @@ import AppSelector from "@/pages/AppSelector";
 import Dashboard from "@/pages/Dashboard";
 import Tasks from "@/pages/Tasks";
 import Calendar from "@/pages/Calendar";
+import Focus from "@/pages/Focus";
+import Habits from "@/pages/Habits";
 import Profile from "@/pages/Profile";
 import Account from "@/pages/Account";
 import UserManagement from "@/pages/UserManagement";
@@ -57,6 +59,8 @@ const AppRouter = () => {
               {/* Calendar App Routes */}
               <Route path="/calendar" element={<Layout><Calendar /></Layout>} />
               <Route path="/tasks" element={<Layout><Tasks /></Layout>} />
+              <Route path="/focus" element={<Layout><Focus /></Layout>} />
+              <Route path="/habits" element={<Layout><Habits /></Layout>} />
               <Route path="/user-management" element={<Layout><UserManagement /></Layout>} />
               <Route path="/template" element={<Layout><Template /></Layout>} />
               <Route path="/account" element={<Layout><Account /></Layout>} />
@@ -138,6 +142,16 @@ const AppRouter = () => {
       <Route path="/tasks" element={
         <ProtectedRoute>
           <Layout><Tasks /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/focus" element={
+        <ProtectedRoute>
+          <Layout><Focus /></Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/habits" element={
+        <ProtectedRoute>
+          <Layout><Habits /></Layout>
         </ProtectedRoute>
       } />
       <Route path="/user-management" element={

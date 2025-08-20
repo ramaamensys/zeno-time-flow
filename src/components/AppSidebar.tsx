@@ -5,6 +5,7 @@ import {
   CheckSquare,
   Calendar,
   Timer,
+  Target,
   User,
   Users,
   ClipboardList,
@@ -65,6 +66,8 @@ export function AppSidebar() {
   const items = [
     { title: "Calendar", url: "/calendar", icon: Calendar },
     { title: "Tasks", url: "/tasks", icon: CheckSquare },
+    { title: "Focus", url: "/focus", icon: Timer },
+    { title: "Habits", url: "/habits", icon: Target },
     { title: "Account", url: "/account", icon: Settings },
     ...(userRole === 'super_admin' || userRole === 'admin' ? [
       { title: "Template", url: "/template", icon: GraduationCap },
