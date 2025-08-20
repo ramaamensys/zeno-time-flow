@@ -40,9 +40,11 @@ const Focus = () => {
 
   useEffect(() => {
     if (user) {
-      checkUserRole();
-      loadUsers();
-      fetchSessions();
+      const initializeData = async () => {
+        await checkUserRole();
+        fetchSessions();
+      };
+      initializeData();
     }
   }, [user, selectedUserId]);
 
@@ -74,24 +76,19 @@ const Focus = () => {
     }
     
     console.log('User role set to:', roles?.role || 'user', 'for user:', user?.email);
-    setUserRole(roles?.role || 'user');
+    const role = roles?.role || 'user';
+    setUserRole(role);
+    
+    // Load users if admin
+    if (role === 'admin' || role === 'super_admin') {
+      loadUsers();
+    }
   };
 
   const loadUsers = async () => {
     if (!user) return;
 
-    const { data: roles, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Error checking user role for loading users:', error);
-      return;
-    }
-
-    if (roles?.role === 'admin' || roles?.role === 'super_admin') {
+    try {
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('user_id, full_name, email')
@@ -100,8 +97,15 @@ const Focus = () => {
       if (profilesError) {
         console.error('Error loading profiles:', profilesError);
       } else if (profiles) {
-        setUsers(profiles.map(p => ({ id: p.user_id, full_name: p.full_name || p.email || 'Unknown', email: p.email || '' })));
+        setUsers(profiles.map(p => ({ 
+          id: p.user_id, 
+          full_name: p.full_name || p.email || 'Unknown', 
+          email: p.email || '' 
+        })));
+        console.log('Loaded users:', profiles.length);
       }
+    } catch (error) {
+      console.error('Error in loadUsers:', error);
     }
   };
 
@@ -416,6 +420,7 @@ const Focus = () => {
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
               View User Focus Sessions
+              <Badge variant="outline" className="ml-2">Admin: {userRole}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -433,8 +438,18 @@ const Focus = () => {
                     </SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+                </Select>
+                <Badge variant="secondary">{users.length} users loaded</Badge>
             </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* Debug Info */}
+      {process.env.NODE_ENV === 'development' && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="p-4">
+            <p className="text-sm">Debug: Role = {userRole}, Users = {users.length}, Selected = {selectedUserId || 'none'}</p>
           </CardContent>
         </Card>
       )}
