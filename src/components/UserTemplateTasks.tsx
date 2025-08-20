@@ -38,7 +38,29 @@ export default function UserTemplateTasks() {
 
   useEffect(() => {
     fetchUserTemplateTasks();
-  }, []);
+  }, [user]);
+
+  useEffect(() => {
+    // Set up real-time subscription for calendar_events changes
+    const channel = supabase
+      .channel('template-tasks-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'calendar_events'
+        },
+        () => {
+          fetchUserTemplateTasks();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const fetchUserTemplateTasks = async () => {
     if (!user) return;
