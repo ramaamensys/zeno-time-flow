@@ -434,12 +434,12 @@ const Focus = () => {
           <CardContent>
             <div className="flex items-center gap-4">
               <Label htmlFor="user-select">Select User:</Label>
-              <Select value={selectedUserId || ''} onValueChange={(value) => setSelectedUserId(value || null)}>
+              <Select value={selectedUserId || 'my_sessions'} onValueChange={(value) => setSelectedUserId(value === 'my_sessions' ? null : value)}>
                 <SelectTrigger className="w-64">
                   <SelectValue placeholder="Select a user to view their focus sessions" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">My Sessions</SelectItem>
+                  <SelectItem value="my_sessions">My Sessions</SelectItem>
                   {users.map(user => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.full_name} ({user.email})

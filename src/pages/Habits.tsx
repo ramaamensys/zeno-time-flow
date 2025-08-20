@@ -647,12 +647,12 @@ const Habits = () => {
             <CardContent>
               <div className="flex items-center gap-4">
                 <Label htmlFor="user-select">Select User:</Label>
-                <Select value={selectedUserId || ''} onValueChange={(value) => setSelectedUserId(value || null)}>
+                <Select value={selectedUserId || 'my_habits'} onValueChange={(value) => setSelectedUserId(value === 'my_habits' ? null : value)}>
                   <SelectTrigger className="w-64">
                     <SelectValue placeholder="Select a user to view their habits" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">My Habits</SelectItem>
+                    <SelectItem value="my_habits">My Habits</SelectItem>
                     {users.map(user => (
                       <SelectItem key={user.id} value={user.id}>
                         {user.full_name} ({user.email})
