@@ -22,8 +22,8 @@ const Auth = () => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        console.log("User already logged in, redirecting to calendar");
-        navigate("/calendar");
+        console.log("User already logged in, redirecting to dashboard");
+        navigate("/");
       }
     };
     checkUser();
@@ -47,8 +47,8 @@ const Auth = () => {
         variant: "destructive",
       });
     } else {
-      console.log("Sign in successful, redirecting to calendar");
-      navigate("/calendar");
+      console.log("Sign in successful, redirecting to dashboard");
+      navigate("/");
     }
     setIsLoading(false);
   };
