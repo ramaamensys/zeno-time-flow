@@ -65,23 +65,31 @@ const Focus = () => {
   const checkUserRole = async () => {
     if (!user) return;
 
-    const { data: roles, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    try {
+      const { data: roles, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .limit(1)
+        .single();
 
-    if (error) {
-      console.error('Error checking user role:', error);
-    }
-    
-    console.log('User role set to:', roles?.role || 'user', 'for user:', user?.email);
-    const role = roles?.role || 'user';
-    setUserRole(role);
-    
-    // Load users if admin
-    if (role === 'admin' || role === 'super_admin') {
-      loadUsers();
+      if (error) {
+        console.error('Error checking user role:', error);
+        setUserRole('user');
+        return;
+      }
+      
+      console.log('User role set to:', roles?.role || 'user', 'for user:', user?.email);
+      const role = roles?.role || 'user';
+      setUserRole(role);
+      
+      // Load users if admin
+      if (role === 'admin' || role === 'super_admin') {
+        await loadUsers();
+      }
+    } catch (error) {
+      console.error('Error in checkUserRole:', error);
+      setUserRole('user');
     }
   };
 
