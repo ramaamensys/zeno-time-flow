@@ -64,7 +64,7 @@ export function AppSidebar() {
   }, [user]);
 
   const items = [
-    { title: "Calendar", url: "/calendar", icon: Calendar },
+    { title: "Calendar", url: "/", icon: Calendar },
     { title: "Tasks", url: "/tasks", icon: CheckSquare },
     { title: "Focus", url: "/focus", icon: Timer },
     { title: "Habits", url: "/habits", icon: Target },

@@ -134,7 +134,7 @@ const SchedulerLayout = ({ children }: SchedulerLayoutProps) => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => navigate('/calendar')}>
+                    <DropdownMenuItem onClick={() => navigate('/')}>
                       📝 Zeno Time Flow (Calendar)
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate('/app-selector')}>

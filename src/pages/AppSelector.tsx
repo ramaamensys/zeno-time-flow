@@ -64,7 +64,7 @@ const AppSelector = () => {
     const { hasCalendar, hasScheduler } = userAccess;
     
     if (hasCalendar && !hasScheduler) {
-      navigate('/calendar');
+      navigate('/');
     } else if (hasScheduler && !hasCalendar) {
       navigate('/scheduler');
     }
@@ -72,7 +72,7 @@ const AppSelector = () => {
 
   const handleAppSelection = (appType: 'calendar' | 'scheduler') => {
     if (appType === 'calendar') {
-      navigate('/calendar');
+      navigate('/');
     } else {
       navigate('/scheduler');
     }
