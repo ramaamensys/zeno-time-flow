@@ -19,21 +19,30 @@ const Auth = () => {
   useEffect(() => {
     console.log("Auth page loaded");
     
-    // Set up auth state listener to handle redirects
+    // Check if user is already authenticated
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        console.log("User already authenticated, redirecting");
+        navigate("/");
+        return;
+      }
+    };
+    
+    checkSession();
+
+    // Set up auth state listener to handle sign-in redirects
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === 'SIGNED_IN' && session) {
-          console.log("Sign in detected, redirecting to dashboard");
-          // Use setTimeout to avoid conflicts with React Router
-          setTimeout(() => {
-            window.location.href = '/';
-          }, 100);
+          console.log("Sign in successful, redirecting to dashboard");
+          navigate("/");
         }
       }
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,8 +62,8 @@ const Auth = () => {
         variant: "destructive",
       });
     } else {
-      console.log("Sign in successful, auth state change will handle redirect");
-      // Don't navigate here, let the auth state change handle it
+      console.log("Sign in successful");
+      // Auth state change listener will handle the redirect
     }
     setIsLoading(false);
   };

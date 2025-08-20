@@ -134,6 +134,11 @@ const AppRouter = () => {
   // Default to calendar app routes
   return (
     <Routes>
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Layout><Calendar /></Layout>
+        </ProtectedRoute>
+      } />
       <Route path="/calendar" element={
         <ProtectedRoute>
           <Layout><Calendar /></Layout>
@@ -174,19 +179,9 @@ const AppRouter = () => {
           <Layout><Profile /></Layout>
         </ProtectedRoute>
       } />
-      <Route path="/" element={
-        <ProtectedRoute>
-          <Layout><Calendar /></Layout>
-        </ProtectedRoute>
-      } />
       <Route path="/dashboard" element={
         <ProtectedRoute>
           <Layout><Dashboard /></Layout>
-        </ProtectedRoute>
-      } />
-      <Route path="/calendar" element={
-        <ProtectedRoute>
-          <Layout><Calendar /></Layout>
         </ProtectedRoute>
       } />
       <Route path="*" element={<NotFound />} />
