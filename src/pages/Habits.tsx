@@ -115,6 +115,7 @@ const Habits = () => {
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('user_id, full_name, email')
+        .neq('user_id', user.id) // Exclude current user from the list
         .order('full_name');
 
       if (profilesError) {
@@ -666,14 +667,6 @@ const Habits = () => {
           </Card>
         )}
         
-        {/* Debug Info */}
-        {process.env.NODE_ENV === 'development' && (
-          <Card className="border-yellow-200 bg-yellow-50">
-            <CardContent className="p-4">
-              <p className="text-sm">Debug: Role = {userRole}, Users = {users.length}, Selected = {selectedUserId || 'none'}</p>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );
