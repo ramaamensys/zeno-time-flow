@@ -133,13 +133,12 @@ export default function LearningTemplates() {
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
-        .single();
+        .eq('user_id', user.id);
 
       if (error) throw error;
-      const adminStatus = data?.role === 'admin' || data?.role === 'super_admin';
-      setIsAdmin(adminStatus);
-      setIsAuthorized(adminStatus);
+      const hasAdminRole = data?.some(role => role.role === 'admin' || role.role === 'super_admin');
+      setIsAdmin(hasAdminRole);
+      setIsAuthorized(hasAdminRole);
     } catch (error) {
       setIsAdmin(false);
       setIsAuthorized(false);
