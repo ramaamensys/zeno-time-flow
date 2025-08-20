@@ -93,6 +93,7 @@ export type Database = {
           parent_task_id: string | null
           priority: string | null
           start_time: string | null
+          template_id: string | null
           title: string
           updated_at: string | null
           user_id: string
@@ -109,6 +110,7 @@ export type Database = {
           parent_task_id?: string | null
           priority?: string | null
           start_time?: string | null
+          template_id?: string | null
           title: string
           updated_at?: string | null
           user_id: string
@@ -125,11 +127,20 @@ export type Database = {
           parent_task_id?: string | null
           priority?: string | null
           start_time?: string | null
+          template_id?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "learning_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       companies: {
         Row: {

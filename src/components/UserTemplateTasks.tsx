@@ -67,20 +67,30 @@ export default function UserTemplateTasks() {
 
       if (templatesError) throw templatesError;
 
-      // Get tasks for each template
+      // Get tasks from calendar_events for each template
       const { data: tasks, error: tasksError } = await supabase
-        .from('template_tasks')
+        .from('calendar_events')
         .select('*')
         .eq('user_id', user.id)
         .in('template_id', templateIds)
+        .not('template_id', 'is', null)
         .order('created_at', { ascending: false });
 
       if (tasksError) throw tasksError;
 
-      // Combine templates with their tasks
+      // Combine templates with their tasks, transforming calendar_events to TemplateTask format
       const templatesWithTasksData: TemplateWithTasks[] = (templates || []).map(template => ({
         template,
-        tasks: (tasks || []).filter(task => task.template_id === template.id)
+        tasks: (tasks || []).filter(task => task.template_id === template.id).map(task => ({
+          id: task.id,
+          template_id: task.template_id!,
+          title: task.title,
+          description: task.description || '',
+          priority: task.priority,
+          status: task.completed ? 'completed' : 'pending',
+          due_date: task.start_time || '',
+          created_at: task.created_at
+        }))
       }));
 
       setTemplatesWithTasks(templatesWithTasksData);
@@ -93,9 +103,13 @@ export default function UserTemplateTasks() {
 
   const updateTaskStatus = async (taskId: string, newStatus: string) => {
     try {
+      const completed = newStatus === 'completed';
       const { error } = await supabase
-        .from('template_tasks')
-        .update({ status: newStatus })
+        .from('calendar_events')
+        .update({ 
+          completed: completed,
+          completed_at: completed ? new Date().toISOString() : null 
+        })
         .eq('id', taskId);
 
       if (error) throw error;

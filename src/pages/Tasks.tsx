@@ -30,6 +30,7 @@ interface CalendarEvent {
   parent_task_id?: string | null;
   completed?: boolean;
   completed_at?: string | null;
+  template_id?: string | null;
   profiles?: {
     full_name: string | null;
     email: string;
@@ -1003,22 +1004,29 @@ const Tasks = () => {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                      <div className="space-y-1 flex-1">
-                       <div className="flex items-center space-x-2">
-                         <CardTitle className="text-lg">{event.title}</CardTitle>
-                         <Badge variant={getPriorityColor(event.priority)}>
-                           <Flag className="w-3 h-3 mr-1" />
-                           {event.priority}
-                         </Badge>
-                         <Badge variant={getEventTypeColor(event.event_type)}>
-                           {event.event_type}
-                         </Badge>
-                         {/* Show "Assigned" badge if task was assigned by admin */}
-                         {event.user_id !== user?.id && (
-                           <Badge variant="outline" className="text-xs">
-                             Assigned
-                           </Badge>
-                         )}
-                       </div>
+                        <div className="flex items-center space-x-2 flex-wrap">
+                          <CardTitle className="text-lg">{event.title}</CardTitle>
+                          <Badge variant={getPriorityColor(event.priority)}>
+                            <Flag className="w-3 h-3 mr-1" />
+                            {event.priority}
+                          </Badge>
+                          <Badge variant={getEventTypeColor(event.event_type)}>
+                            {event.event_type}
+                          </Badge>
+                          {/* Show template badge if task is from template */}
+                          {event.template_id && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                              <BookOpen className="w-3 h-3 mr-1" />
+                              From Template
+                            </Badge>
+                          )}
+                          {/* Show "Assigned" badge if task was assigned by admin */}
+                          {event.user_id !== user?.id && (
+                            <Badge variant="outline" className="text-xs">
+                              Assigned
+                            </Badge>
+                          )}
+                        </div>
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                         <div className="flex items-center">
        <Calendar className="w-4 h-4 mr-1" />

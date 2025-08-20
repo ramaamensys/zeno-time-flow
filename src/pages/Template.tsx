@@ -215,11 +215,12 @@ export default function LearningTemplates() {
       if (assignmentsError) throw assignmentsError;
       setAssignments(assignmentsData || []);
 
-      // Fetch tasks for expanded templates with hierarchical structure
+      // Fetch tasks from calendar_events for expanded templates
       let tasksQuery = supabase
-        .from('template_tasks')
+        .from('calendar_events')
         .select('*')
-        .in('template_id', templateIds);
+        .in('template_id', templateIds)
+        .not('template_id', 'is', null);
 
       if (!isAdmin) {
         // For regular users, only fetch their own tasks
@@ -230,17 +231,23 @@ export default function LearningTemplates() {
 
       if (tasksError) throw tasksError;
 
-      // Organize tasks into hierarchical structure
-      const primaryTasks = (tasksData as any[])?.filter(task => !task.parent_task_id) || [];
-      const subTasks = (tasksData as any[])?.filter(task => task.parent_task_id) || [];
-
-      // Attach sub-tasks to their parent tasks
-      const tasksWithSubTasks = primaryTasks.map(task => ({
-        ...task,
-        sub_tasks: subTasks.filter(subTask => subTask.parent_task_id === task.id)
+      // Transform calendar_events to match TemplateTask interface  
+      const transformedTasks = (tasksData || []).map(task => ({
+        id: task.id,
+        template_id: task.template_id,
+        user_id: task.user_id,
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        status: task.completed ? 'completed' : 'pending',
+        due_date: task.start_time,
+        created_by: task.user_id,
+        created_at: task.created_at,
+        updated_at: task.updated_at,
+        parent_task_id: null // calendar_events doesn't have sub-tasks
       }));
 
-      setTemplateTasks(tasksWithSubTasks);
+      setTemplateTasks(transformedTasks);
     } catch (error) {
       toast.error('Failed to fetch template data');
     }
@@ -335,23 +342,24 @@ export default function LearningTemplates() {
 
     try {
       const taskData = {
-        template_id: templateId,
+        user_id: taskForm.user_id,
         title: taskForm.title,
         description: taskForm.description || null,
         priority: taskForm.priority,
-        due_date: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
-        user_id: taskForm.user_id,
-        created_by: user.id,
-        status: 'pending'
+        start_time: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
+        end_time: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
+        all_day: false,
+        event_type: 'task',
+        template_id: templateId,
       };
 
       const { error } = await supabase
-        .from('template_tasks')
+        .from('calendar_events')
         .insert([taskData]);
 
       if (error) throw error;
       
-      toast.success('Template task created successfully');
+      toast.success('Template task created and added to user\'s tasks');
       setShowCreateTask(false);
       resetTaskForm();
       fetchAllTemplateData();
@@ -422,7 +430,7 @@ export default function LearningTemplates() {
   const deleteTask = async (taskId: string) => {
     try {
       const { error } = await supabase
-        .from('template_tasks')
+        .from('calendar_events')
         .delete()
         .eq('id', taskId);
 
