@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           
           // Use setTimeout to avoid potential routing conflicts
           setTimeout(() => {
-            window.location.replace('/auth');
+            window.location.href = '/auth';
           }, 100);
         }
       }
