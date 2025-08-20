@@ -372,6 +372,78 @@ export type Database = {
         }
         Relationships: []
       }
+      habit_completions: {
+        Row: {
+          completed: boolean
+          created_at: string
+          date: string
+          habit_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          date?: string
+          habit_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          date?: string
+          habit_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      habits: {
+        Row: {
+          best_streak: number
+          category: string
+          color: string
+          created_at: string
+          current_streak: number
+          description: string | null
+          frequency: string
+          id: string
+          target_count: number
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          best_streak?: number
+          category?: string
+          color?: string
+          created_at?: string
+          current_streak?: number
+          description?: string | null
+          frequency?: string
+          id?: string
+          target_count?: number
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          best_streak?: number
+          category?: string
+          color?: string
+          created_at?: string
+          current_streak?: number
+          description?: string | null
+          frequency?: string
+          id?: string
+          target_count?: number
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       learning_templates: {
         Row: {
           created_at: string

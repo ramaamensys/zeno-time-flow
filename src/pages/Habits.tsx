@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Calendar, Check, Plus, Flame, Trophy, Clock } from 'lucide-react';
+import { Calendar, Check, Plus, Flame, Trophy, Clock, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,6 +38,10 @@ const Habits = () => {
   const [completions, setCompletions] = useState<HabitCompletion[]>([]);
   const [isAddingHabit, setIsAddingHabit] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [users, setUsers] = useState<Array<{ id: string; full_name: string; email: string }>>([]);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [newHabit, setNewHabit] = useState({
     title: '',
@@ -64,76 +68,85 @@ const Habits = () => {
 
   useEffect(() => {
     if (user) {
+      checkUserRole();
+      loadUsers();
       loadHabits();
       loadCompletions();
     }
-  }, [user, selectedDate]);
+  }, [user, selectedDate, selectedUserId]);
+
+  const checkUserRole = async () => {
+    if (!user) return;
+
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    setUserRole(roles?.role || 'user');
+  };
+
+  const loadUsers = async () => {
+    if (!user) return;
+
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    if (roles?.role === 'admin' || roles?.role === 'super_admin') {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email')
+        .order('full_name');
+
+      if (profiles) {
+        setUsers(profiles.map(p => ({ id: p.user_id, full_name: p.full_name || p.email || 'Unknown', email: p.email || '' })));
+      }
+    }
+  };
 
   const loadHabits = async () => {
-    // Mock data for habits since we don't have a dedicated table
-    const mockHabits: Habit[] = [
-      {
-        id: '1',
-        title: 'Morning Exercise',
-        description: '30 minutes of cardio or strength training',
-        category: 'health',
-        frequency: 'daily',
-        target_count: 1,
-        current_streak: 5,
-        best_streak: 12,
-        created_at: '2024-01-01',
-        color: '#10b981'
-      },
-      {
-        id: '2',
-        title: 'Read for 30 minutes',
-        description: 'Read books or articles to expand knowledge',
-        category: 'learning',
-        frequency: 'daily',
-        target_count: 1,
-        current_streak: 3,
-        best_streak: 8,
-        created_at: '2024-01-01',
-        color: '#8b5cf6'
-      },
-      {
-        id: '3',
-        title: 'Meditation',
-        description: '10 minutes of mindfulness meditation',
-        category: 'mindfulness',
-        frequency: 'daily',
-        target_count: 1,
-        current_streak: 7,
-        best_streak: 15,
-        created_at: '2024-01-01',
-        color: '#f59e0b'
-      },
-      {
-        id: '4',
-        title: 'Weekly Review',
-        description: 'Review goals and plan for the upcoming week',
-        category: 'productivity',
-        frequency: 'weekly',
-        target_count: 1,
-        current_streak: 2,
-        best_streak: 4,
-        created_at: '2024-01-01',
-        color: '#3b82f6'
-      }
-    ];
-    setHabits(mockHabits);
+    if (!user) return;
+
+    const targetUserId = selectedUserId || user.id;
+    
+    const { data, error } = await supabase
+      .from('habits')
+      .select('*')
+      .eq('user_id', targetUserId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error loading habits:', error);
+      toast.error('Failed to load habits');
+    } else {
+      setHabits((data || []).map(habit => ({
+        ...habit,
+        frequency: habit.frequency as 'daily' | 'weekly'
+      })));
+    }
+    setIsLoading(false);
   };
 
   const loadCompletions = async () => {
-    // Mock data for completions
-    const today = new Date().toISOString().split('T')[0];
-    const mockCompletions: HabitCompletion[] = [
-      { id: '1', habit_id: '1', date: today, completed: true },
-      { id: '2', habit_id: '2', date: today, completed: false },
-      { id: '3', habit_id: '3', date: today, completed: true },
-      { id: '4', habit_id: '4', date: today, completed: false }
-    ];
-    setCompletions(mockCompletions);
+    if (!user) return;
+
+    const targetUserId = selectedUserId || user.id;
+    
+    const { data, error } = await supabase
+      .from('habit_completions')
+      .select('*')
+      .eq('user_id', targetUserId);
+
+    if (error) {
+      console.error('Error loading completions:', error);
+      toast.error('Failed to load habit completions');
+    } else {
+      setCompletions(data || []);
+    }
   };
 
   const createHabit = async () => {
@@ -142,70 +155,93 @@ const Habits = () => {
       return;
     }
 
-    const habit: Habit = {
-      id: Date.now().toString(),
-      title: newHabit.title,
-      description: newHabit.description,
-      category: newHabit.category,
-      frequency: newHabit.frequency,
-      target_count: newHabit.target_count,
-      current_streak: 0,
-      best_streak: 0,
-      created_at: new Date().toISOString(),
-      color: newHabit.color
-    };
+    const { error } = await supabase
+      .from('habits')
+      .insert([{
+        title: newHabit.title,
+        description: newHabit.description,
+        category: newHabit.category,
+        frequency: newHabit.frequency,
+        target_count: newHabit.target_count,
+        color: newHabit.color,
+        user_id: user?.id
+      }]);
 
-    setHabits([...habits, habit]);
-    setNewHabit({
-      title: '',
-      description: '',
-      category: 'health',
-      frequency: 'daily',
-      target_count: 1,
-      color: '#10b981'
-    });
-    setIsAddingHabit(false);
-    toast.success('Habit created successfully');
+    if (error) {
+      console.error('Error creating habit:', error);
+      toast.error('Failed to create habit');
+    } else {
+      setNewHabit({
+        title: '',
+        description: '',
+        category: 'health',
+        frequency: 'daily',
+        target_count: 1,
+        color: '#10b981'
+      });
+      setIsAddingHabit(false);
+      toast.success('Habit created successfully');
+      loadHabits();
+    }
   };
 
-  const toggleHabitCompletion = (habitId: string) => {
+  const toggleHabitCompletion = async (habitId: string) => {
+    if (!user) return;
+
     const today = new Date().toISOString().split('T')[0];
+    const targetUserId = selectedUserId || user.id;
     const existingCompletion = completions.find(c => c.habit_id === habitId && c.date === today);
     
     if (existingCompletion) {
-      setCompletions(completions.map(c => 
-        c.id === existingCompletion.id 
-          ? { ...c, completed: !c.completed }
-          : c
-      ));
+      const { error } = await supabase
+        .from('habit_completions')
+        .update({ completed: !existingCompletion.completed })
+        .eq('id', existingCompletion.id);
+
+      if (error) {
+        console.error('Error updating completion:', error);
+        toast.error('Failed to update habit completion');
+        return;
+      }
     } else {
-      const newCompletion: HabitCompletion = {
-        id: Date.now().toString(),
-        habit_id: habitId,
-        date: today,
-        completed: true
-      };
-      setCompletions([...completions, newCompletion]);
+      const { error } = await supabase
+        .from('habit_completions')
+        .insert([{
+          habit_id: habitId,
+          user_id: targetUserId,
+          date: today,
+          completed: true
+        }]);
+
+      if (error) {
+        console.error('Error creating completion:', error);
+        toast.error('Failed to mark habit as complete');
+        return;
+      }
     }
 
-    // Update streak
+    // Update streak in habits table
     const habit = habits.find(h => h.id === habitId);
     if (habit) {
       const wasCompleted = existingCompletion?.completed || false;
       const isNowCompleted = !wasCompleted;
       
-      setHabits(habits.map(h => 
-        h.id === habitId 
-          ? { 
-              ...h, 
-              current_streak: isNowCompleted ? h.current_streak + 1 : Math.max(0, h.current_streak - 1),
-              best_streak: isNowCompleted && h.current_streak + 1 > h.best_streak ? h.current_streak + 1 : h.best_streak
-            }
-          : h
-      ));
+      const { error } = await supabase
+        .from('habits')
+        .update({
+          current_streak: isNowCompleted ? habit.current_streak + 1 : Math.max(0, habit.current_streak - 1),
+          best_streak: isNowCompleted && habit.current_streak + 1 > habit.best_streak ? habit.current_streak + 1 : habit.best_streak
+        })
+        .eq('id', habitId);
+
+      if (error) {
+        console.error('Error updating habit streak:', error);
+      }
     }
 
     toast.success(existingCompletion?.completed ? 'Habit marked as incomplete' : 'Habit completed!');
+    loadHabits();
+    loadCompletions();
   };
 
   const getHabitCompletion = (habitId: string, date: string) => {
@@ -239,6 +275,14 @@ const Habits = () => {
   const stats = getTodayStats();
   const weekDays = getWeeklyCalendar();
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -247,14 +291,20 @@ const Habits = () => {
           <div>
             <h1 className="text-3xl font-bold text-foreground">Habits</h1>
             <p className="text-muted-foreground">Build lasting habits, one day at a time</p>
+            {selectedUserId && userRole && (userRole === 'admin' || userRole === 'super_admin') && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Viewing habits for: {users.find(u => u.id === selectedUserId)?.full_name}
+              </p>
+            )}
           </div>
-          <Dialog open={isAddingHabit} onOpenChange={setIsAddingHabit}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Habit
-              </Button>
-            </DialogTrigger>
+          {(!selectedUserId || selectedUserId === user?.id) && (
+            <Dialog open={isAddingHabit} onOpenChange={setIsAddingHabit}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Habit
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create New Habit</DialogTitle>
@@ -322,6 +372,7 @@ const Habits = () => {
               </div>
             </DialogContent>
           </Dialog>
+          )}
         </div>
 
         {/* Stats Cards */}
@@ -416,14 +467,22 @@ const Habits = () => {
                               </div>
                             </div>
                           </div>
-                          <Button
-                            variant={isCompleted ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => toggleHabitCompletion(habit.id)}
-                            className={isCompleted ? "bg-green-500 hover:bg-green-600" : ""}
-                          >
-                            <Check className="w-4 h-4" />
-                          </Button>
+                          {(!selectedUserId || selectedUserId === user?.id) && (
+                            <Button
+                              variant={isCompleted ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => toggleHabitCompletion(habit.id)}
+                              className={isCompleted ? "bg-green-500 hover:bg-green-600" : ""}
+                            >
+                              <Check className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {isCompleted && (selectedUserId && selectedUserId !== user?.id) && (
+                            <Badge variant="default" className="bg-green-500">
+                              <Check className="w-3 h-3 mr-1" />
+                              Completed
+                            </Badge>
+                          )}
                         </div>
                       );
                     })
@@ -465,14 +524,22 @@ const Habits = () => {
                               </div>
                             </div>
                           </div>
-                          <Button
-                            variant={isCompleted ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => toggleHabitCompletion(habit.id)}
-                            className={isCompleted ? "bg-green-500 hover:bg-green-600" : ""}
-                          >
-                            <Check className="w-4 h-4" />
-                          </Button>
+                          {(!selectedUserId || selectedUserId === user?.id) && (
+                            <Button
+                              variant={isCompleted ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => toggleHabitCompletion(habit.id)}
+                              className={isCompleted ? "bg-green-500 hover:bg-green-600" : ""}
+                            >
+                              <Check className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {isCompleted && (selectedUserId && selectedUserId !== user?.id) && (
+                            <Badge variant="default" className="bg-green-500">
+                              <Check className="w-3 h-3 mr-1" />
+                              Completed
+                            </Badge>
+                          )}
                         </div>
                       );
                     })}
@@ -539,9 +606,39 @@ const Habits = () => {
                   </div>
                 </div>
               </CardContent>
-            </Card>
-          </div>
+          </Card>
         </div>
+        </div>
+
+        {/* Admin User Filter */}
+        {userRole && (userRole === 'admin' || userRole === 'super_admin') && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                View User Habits
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <Label htmlFor="user-select">Select User:</Label>
+                <Select value={selectedUserId || ''} onValueChange={(value) => setSelectedUserId(value || null)}>
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder="Select a user to view their habits" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">My Habits</SelectItem>
+                    {users.map(user => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.full_name} ({user.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

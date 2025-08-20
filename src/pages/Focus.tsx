@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Play, Pause, Square, Timer, Target, Brain } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Play, Pause, Square, Timer, Target, Brain, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,12 +34,17 @@ const Focus = () => {
   const [notes, setNotes] = useState("");
   const [productivityScore, setProductivityScore] = useState(5);
   const [interruptions, setInterruptions] = useState(0);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [users, setUsers] = useState<Array<{ id: string; full_name: string; email: string }>>([]);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
+      checkUserRole();
+      loadUsers();
       fetchSessions();
     }
-  }, [user]);
+  }, [user, selectedUserId]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -54,10 +60,48 @@ const Focus = () => {
     };
   }, [isActive, seconds]);
 
+  const checkUserRole = async () => {
+    if (!user) return;
+
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    setUserRole(roles?.role || 'user');
+  };
+
+  const loadUsers = async () => {
+    if (!user) return;
+
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
+
+    if (roles?.role === 'admin' || roles?.role === 'super_admin') {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email')
+        .order('full_name');
+
+      if (profiles) {
+        setUsers(profiles.map(p => ({ id: p.user_id, full_name: p.full_name || p.email || 'Unknown', email: p.email || '' })));
+      }
+    }
+  };
+
   const fetchSessions = async () => {
+    if (!user) return;
+
+    const targetUserId = selectedUserId || user.id;
+    
     const { data, error } = await supabase
       .from("focus_sessions")
       .select("*")
+      .eq('user_id', targetUserId)
       .order("created_at", { ascending: false })
       .limit(10);
 
@@ -194,6 +238,11 @@ const Focus = () => {
         <p className="text-muted-foreground">
           Track your focused work time and productivity
         </p>
+        {selectedUserId && userRole && (userRole === 'admin' || userRole === 'super_admin') && (
+          <p className="text-sm text-muted-foreground mt-1">
+            Viewing focus sessions for: {users.find(u => u.id === selectedUserId)?.full_name}
+          </p>
+        )}
       </div>
 
       <Card className="border-2">
@@ -228,12 +277,12 @@ const Focus = () => {
             )}
 
             <div className="flex items-center justify-center gap-4">
-              {!currentSession ? (
+              {!currentSession && (!selectedUserId || selectedUserId === user?.id) ? (
                 <Button onClick={startSession} size="lg">
                   <Play className="mr-2 h-4 w-4" />
                   Start Focus Session
                 </Button>
-              ) : (
+              ) : currentSession ? (
                 <>
                   {isActive ? (
                     <Button onClick={pauseSession} variant="outline" size="lg">
@@ -251,6 +300,8 @@ const Focus = () => {
                     Stop Session
                   </Button>
                 </>
+              ) : selectedUserId && selectedUserId !== user?.id && (
+                <p className="text-muted-foreground">Viewing another user's sessions (read-only)</p>
               )}
             </div>
           </div>
@@ -345,6 +396,36 @@ const Focus = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Admin User Filter */}
+      {userRole && (userRole === 'admin' || userRole === 'super_admin') && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              View User Focus Sessions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <Label htmlFor="user-select">Select User:</Label>
+              <Select value={selectedUserId || ''} onValueChange={(value) => setSelectedUserId(value || null)}>
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder="Select a user to view their focus sessions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">My Sessions</SelectItem>
+                  {users.map(user => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.full_name} ({user.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
