@@ -560,6 +560,31 @@ const Tasks = () => {
     }
   };
 
+  const updateTaskNotes = async (taskId: string, notes: string, files?: string[]) => {
+    const { error } = await supabase
+      .from("calendar_events")
+      .update({ 
+        notes: notes
+        // Note: files would need to be stored separately in a files table or storage bucket
+        // For now, we're just saving the notes
+      })
+      .eq("id", taskId);
+
+    if (error) {
+      toast({
+        title: "Error updating notes",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Notes updated",
+        description: "Task notes have been saved successfully",
+      });
+      fetchEvents();
+    }
+  };
+
   const openEventDetails = (event: CalendarEvent) => {
     setSelectedEvent(event);
     setIsDetailDialogOpen(true);
@@ -1066,6 +1091,7 @@ const Tasks = () => {
                 onAddSubTask={openSubTaskDialog}
                 onEditTask={openEventDetails}
                 onViewDetails={openEventDetails}
+                onUpdateNotes={updateTaskNotes}
                 isAdmin={isAdminUser}
               />
             ))}
