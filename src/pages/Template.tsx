@@ -232,20 +232,22 @@ export default function LearningTemplates() {
       if (tasksError) throw tasksError;
 
       // Transform calendar_events to match TemplateTask interface  
-      const transformedTasks = (tasksData || []).map(task => ({
-        id: task.id,
-        template_id: task.template_id,
-        user_id: task.user_id,
-        title: task.title,
-        description: task.description,
-        priority: task.priority,
-        status: task.completed ? 'completed' : 'pending',
-        due_date: task.start_time,
-        created_by: task.user_id,
-        created_at: task.created_at,
-        updated_at: task.updated_at,
-        parent_task_id: null // calendar_events doesn't have sub-tasks
-      }));
+      const transformedTasks = (tasksData || [])
+        .map(task => ({
+          id: task.id,
+          template_id: task.template_id,
+          user_id: task.user_id,
+          title: task.title,
+          description: task.description,
+          priority: task.priority || 'medium',
+          status: task.completed ? 'completed' : 'pending',
+          due_date: task.start_time,
+          created_by: task.user_id,
+          created_at: task.created_at,
+          updated_at: task.updated_at,
+          parent_task_id: null // calendar_events doesn't have sub-tasks
+        }))
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       setTemplateTasks(transformedTasks);
     } catch (error) {
@@ -405,13 +407,14 @@ export default function LearningTemplates() {
 
     try {
       const { error } = await supabase
-        .from('template_tasks')
+        .from('calendar_events')
         .update({
           title: taskForm.title,
           description: taskForm.description,
           priority: taskForm.priority,
-          due_date: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
-          status: taskForm.status || selectedTask.status
+          start_time: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
+          end_time: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
+          updated_at: new Date().toISOString()
         })
         .eq('id', selectedTask.id);
 
@@ -556,16 +559,21 @@ export default function LearningTemplates() {
 
   const toggleTaskCompletion = async (taskId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+    const isCompleted = newStatus === 'completed';
     
     try {
       const { error } = await supabase
-        .from('template_tasks')
-        .update({ status: newStatus })
+        .from('calendar_events')
+        .update({ 
+          completed: isCompleted,
+          completed_at: isCompleted ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', taskId);
 
       if (error) throw error;
       
-      toast.success(`Task ${newStatus === 'completed' ? 'completed' : 'reopened'}`);
+      toast.success(`Task ${isCompleted ? 'completed' : 'reopened'}`);
       fetchAllTemplateData();
     } catch (error) {
       toast.error('Failed to update task status');
