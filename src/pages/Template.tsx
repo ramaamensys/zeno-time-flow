@@ -980,12 +980,19 @@ export default function LearningTemplates() {
                                       {task.description && (
                                         <p className="text-xs text-muted-foreground mb-1">{task.description}</p>
                                       )}
-                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                        <span>{assignedUser?.full_name || 'Unknown'}</span>
-                                        {task.due_date && (
-                                          <span>• Due: {format(new Date(task.due_date), 'MMM dd')}</span>
-                                        )}
-                                      </div>
+                                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                         <span>{assignedUser?.full_name || 'Unknown'}</span>
+                                         <span>• Created: {
+                                           task.created_at 
+                                             ? (new Date(task.created_at).toDateString() === new Date().toDateString() 
+                                                 ? 'Today' 
+                                                 : format(new Date(task.created_at), 'MMM dd'))
+                                             : 'Unknown'
+                                         }</span>
+                                         {task.due_date && (
+                                           <span>• Due: {format(new Date(task.due_date), 'MMM dd')}</span>
+                                         )}
+                                       </div>
                                     </div>
                                      <div className="flex items-center gap-1 ml-2">
                                        <Badge variant={getPriorityColor(task.priority)} className="text-xs px-1 py-0">
