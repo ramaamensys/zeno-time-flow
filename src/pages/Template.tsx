@@ -473,28 +473,32 @@ export default function LearningTemplates() {
         !(task.title === taskToDelete.title && task.template_id === taskToDelete.template_id)
       ));
 
-      // Delete all matching calendar events (by title and template_id)
-      const { data: allEvents, error: fetchError } = await supabase
+      // Step 1: Delete the specific task by ID first
+      const { error: directDeleteError } = await supabase
         .from('calendar_events')
-        .select('id, title')
+        .delete()
+        .eq('id', taskToDelete.id);
+
+      if (directDeleteError) {
+        console.error('Direct delete failed:', directDeleteError);
+      } else {
+        console.log('Direct delete successful');
+      }
+
+      // Step 2: Delete any other matching records by title and template_id
+      const { error: batchDeleteError } = await supabase
+        .from('calendar_events')
+        .delete()
         .eq('template_id', taskToDelete.template_id)
         .eq('title', taskToDelete.title);
 
-      if (fetchError) throw fetchError;
-
-      if (allEvents && allEvents.length > 0) {
-        // Delete all matching events by their IDs
-        const { error: deleteError } = await supabase
-          .from('calendar_events')
-          .delete()
-          .eq('template_id', taskToDelete.template_id)
-          .eq('title', taskToDelete.title);
-
-        if (deleteError) throw deleteError;
-        console.log(`Deleted ${allEvents.length} calendar events`);
+      if (batchDeleteError) {
+        console.error('Batch delete failed:', batchDeleteError);
+      } else {
+        console.log('Batch delete successful');
       }
 
-      // Also clean up template_tasks table
+      // Step 3: Also clean up template_tasks table
       const { error: templateError } = await supabase
         .from('template_tasks')
         .delete()
@@ -503,14 +507,44 @@ export default function LearningTemplates() {
 
       if (templateError) {
         console.log('Template tasks delete error:', templateError);
+      } else {
+        console.log('Template tasks delete successful');
+      }
+
+      // Step 4: Verify deletion worked by checking if record still exists
+      const { data: verificationData, error: verificationError } = await supabase
+        .from('calendar_events')
+        .select('id, title')
+        .eq('template_id', taskToDelete.template_id)
+        .eq('title', taskToDelete.title);
+
+      console.log('Post-deletion verification:', verificationData);
+
+      if (verificationData && verificationData.length > 0) {
+        console.error('WARNING: Records still exist after deletion!', verificationData);
+        // Try one more aggressive delete
+        const remainingIds = verificationData.map(item => item.id);
+        const { error: finalDeleteError } = await supabase
+          .from('calendar_events')
+          .delete()
+          .in('id', remainingIds);
+        
+        console.log('Final cleanup delete result:', finalDeleteError);
       }
       
       toast.success('Task deleted successfully');
 
-      // Wait longer before refreshing to ensure DB consistency
-      setTimeout(() => {
+      // Wait longer and then verify again before refreshing
+      setTimeout(async () => {
+        const { data: finalCheck } = await supabase
+          .from('calendar_events')
+          .select('id, title')
+          .eq('template_id', taskToDelete.template_id)
+          .eq('title', taskToDelete.title);
+        
+        console.log('Final verification before refresh:', finalCheck);
         fetchAllTemplateData();
-      }, 500);
+      }, 1000);
 
     } catch (error) {
       console.error('Delete task error:', error);
