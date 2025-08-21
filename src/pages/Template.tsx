@@ -463,6 +463,11 @@ export default function LearningTemplates() {
         throw new Error('Task not found');
       }
 
+      console.log('Deleting task:', taskToDelete);
+      console.log('Task title:', taskToDelete.title);
+      console.log('Task description:', taskToDelete.description);
+      console.log('Task template_id:', taskToDelete.template_id);
+
       // First delete from template_tasks table
       const { error: templateError } = await supabase
         .from('template_tasks')
@@ -470,36 +475,19 @@ export default function LearningTemplates() {
         .eq('template_id', taskToDelete.template_id)
         .eq('title', taskToDelete.title);
 
-      if (templateError) throw templateError;
+      console.log('Template tasks delete error:', templateError);
 
-      // Then delete all matching calendar events (user assignments)
-      // Handle both null and empty descriptions
-      if (taskToDelete.description === null || taskToDelete.description === '') {
-        const { error: error1 } = await supabase
-          .from('calendar_events')
-          .delete()
-          .eq('template_id', taskToDelete.template_id)
-          .eq('title', taskToDelete.title)
-          .is('description', null);
+      // Delete all matching calendar events regardless of user_id
+      // This will remove all user assignments for this task
+      const { error: calendarError } = await supabase
+        .from('calendar_events')
+        .delete()
+        .eq('template_id', taskToDelete.template_id)
+        .eq('title', taskToDelete.title);
 
-        const { error: error2 } = await supabase
-          .from('calendar_events')
-          .delete()
-          .eq('template_id', taskToDelete.template_id)
-          .eq('title', taskToDelete.title)
-          .eq('description', '');
-
-        if (error1 && error2) throw error1 || error2;
-      } else {
-        const { error } = await supabase
-          .from('calendar_events')
-          .delete()
-          .eq('template_id', taskToDelete.template_id)
-          .eq('title', taskToDelete.title)
-          .eq('description', taskToDelete.description);
-
-        if (error) throw error;
-      }
+      console.log('Calendar events delete error:', calendarError);
+      
+      if (calendarError) throw calendarError;
       
       toast.success('Task deleted successfully');
       fetchAllTemplateData();
