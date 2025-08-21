@@ -148,6 +148,44 @@ export type Database = {
           },
         ]
       }
+      chat_messages: {
+        Row: {
+          chat_id: string
+          created_at: string
+          files: Json | null
+          id: string
+          message: string | null
+          message_type: string
+          sender_id: string
+        }
+        Insert: {
+          chat_id: string
+          created_at?: string
+          files?: Json | null
+          id?: string
+          message?: string | null
+          message_type?: string
+          sender_id: string
+        }
+        Update: {
+          chat_id?: string
+          created_at?: string
+          files?: Json | null
+          id?: string
+          message?: string | null
+          message_type?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "task_chats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           address: string | null
@@ -658,6 +696,41 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      task_chats: {
+        Row: {
+          admin_id: string
+          created_at: string
+          id: string
+          task_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          id?: string
+          task_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          id?: string
+          task_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_chats_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       template_assignments: {
         Row: {

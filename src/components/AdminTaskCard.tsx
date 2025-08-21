@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { FileUpload } from "@/components/ui/file-upload";
+import { TaskChat } from "@/components/TaskChat";
 import { CheckSquare, Clock, Flag, User, Edit, Plus, Calendar, ChevronDown, ChevronRight, X, Check, BookOpen, MessageCircle, Save } from "lucide-react";
 import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -330,6 +331,18 @@ export const AdminTaskCard = ({
                       </Button>
                     </>
                   )}
+                  
+                  {/* Task Chat */}
+                  <TaskChat
+                    taskId={task.id}
+                    taskTitle={task.title}
+                    assignedUsers={task.profiles ? [{
+                      user_id: task.user_id,
+                      full_name: task.profiles.full_name,
+                      email: task.profiles.email
+                    }] : []}
+                    isAdmin={true}
+                  />
                 </div>
               </div>
 

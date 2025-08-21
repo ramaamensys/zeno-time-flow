@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { TaskChat } from "@/components/TaskChat";
 import { CheckCircle, Clock, AlertCircle, BookOpen, MessageCircle, Save, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -327,6 +328,21 @@ function UserTemplateTasks() {
                               <MessageCircle className="h-3 w-3 mr-1" />
                               Notes
                             </Button>
+                            
+                            {/* Task Chat - only show if user ID is available */}
+                            {user?.id && (
+                              <TaskChat
+                                taskId={task.id}
+                                taskTitle={task.title}
+                                assignedUsers={[{
+                                  user_id: user.id,
+                                  full_name: user.user_metadata?.full_name || null,
+                                  email: user.email || ''
+                                }]}
+                                isAdmin={false}
+                              />
+                            )}
+                            
                             {task.status === 'pending' && (
                               <Button
                                 size="sm"
