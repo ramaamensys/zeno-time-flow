@@ -197,14 +197,14 @@ export default function LearningTemplates() {
 
   const fetchAllTemplateData = async () => {
     const templateIds = Array.from(expandedTemplates);
-    if (templateIds.length === 0 || !user) return;
+    if (!user) return;
 
     try {
-      // Fetch assignments for expanded templates
+      // FIXED: Fetch assignments for ALL templates (not just expanded ones)
+      // so we can show user counts even when templates are collapsed
       let assignmentsQuery = supabase
         .from('template_assignments')
-        .select('*')
-        .in('template_id', templateIds);
+        .select('*');
 
       if (!isAdmin) {
         // For regular users, only fetch their own assignments
@@ -215,6 +215,9 @@ export default function LearningTemplates() {
 
       if (assignmentsError) throw assignmentsError;
       setAssignments(assignmentsData || []);
+
+      // Only fetch tasks for expanded templates to optimize performance
+      if (templateIds.length === 0) return;
 
       // Fetch tasks from calendar_events for expanded templates with a fresh query
       let tasksQuery = supabase
