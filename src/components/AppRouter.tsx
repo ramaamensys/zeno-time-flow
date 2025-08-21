@@ -40,9 +40,14 @@ const AppRouter = () => {
     );
   }
 
-  // If no user, show not found (auth should handle redirects)
+  // If no user, check if we're on auth page, otherwise show loading
   if (!user) {
-    return <NotFound />;
+    // Don't show 404 while auth is loading or on auth-related pages
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
   // If appType is null, show app selector (admin or multi-app users)
