@@ -468,74 +468,59 @@ export default function LearningTemplates() {
 
       console.log('Deleting task:', taskToDelete);
 
-      // Immediately remove from local state to provide instant feedback
-      setTemplateTasks(prev => prev.filter(task => 
-        !(task.title === taskToDelete.title && task.template_id === taskToDelete.template_id)
-      ));
-
-      // CRITICAL FIX: Delete ALL instances of this task across ALL users
-      // This handles the case where a task was assigned and has multiple copies
-      const { data: allMatchingTasks, error: fetchError } = await supabase
+      // STEP 1: Delete from calendar_events using a comprehensive approach
+      const { error: calendarDeleteError } = await supabase
         .from('calendar_events')
-        .select('id, user_id, title')
-        .eq('template_id', taskToDelete.template_id)
-        .eq('title', taskToDelete.title);
+        .delete()
+        .or(`id.eq.${taskToDelete.id},and(template_id.eq.${taskToDelete.template_id},title.eq.${taskToDelete.title})`);
 
-      if (fetchError) {
-        console.error('Fetch error:', fetchError);
-        throw fetchError;
+      if (calendarDeleteError) {
+        console.error('Calendar delete error:', calendarDeleteError);
+        throw calendarDeleteError;
       }
 
-      console.log('All matching tasks found:', allMatchingTasks);
+      console.log('Calendar events deleted successfully');
 
-      if (allMatchingTasks && allMatchingTasks.length > 0) {
-        // Delete ALL matching tasks by their IDs (across all users)
-        const allTaskIds = allMatchingTasks.map(task => task.id);
-        
-        const { error: deleteError } = await supabase
-          .from('calendar_events')
-          .delete()
-          .in('id', allTaskIds);
-
-        if (deleteError) {
-          console.error('Delete error:', deleteError);
-          throw deleteError;
-        }
-        
-        console.log(`Successfully deleted ${allMatchingTasks.length} task instances across all users`);
-      }
-
-      // Also clean up template_tasks table
-      const { error: templateError } = await supabase
+      // STEP 2: Delete from template_tasks table
+      const { error: templateDeleteError } = await supabase
         .from('template_tasks')
         .delete()
         .eq('template_id', taskToDelete.template_id)
         .eq('title', taskToDelete.title);
 
-      if (templateError) {
-        console.log('Template tasks delete error:', templateError);
+      if (templateDeleteError) {
+        console.error('Template tasks delete error:', templateDeleteError);
+        throw templateDeleteError;
       }
 
-      // Final verification - should be empty now
-      const { data: verificationData } = await supabase
+      console.log('Template tasks deleted successfully');
+
+      // STEP 3: Verify deletion worked
+      const { data: remainingTasks } = await supabase
         .from('calendar_events')
         .select('id, title, user_id')
         .eq('template_id', taskToDelete.template_id)
         .eq('title', taskToDelete.title);
 
-      console.log('Final verification (should be empty):', verificationData);
-      
-      toast.success('Task deleted successfully from all users');
+      console.log('Remaining tasks after deletion:', remainingTasks);
 
-      // Refresh data after a short delay
+      // STEP 4: Update local state immediately
+      setTemplateTasks(prev => prev.filter(task => 
+        !(task.title === taskToDelete.title && task.template_id === taskToDelete.template_id)
+      ));
+
+      toast.success('Task deleted successfully');
+
+      // STEP 5: Wait longer before refreshing to ensure DB consistency
       setTimeout(() => {
+        console.log('Refreshing template data...');
         fetchAllTemplateData();
-      }, 300);
+      }, 1000);
 
     } catch (error) {
       console.error('Delete task error:', error);
       toast.error('Failed to delete task');
-      // Restore the task in local state if deletion failed
+      // Restore by refreshing data
       fetchAllTemplateData();
     }
   };
