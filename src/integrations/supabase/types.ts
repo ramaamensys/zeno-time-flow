@@ -481,6 +481,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          manager_id: string | null
           mobile_number: string | null
           status: string | null
           updated_at: string | null
@@ -492,6 +493,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          manager_id?: string | null
           mobile_number?: string | null
           status?: string | null
           updated_at?: string | null
@@ -503,12 +505,21 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          manager_id?: string | null
           mobile_number?: string | null
           status?: string | null
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       schedule_templates: {
         Row: {

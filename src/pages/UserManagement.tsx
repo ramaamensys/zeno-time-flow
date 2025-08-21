@@ -41,6 +41,8 @@ interface UserProfile {
   created_at: string;
   status: string;
   role: string;
+  manager_id?: string;
+  manager_name?: string;
 }
 
 export default function UserManagement() {
@@ -55,8 +57,11 @@ export default function UserManagement() {
     full_name: "",
     password: "",
     role: "user" as "user" | "admin" | "super_admin",
-    app_type: "calendar" as "calendar" | "scheduler"
+    app_type: "calendar" as "calendar" | "scheduler",
+    manager_id: ""
   });
+  const [managers, setManagers] = useState<UserProfile[]>([]);
+  const [currentUserRole, setCurrentUserRole] = useState<string>('');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
@@ -75,10 +80,24 @@ export default function UserManagement() {
     if (!user) return;
 
     try {
-      // For now, allow all authenticated users to access user management
-      // TODO: Add proper role-based access control
-      setIsAuthorized(true);
-      await loadUsers();
+      // Check if user is super admin
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      const isSuperAdmin = roles?.some(r => r.role === 'super_admin') || false;
+      const isRamaAdmin = user.email === 'rama.k@amensys.com';
+      
+      if (isSuperAdmin || isRamaAdmin) {
+        setIsAuthorized(true);
+        setCurrentUserRole('super_admin');
+        await loadUsers();
+        await loadManagers();
+      } else {
+        setIsAuthorized(false);
+        setLoading(false);
+      }
     } catch (error) {
       console.error('Error loading users:', error);
       toast({
@@ -92,10 +111,16 @@ export default function UserManagement() {
 
   const loadUsers = async () => {
     try {
-      // Get all profiles including deleted ones for admin view
+      // Get all profiles including manager information
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          manager:manager_id (
+            user_id,
+            full_name
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (profilesError) throw profilesError;
@@ -123,7 +148,8 @@ export default function UserManagement() {
 
           return {
             ...profile,
-            role: highestRole
+            role: highestRole,
+            manager_name: profile.manager?.full_name || null
           };
         })
       );
@@ -138,6 +164,33 @@ export default function UserManagement() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadManagers = async () => {
+    try {
+      // Get all users with admin role (potential managers)
+      const { data: adminRoles } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'admin');
+
+      if (adminRoles && adminRoles.length > 0) {
+        const { data: adminProfiles } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('user_id', adminRoles.map(r => r.user_id))
+          .eq('status', 'active');
+
+        if (adminProfiles) {
+          setManagers(adminProfiles.map(profile => ({
+            ...profile,
+            role: 'admin'
+          })));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading managers:', error);
     }
   };
 
@@ -185,7 +238,8 @@ export default function UserManagement() {
           full_name: newUser.full_name,
           role: newUser.role,
           password: newUser.password,
-          app_type: newUser.app_type
+          app_type: newUser.app_type,
+          manager_id: newUser.manager_id || null
         }
       });
 
@@ -202,7 +256,7 @@ export default function UserManagement() {
       });
 
       // Clear the form and close dialog
-      setNewUser({ email: "", full_name: "", role: "user", password: "", app_type: "calendar" });
+      setNewUser({ email: "", full_name: "", role: "user", password: "", app_type: "calendar", manager_id: "" });
       setIsDialogOpen(false);
       
       // Reload users to show the new user
@@ -370,7 +424,7 @@ export default function UserManagement() {
       <div className="flex flex-col items-center justify-center h-96 space-y-4">
         <Users className="h-16 w-16 text-muted-foreground" />
         <h2 className="text-2xl font-bold">Access Denied</h2>
-        <p className="text-muted-foreground">You don't have permission to access this page.</p>
+        <p className="text-muted-foreground">Only super administrators can access user management.</p>
       </div>
     );
   }
@@ -538,6 +592,26 @@ export default function UserManagement() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {newUser.role === "user" && (
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="manager" className="text-right">
+                        Assign Manager
+                      </Label>
+                      <Select value={newUser.manager_id} onValueChange={(value) => setNewUser({ ...newUser, manager_id: value })}>
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Select a manager (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">No Manager</SelectItem>
+                          {managers.map((manager) => (
+                            <SelectItem key={manager.user_id} value={manager.user_id}>
+                              {manager.full_name} ({manager.email})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button
@@ -608,6 +682,7 @@ export default function UserManagement() {
                 <TableHead>Email</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Manager</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -615,7 +690,7 @@ export default function UserManagement() {
             <TableBody>
               {filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No users found matching the current filters.
                   </TableCell>
                 </TableRow>
@@ -635,6 +710,13 @@ export default function UserManagement() {
                     <Badge variant={getRoleBadgeVariant(userProfile.role)}>
                       {userProfile.role.replace('_', ' ')}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {userProfile.manager_name ? (
+                      <span className="text-sm">{userProfile.manager_name}</span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">No manager</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {new Date(userProfile.created_at).toLocaleDateString()}

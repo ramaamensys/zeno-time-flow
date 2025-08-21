@@ -13,6 +13,7 @@ interface CreateUserRequest {
   role: string;
   password: string;
   app_type?: 'calendar' | 'scheduler';
+  manager_id?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -24,7 +25,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, full_name, role, password, app_type = 'calendar' }: CreateUserRequest = await req.json();
+    const { email, full_name, role, password, app_type = 'calendar', manager_id }: CreateUserRequest = await req.json();
 
     console.log(`Creating user with email: ${email}, role: ${role}, app_type: ${app_type}`);
 
@@ -89,7 +90,8 @@ const handler = async (req: Request): Promise<Response> => {
           user_id: data.user.id,
           full_name: full_name,
           email: email,
-          status: 'active'
+          status: 'active',
+          manager_id: manager_id || null
         });
         
       // Create/update user role and app_type

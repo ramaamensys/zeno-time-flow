@@ -70,7 +70,9 @@ export function AppSidebar() {
     { title: "Daily Tasks/Habits", url: "/habits", icon: Target },
     { title: "Account", url: "/account", icon: Settings },
     ...(userRole === 'super_admin' || userRole === 'admin' ? [
-      { title: "Template", url: "/template", icon: GraduationCap },
+      { title: "Template", url: "/template", icon: GraduationCap }
+    ] : []),
+    ...(userRole === 'super_admin' ? [
       { title: "User Management", url: "/user-management", icon: Users }
     ] : [])
   ];
