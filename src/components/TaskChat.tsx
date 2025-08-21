@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageCircle, Send, Paperclip, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -43,6 +44,7 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
   const [isLoading, setIsLoading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const channelRef = useRef<any>(null);
@@ -60,8 +62,15 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Initialize selectedUser to first assigned user for admins
   useEffect(() => {
-    if (user && isChatOpen) {
+    if (isAdmin && assignedUsers.length > 0 && !selectedUser) {
+      setSelectedUser(assignedUsers[0].user_id);
+    }
+  }, [isAdmin, assignedUsers, selectedUser]);
+
+  useEffect(() => {
+    if (user && isChatOpen && (selectedUser || !isAdmin)) {
       initializeChatRoom();
     }
     
@@ -72,7 +81,7 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
         channelRef.current = null;
       }
     };
-  }, [user, taskId, isChatOpen]);
+  }, [user, taskId, isChatOpen, selectedUser]);
 
   useEffect(() => {
     scrollToBottom();
@@ -86,14 +95,14 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
       let existingChatId: string | null = null;
 
       if (isAdmin) {
-        // Admin: get chat room with the assigned user
-        const assignedUser = assignedUsers[0]; // For now, handle first user
-        if (assignedUser) {
+        // Admin: get chat room with the selected assigned user
+        const targetUserId = selectedUser;
+        if (targetUserId) {
           let { data: existingChat, error: fetchError } = await supabase
             .from('task_chats')
             .select('id')
             .eq('task_id', taskId)
-            .eq('user_id', assignedUser.user_id)
+            .eq('user_id', targetUserId)
             .eq('admin_id', user.id)
             .maybeSingle();
 
@@ -107,7 +116,7 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
               .from('task_chats')
               .insert({
                 task_id: taskId,
-                user_id: assignedUser.user_id,
+                user_id: targetUserId,
                 admin_id: user.id
               })
               .select('id')
@@ -125,10 +134,10 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
           }
         }
       } else {
-        // User: find chat room where user is assigned
+        // User: find chat room with any admin for this task
         const { data: userChat, error: userChatError } = await supabase
           .from('task_chats')
-          .select('id')
+          .select('id, admin_id')
           .eq('task_id', taskId)
           .eq('user_id', user.id)
           .maybeSingle();
@@ -137,8 +146,15 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
           console.error('Error fetching user chat:', userChatError);
         }
 
-        existingChatId = userChat?.id || null;
-        console.log('User chat search result:', userChat, 'for task:', taskId, 'user:', user.id);
+        if (!userChat) {
+          // Create new chat - need to find an admin to create chat with
+          // For now, we'll need an admin to initiate the chat
+          console.log('No existing chat found for user. Admin needs to initiate chat.');
+          existingChatId = null;
+        } else {
+          existingChatId = userChat.id;
+          console.log('User chat found:', userChat, 'for task:', taskId, 'user:', user.id);
+        }
       }
 
       if (existingChatId) {
@@ -354,10 +370,32 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
             <MessageCircle className="h-5 w-5" />
             <span>Task Chat: {taskTitle}</span>
           </DialogTitle>
+          
+          {/* User Selection for Admins */}
+          {isAdmin && assignedUsers.length > 1 && (
+            <div className="mb-3">
+              <label className="text-sm font-medium mb-2 block">Select User to Chat With:</label>
+              <Select value={selectedUser || ""} onValueChange={setSelectedUser}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a user..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignedUsers.map((user) => (
+                    <SelectItem key={user.user_id} value={user.user_id}>
+                      {user.full_name || user.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          
           <div className="text-sm text-muted-foreground">
             {isAdmin 
-              ? `Chatting with: ${assignedUsers.map(u => u.full_name || u.email).join(', ')}`
-              : 'Chatting with Admin'
+              ? selectedUser 
+                ? `Chatting with: ${assignedUsers.find(u => u.user_id === selectedUser)?.full_name || assignedUsers.find(u => u.user_id === selectedUser)?.email}`
+                : 'Select a user to chat with'
+              : 'Chat with Admin about this task'
             }
           </div>
         </DialogHeader>
@@ -367,8 +405,19 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
           </div>
         ) : !chatId ? (
-          <div className="text-center py-8 text-muted-foreground flex-1">
-            Chat room not available for this task
+          <div className="text-center py-8 text-muted-foreground flex-1 space-y-3">
+            <div className="text-lg">💬</div>
+            {isAdmin ? (
+              <div>
+                <div className="font-medium">No chat room created yet</div>
+                <div className="text-sm">Select a user from the dropdown above to start a conversation</div>
+              </div>
+            ) : (
+              <div>
+                <div className="font-medium">Chat not available yet</div>
+                <div className="text-sm">An admin needs to start the conversation with you for this task</div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col flex-1 overflow-hidden">
