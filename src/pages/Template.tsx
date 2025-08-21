@@ -463,14 +463,36 @@ export default function LearningTemplates() {
         throw new Error('Task not found');
       }
 
-      const { error } = await supabase
-        .from('calendar_events')
-        .delete()
-        .eq('template_id', taskToDelete.template_id)
-        .eq('title', taskToDelete.title)
-        .eq('description', taskToDelete.description || '');
+      // Handle both null and empty descriptions
+      const descriptionConditions = [];
+      
+      // First delete tasks with matching description (null or empty string)
+      if (taskToDelete.description === null || taskToDelete.description === '') {
+        const { error: error1 } = await supabase
+          .from('calendar_events')
+          .delete()
+          .eq('template_id', taskToDelete.template_id)
+          .eq('title', taskToDelete.title)
+          .is('description', null);
 
-      if (error) throw error;
+        const { error: error2 } = await supabase
+          .from('calendar_events')
+          .delete()
+          .eq('template_id', taskToDelete.template_id)
+          .eq('title', taskToDelete.title)
+          .eq('description', '');
+
+        if (error1 && error2) throw error1 || error2;
+      } else {
+        const { error } = await supabase
+          .from('calendar_events')
+          .delete()
+          .eq('template_id', taskToDelete.template_id)
+          .eq('title', taskToDelete.title)
+          .eq('description', taskToDelete.description);
+
+        if (error) throw error;
+      }
       
       toast.success('Task deleted successfully');
       fetchAllTemplateData();
