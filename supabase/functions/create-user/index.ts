@@ -89,6 +89,23 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Ensure user has proper profile and role (for both new and existing users)
     if (data.user) {
+      let finalManagerId = manager_id || null;
+      
+      // If creating an admin, set super admin as their manager
+      if (role === 'admin') {
+        const { data: superAdminData, error: superAdminError } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'super_admin')
+          .limit(1)
+          .single();
+          
+        if (superAdminData && !superAdminError) {
+          finalManagerId = superAdminData.user_id;
+          console.log('Setting super admin as manager for admin user');
+        }
+      }
+      
       // Create/update profile
       await supabase
         .from('profiles')
@@ -97,7 +114,7 @@ const handler = async (req: Request): Promise<Response> => {
           full_name: full_name,
           email: email,
           status: 'active',
-          manager_id: manager_id || null
+          manager_id: finalManagerId
         });
         
       // Create/update user role and app_type
