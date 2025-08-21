@@ -95,10 +95,10 @@ export const TaskCard = ({
   const canToggleComplete = isUserTask || (isAdmin && !isTemplateTask);
   
   // Determine if chat should be shown
-  // Chat should only show for tasks assigned by admins (template tasks or admin-assigned tasks)
-  // NOT for self-created tasks by regular users
-  const shouldShowChat = isTemplateTask || isAdmin;
-  const isSelfCreatedTask = currentUser && task.user_id === currentUser.id && !isTemplateTask;
+  // Chat should only show for template tasks or when viewing tasks assigned to others
+  // NOT for self-created tasks (regardless of admin status)
+  const isSelfCreatedTask = currentUser && task.user_id === currentUser.id;
+  const shouldShowChat = isTemplateTask || (isAdmin && !isSelfCreatedTask);
 
   const StatusIcon = getStatusIcon(task.status, task.completed);
   const isCompleted = task.completed || task.status === 'completed';
@@ -313,19 +313,17 @@ export const TaskCard = ({
                         isAdmin={isAdmin}
                       />
                       
-                      {/* TaskChat Component - Only for admin-assigned tasks */}
-                      {!isSelfCreatedTask && (
-                        <TaskChat
-                          taskId={task.id}
-                          taskTitle={task.title}
-                          assignedUsers={isAdmin && user ? [{
-                            user_id: task.user_id,
-                            full_name: user.full_name,
-                            email: user.email
-                          }] : []}
-                          isAdmin={isAdmin}
-                        />
-                      )}
+                      {/* TaskChat Component */}
+                      <TaskChat
+                        taskId={task.id}
+                        taskTitle={task.title}
+                        assignedUsers={isAdmin && user ? [{
+                          user_id: task.user_id,
+                          full_name: user.full_name,
+                          email: user.email
+                        }] : []}
+                        isAdmin={isAdmin}
+                      />
                     </>
                   )}
 
