@@ -78,7 +78,19 @@ const LearningTemplates = () => {
     due_date: "",
   });
 
+  const [editTaskForm, setEditTaskForm] = useState({
+    id: "",
+    title: "",
+    description: "",
+    priority: "medium",
+    due_date: "",
+    user_id: "",
+  });
+
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [selectedTask, setSelectedTask] = useState<TemplateTask | null>(null);
+  const [isEditTaskDialogOpen, setIsEditTaskDialogOpen] = useState(false);
+  const [isReassignDialogOpen, setIsReassignDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -261,6 +273,82 @@ const LearningTemplates = () => {
     } catch (error) {
       toast.error('Failed to update template');
     }
+  };
+
+  const updateTask = async () => {
+    if (!user || !selectedTask) return;
+
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .update({
+          title: editTaskForm.title,
+          description: editTaskForm.description,
+          priority: editTaskForm.priority,
+          start_time: editTaskForm.due_date ? new Date(editTaskForm.due_date).toISOString() : null,
+          end_time: editTaskForm.due_date ? new Date(editTaskForm.due_date).toISOString() : null,
+        })
+        .eq('id', editTaskForm.id);
+
+      if (error) throw error;
+
+      toast.success('Task updated successfully');
+      setIsEditTaskDialogOpen(false);
+      setEditTaskForm({ id: "", title: "", description: "", priority: "medium", due_date: "", user_id: "" });
+      setSelectedTask(null);
+      fetchAllTemplateData();
+    } catch (error) {
+      toast.error('Failed to update task');
+    }
+  };
+
+  const reassignTask = async () => {
+    if (!user || !selectedTask || !editTaskForm.user_id) return;
+
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .update({
+          user_id: editTaskForm.user_id,
+        })
+        .eq('id', selectedTask.id);
+
+      if (error) throw error;
+
+      toast.success('Task reassigned successfully');
+      setIsReassignDialogOpen(false);
+      setEditTaskForm({ id: "", title: "", description: "", priority: "medium", due_date: "", user_id: "" });
+      setSelectedTask(null);
+      fetchAllTemplateData();
+    } catch (error) {
+      toast.error('Failed to reassign task');
+    }
+  };
+
+  const handleEditTask = (task: TemplateTask) => {
+    setSelectedTask(task);
+    setEditTaskForm({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      due_date: task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '',
+      user_id: task.user_id,
+    });
+    setIsEditTaskDialogOpen(true);
+  };
+
+  const handleReassignTask = (task: TemplateTask) => {
+    setSelectedTask(task);
+    setEditTaskForm({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      due_date: task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '',
+      user_id: task.user_id,
+    });
+    setIsReassignDialogOpen(true);
   };
 
   const deleteTemplate = async (templateId: string) => {
@@ -642,6 +730,10 @@ const LearningTemplates = () => {
                   setIsEditDialogOpen(true);
                 }}
                 onDeleteTemplate={() => deleteTemplate(template.id)}
+                onToggleTaskComplete={toggleTaskCompletion}
+                onEditTask={handleEditTask}
+                onReassignTask={handleReassignTask}
+                onDeleteTask={deleteTask}
               />
             ))}
           </div>
@@ -789,6 +881,118 @@ const LearningTemplates = () => {
                 </Button>
                 <Button onClick={updateTemplate} disabled={!templateForm.name.trim()}>
                   Update Template
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Task Dialog */}
+        <Dialog open={isEditTaskDialogOpen} onOpenChange={setIsEditTaskDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit Task</DialogTitle>
+              <DialogDescription>
+                Update the task details for "{selectedTask?.title}".
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-task-title">Task Title</Label>
+                <Input
+                  id="edit-task-title"
+                  placeholder="Enter task title"
+                  value={editTaskForm.title}
+                  onChange={(e) => setEditTaskForm(prev => ({ ...prev, title: e.target.value }))}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-task-description">Description</Label>
+                <Textarea
+                  id="edit-task-description"
+                  placeholder="Enter task description"
+                  value={editTaskForm.description}
+                  onChange={(e) => setEditTaskForm(prev => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-task-priority">Priority</Label>
+                  <Select value={editTaskForm.priority} onValueChange={(value) => setEditTaskForm(prev => ({ ...prev, priority: value }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="edit-task-due-date">Due Date</Label>
+                  <Input
+                    id="edit-task-due-date"
+                    type="date"
+                    value={editTaskForm.due_date}
+                    onChange={(e) => setEditTaskForm(prev => ({ ...prev, due_date: e.target.value }))}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsEditTaskDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={updateTask} 
+                  disabled={!editTaskForm.title.trim()}
+                >
+                  Update Task
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Reassign Task Dialog */}
+        <Dialog open={isReassignDialogOpen} onOpenChange={setIsReassignDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Reassign Task</DialogTitle>
+              <DialogDescription>
+                Reassign "{selectedTask?.title}" to a different user.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="reassign-user">Assign to User</Label>
+                <Select value={editTaskForm.user_id} onValueChange={(value) => setEditTaskForm(prev => ({ ...prev, user_id: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a user" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teamMembers.map((member) => (
+                      <SelectItem key={member.user_id} value={member.user_id}>
+                        {member.full_name} ({member.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsReassignDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={reassignTask} 
+                  disabled={!editTaskForm.user_id}
+                >
+                  Reassign Task
                 </Button>
               </div>
             </div>

@@ -46,6 +46,10 @@ interface TemplateCardProps {
   onAddTask: () => void;
   onEditTemplate: () => void;
   onDeleteTemplate?: () => void;
+  onToggleTaskComplete?: (taskId: string, completed: boolean) => void;
+  onEditTask?: (task: TemplateTask) => void;
+  onReassignTask?: (task: TemplateTask) => void;
+  onDeleteTask?: (taskId: string) => void;
 }
 
 const getInitials = (name: string) => {
@@ -92,6 +96,10 @@ export const TemplateCard = ({
   onAddTask,
   onEditTemplate,
   onDeleteTemplate,
+  onToggleTaskComplete,
+  onEditTask,
+  onReassignTask,
+  onDeleteTask,
 }: TemplateCardProps) => {
   const progress = getProgress(tasks);
   const completedTasks = tasks.filter(task => task.completed || task.status === 'completed').length;
@@ -290,29 +298,94 @@ export const TemplateCard = ({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {tasks.slice(0, 5).map((task) => (
-                    <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-2 h-2 rounded-full ${
-                          task.completed || task.status === 'completed' ? 'bg-green-500' : 'bg-gray-400'
-                        }`} />
-                        <div>
-                          <p className="font-medium text-sm">{task.title}</p>
-                          {task.description && (
-                            <p className="text-xs text-gray-500 mt-1">{task.description}</p>
+                  {tasks.slice(0, 5).map((task) => {
+                    const assignedUser = assignedUsers.find(u => u.user_id === task.user_id);
+                    return (
+                      <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onToggleTaskComplete?.(task.id, task.completed)}
+                            className="h-6 w-6 p-0 shrink-0"
+                          >
+                            {task.completed || task.status === 'completed' ? (
+                              <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                                <div className="w-2 h-2 bg-white rounded-full" />
+                              </div>
+                            ) : (
+                              <div className="w-4 h-4 border-2 border-gray-400 rounded-full" />
+                            )}
+                          </Button>
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-medium text-sm truncate ${
+                              task.completed || task.status === 'completed' ? 'line-through text-gray-500' : ''
+                            }`}>
+                              {task.title}
+                            </p>
+                            {task.description && (
+                              <p className="text-xs text-gray-500 mt-1 truncate">{task.description}</p>
+                            )}
+                            {assignedUser && (
+                              <div className="flex items-center text-xs text-gray-500 mt-1">
+                                <Users className="h-3 w-3 mr-1" />
+                                {assignedUser.full_name}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2 shrink-0">
+                          <Badge 
+                            variant={task.priority === 'high' ? 'destructive' : task.priority === 'medium' ? 'default' : 'secondary'} 
+                            className="text-xs"
+                          >
+                            {task.priority}
+                          </Badge>
+                          <Badge 
+                            variant={task.completed || task.status === 'completed' ? 'default' : 'outline'} 
+                            className="text-xs"
+                          >
+                            {task.completed || task.status === 'completed' ? 'Completed' : 'Pending'}
+                          </Badge>
+                          {isAdmin && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                  <Settings className="h-3 w-3" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem 
+                                  onClick={() => onEditTask?.(task)}
+                                  className="cursor-pointer"
+                                >
+                                  Edit Task
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => onToggleTaskComplete?.(task.id, task.completed)}
+                                  className="cursor-pointer"
+                                >
+                                  Mark as {task.completed || task.status === 'completed' ? 'Pending' : 'Completed'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => onReassignTask?.(task)}
+                                  className="cursor-pointer"
+                                >
+                                  Reassign Task
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => onDeleteTask?.(task.id)}
+                                  className="cursor-pointer text-red-600"
+                                >
+                                  Delete Task
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={task.priority === 'high' ? 'destructive' : task.priority === 'medium' ? 'default' : 'secondary'} className="text-xs">
-                          {task.priority}
-                        </Badge>
-                        <Badge variant={task.completed || task.status === 'completed' ? 'default' : 'outline'} className="text-xs">
-                          {task.completed || task.status === 'completed' ? 'Completed' : 'Pending'}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {tasks.length > 5 && (
                     <div className="text-center py-2">
                       <span className="text-sm text-gray-500">+{tasks.length - 5} more tasks...</span>
