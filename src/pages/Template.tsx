@@ -343,14 +343,26 @@ export default function LearningTemplates() {
     if (!user || !taskForm.title.trim()) return;
 
     try {
+      // Fix date handling to avoid timezone issues
+      let startTime = null;
+      let endTime = null;
+      
+      if (taskForm.due_date) {
+        // Create date in local timezone to avoid UTC conversion issues
+        const [year, month, day] = taskForm.due_date.split('-').map(Number);
+        const localDate = new Date(year, month - 1, day, 12, 0, 0); // Set to noon to avoid timezone issues
+        startTime = localDate.toISOString();
+        endTime = localDate.toISOString();
+      }
+
       const taskData = {
         user_id: taskForm.user_id || user.id, // Use current admin user if no specific user selected
         title: taskForm.title,
         description: taskForm.description || null,
         priority: taskForm.priority,
-        start_time: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
-        end_time: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
-        all_day: false,
+        start_time: startTime,
+        end_time: endTime,
+        all_day: true, // Set to all day to avoid time display issues
         event_type: 'task',
         template_id: templateId,
       };
@@ -406,14 +418,26 @@ export default function LearningTemplates() {
     if (!selectedTask) return;
 
     try {
+      // Fix date handling for updates too
+      let startTime = null;
+      let endTime = null;
+      
+      if (taskForm.due_date) {
+        const [year, month, day] = taskForm.due_date.split('-').map(Number);
+        const localDate = new Date(year, month - 1, day, 12, 0, 0);
+        startTime = localDate.toISOString();
+        endTime = localDate.toISOString();
+      }
+
       const { error } = await supabase
         .from('calendar_events')
         .update({
           title: taskForm.title,
           description: taskForm.description,
           priority: taskForm.priority,
-          start_time: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
-          end_time: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
+          start_time: startTime,
+          end_time: endTime,
+          all_day: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', selectedTask.id);
