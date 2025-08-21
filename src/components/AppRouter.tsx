@@ -40,14 +40,9 @@ const AppRouter = () => {
     );
   }
 
-  // If no user, check if we're on auth page, otherwise show loading
+  // If no user, return nothing to let App.tsx routes handle it
   if (!user) {
-    // Don't show 404 while auth is loading or on auth-related pages
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
+    return null;
   }
 
   // If appType is null, show app selector (admin or multi-app users)
