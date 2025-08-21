@@ -644,7 +644,30 @@ export default function LearningTemplates() {
   };
 
   const getTemplateTasks = (templateId: string) => {
-    return templateTasks.filter(task => task.template_id === templateId);
+    const tasks = templateTasks.filter(task => task.template_id === templateId);
+    
+    // Group tasks by ID to avoid duplicates and count assigned users
+    const groupedTasks = tasks.reduce((acc, task) => {
+      const existingTask = acc.find(t => t.id === task.id);
+      if (existingTask) {
+        // Task already exists, just track that there are multiple assignments
+        if (!existingTask.assignedUserIds) {
+          existingTask.assignedUserIds = [existingTask.user_id];
+        }
+        if (!existingTask.assignedUserIds.includes(task.user_id)) {
+          existingTask.assignedUserIds.push(task.user_id);
+        }
+      } else {
+        // New task, add it with initial assigned user
+        acc.push({
+          ...task,
+          assignedUserIds: [task.user_id]
+        });
+      }
+      return acc;
+    }, [] as (TemplateTask & { assignedUserIds?: string[] })[]);
+    
+    return groupedTasks;
   };
 
   const getUnassignedUsers = (templateId: string) => {
@@ -1003,51 +1026,59 @@ export default function LearningTemplates() {
                              </Button>
                            )}
                          </div>
-                        <div className="space-y-2 max-h-96 overflow-y-auto">
-                          {templateTasksList.map((task) => {
-                            const assignedUser = assignedUsers.find(u => u.user_id === task.user_id);
-                            const StatusIcon = getStatusIcon(task.status);
-                            return (
-                              <Card key={task.id} className="border-l-4 border-l-primary/20">
-                                <CardContent className="p-3">
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <StatusIcon className="h-3 w-3" />
-                                        <h4 className="font-medium text-sm">{task.title}</h4>
-                                      </div>
-                                      {task.description && (
-                                        <p className="text-xs text-muted-foreground mb-1">{task.description}</p>
-                                      )}
-                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                       <span>{assignedUser?.full_name || 'Unknown'}</span>
-                                       <span>• Created: {
-                                         task.created_at 
-                                           ? (new Date(task.created_at).toDateString() === new Date().toDateString() 
-                                               ? 'Today' 
-                                               : format(new Date(task.created_at), 'MMM dd'))
-                                           : 'Unknown'
-                                       }</span>
-                                       {task.due_date && (
-                                         <span>• Due: {format(new Date(task.due_date), 'MMM dd')}</span>
+                         <div className="space-y-2 max-h-96 overflow-y-auto">
+                           {templateTasksList.map((task) => {
+                             const assignedUsers = getAssignedUsers(template.id);
+                             const taskAssignedUsers = task.assignedUserIds 
+                               ? assignedUsers.filter(u => task.assignedUserIds!.includes(u.user_id))
+                               : [assignedUsers.find(u => u.user_id === task.user_id)].filter(Boolean);
+                             
+                             const StatusIcon = getStatusIcon(task.status);
+                             return (
+                               <Card key={task.id} className="border-l-4 border-l-primary/20">
+                                 <CardContent className="p-3">
+                                   <div className="flex justify-between items-start">
+                                     <div className="flex-1">
+                                       <div className="flex items-center gap-2 mb-1">
+                                         <StatusIcon className="h-3 w-3" />
+                                         <h4 className="font-medium text-sm">{task.title}</h4>
+                                       </div>
+                                       {task.description && (
+                                         <p className="text-xs text-muted-foreground mb-1">{task.description}</p>
                                        )}
+                                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                         <span>
+                                           {taskAssignedUsers.length === 1 
+                                             ? taskAssignedUsers[0]?.full_name || 'Unknown'
+                                             : `${taskAssignedUsers.length} users assigned`}
+                                         </span>
+                                         <span>• Created: {
+                                           task.created_at 
+                                             ? (new Date(task.created_at).toDateString() === new Date().toDateString() 
+                                                 ? 'Today' 
+                                                 : format(new Date(task.created_at), 'MMM dd'))
+                                             : 'Unknown'
+                                         }</span>
+                                         {task.due_date && (
+                                           <span>• Due: {format(new Date(task.due_date), 'MMM dd')}</span>
+                                         )}
+                                       </div>
                                      </div>
-                                    </div>
-                                     <div className="flex items-center gap-1 ml-2">
-                                       <Badge variant={getPriorityColor(task.priority)} className="text-xs px-1 py-0">
-                                         {task.priority}
-                                       </Badge>
-                                       <Switch
-                                         checked={task.status === 'completed'}
-                                         onCheckedChange={() => toggleTaskCompletion(task.id, task.status)}
-                                       />
-                                       {isAdmin && (
-                                         <DropdownMenu>
-                                           <DropdownMenuTrigger asChild>
-                                             <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                               <Edit className="h-3 w-3" />
-                                             </Button>
-                                           </DropdownMenuTrigger>
+                                      <div className="flex items-center gap-1 ml-2">
+                                        <Badge variant={getPriorityColor(task.priority)} className="text-xs px-1 py-0">
+                                          {task.priority}
+                                        </Badge>
+                                        <Switch
+                                          checked={task.status === 'completed'}
+                                          onCheckedChange={() => toggleTaskCompletion(task.id, task.status)}
+                                        />
+                                        {isAdmin && (
+                                          <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                                <Edit className="h-3 w-3" />
+                                              </Button>
+                                            </DropdownMenuTrigger>
                                             <DropdownMenuContent>
                                               <DropdownMenuItem onClick={() => openEditTask(task)}>
                                                 <Edit className="mr-2 h-4 w-4" />
@@ -1057,18 +1088,11 @@ export default function LearningTemplates() {
                                                 <Plus className="mr-2 h-4 w-4" />
                                                 Add Sub-task
                                               </DropdownMenuItem>
-                                              {!task.user_id || assignedUser?.full_name === 'Unknown' ? (
-                                                <DropdownMenuItem onClick={() => openAssignTaskDialog(task)}>
-                                                  <User className="mr-2 h-4 w-4" />
-                                                  Assign to User
-                                                </DropdownMenuItem>
-                                              ) : (
-                                                <DropdownMenuItem onClick={() => openAssignTaskDialog(task)}>
-                                                  <Copy className="mr-2 h-4 w-4" />
-                                                  Assign to Another User
-                                                </DropdownMenuItem>
-                                              )}
-                                              {task.user_id && assignedUser?.full_name !== 'Unknown' && (
+                                              <DropdownMenuItem onClick={() => openAssignTaskDialog(task)}>
+                                                <Copy className="mr-2 h-4 w-4" />
+                                                Assign to Users
+                                              </DropdownMenuItem>
+                                              {task.user_id && (
                                                 <DropdownMenuItem onClick={() => openReassignTaskDialog(task)}>
                                                   <User className="mr-2 h-4 w-4" />
                                                   Reassign Task
@@ -1082,73 +1106,73 @@ export default function LearningTemplates() {
                                                 Delete Task
                                               </DropdownMenuItem>
                                             </DropdownMenuContent>
-                                         </DropdownMenu>
-                                       )}
-                                     </div>
-                                  </div>
-                                  
-                                  {/* Sub-tasks */}
-                                  {task.sub_tasks && task.sub_tasks.length > 0 && (
-                                    <div className="mt-2 pl-4 border-l-2 border-muted space-y-1">
-                                      {task.sub_tasks.map((subTask) => {
-                                        const SubStatusIcon = getStatusIcon(subTask.status);
-                                        return (
-                                          <div key={subTask.id} className="flex items-center justify-between text-xs p-2 bg-muted/30 rounded">
-                                            <div className="flex items-center gap-2 flex-1">
-                                              <SubStatusIcon className="h-3 w-3" />
-                                              <span className="font-medium">{subTask.title}</span>
-                                              {subTask.description && (
-                                                <span className="text-muted-foreground">- {subTask.description}</span>
-                                              )}
-                                            </div>
-                                             <div className="flex items-center gap-1">
-                                               <Badge variant={getPriorityColor(subTask.priority)} className="text-xs px-1 py-0">
-                                                 {subTask.priority}
-                                               </Badge>
-                                               <Switch
-                                                 checked={subTask.status === 'completed'}
-                                                 onCheckedChange={() => toggleTaskCompletion(subTask.id, subTask.status)}
-                                               />
-                                               {isAdmin && (
-                                                 <DropdownMenu>
-                                                   <DropdownMenuTrigger asChild>
-                                                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                                       <MoreVertical className="h-3 w-3" />
-                                                     </Button>
-                                                   </DropdownMenuTrigger>
-                                                   <DropdownMenuContent>
-                                                     <DropdownMenuItem onClick={() => openReassignSubTaskDialog(subTask)}>
-                                                       <User className="mr-2 h-4 w-4" />
-                                                       Reassign Sub-task
-                                                     </DropdownMenuItem>
-                                                     <DropdownMenuItem onClick={() => openAssignTaskDialog(subTask)}>
-                                                       <Copy className="mr-2 h-4 w-4" />
-                                                       Assign to Another User
-                                                     </DropdownMenuItem>
-                                                     <DropdownMenuItem 
-                                                       onClick={() => deleteTask(subTask.id)}
-                                                       className="text-destructive"
-                                                     >
-                                                       <Trash2 className="mr-2 h-4 w-4" />
-                                                       Delete Sub-task
-                                                     </DropdownMenuItem>
-                                                   </DropdownMenuContent>
-                                                 </DropdownMenu>
+                                          </DropdownMenu>
+                                        )}
+                                      </div>
+                                   </div>
+                                   
+                                   {/* Sub-tasks */}
+                                   {task.sub_tasks && task.sub_tasks.length > 0 && (
+                                     <div className="mt-2 pl-4 border-l-2 border-muted space-y-1">
+                                       {task.sub_tasks.map((subTask) => {
+                                         const SubStatusIcon = getStatusIcon(subTask.status);
+                                         return (
+                                           <div key={subTask.id} className="flex items-center justify-between text-xs p-2 bg-muted/30 rounded">
+                                             <div className="flex items-center gap-2 flex-1">
+                                               <SubStatusIcon className="h-3 w-3" />
+                                               <span className="font-medium">{subTask.title}</span>
+                                               {subTask.description && (
+                                                 <span className="text-muted-foreground">- {subTask.description}</span>
                                                )}
                                              </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </CardContent>
-                              </Card>
-                            );
-                          })}
-                          {templateTasksList.length === 0 && (
-                            <p className="text-sm text-muted-foreground">No tasks created yet</p>
-                          )}
-                        </div>
+                                              <div className="flex items-center gap-1">
+                                                <Badge variant={getPriorityColor(subTask.priority)} className="text-xs px-1 py-0">
+                                                  {subTask.priority}
+                                                </Badge>
+                                                <Switch
+                                                  checked={subTask.status === 'completed'}
+                                                  onCheckedChange={() => toggleTaskCompletion(subTask.id, subTask.status)}
+                                                />
+                                                {isAdmin && (
+                                                  <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                                        <MoreVertical className="h-3 w-3" />
+                                                      </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent>
+                                                      <DropdownMenuItem onClick={() => openReassignSubTaskDialog(subTask)}>
+                                                        <User className="mr-2 h-4 w-4" />
+                                                        Reassign Sub-task
+                                                      </DropdownMenuItem>
+                                                      <DropdownMenuItem onClick={() => openAssignTaskDialog(subTask)}>
+                                                        <Copy className="mr-2 h-4 w-4" />
+                                                        Assign to Another User
+                                                      </DropdownMenuItem>
+                                                      <DropdownMenuItem 
+                                                        onClick={() => deleteTask(subTask.id)}
+                                                        className="text-destructive"
+                                                      >
+                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                        Delete Sub-task
+                                                      </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                  </DropdownMenu>
+                                                )}
+                                              </div>
+                                           </div>
+                                         );
+                                       })}
+                                     </div>
+                                   )}
+                                 </CardContent>
+                               </Card>
+                             );
+                           })}
+                           {templateTasksList.length === 0 && (
+                             <p className="text-sm text-muted-foreground">No tasks created yet</p>
+                           )}
+                         </div>
                       </div>
                     </div>
                   </CardContent>
@@ -1399,11 +1423,7 @@ export default function LearningTemplates() {
       <Dialog open={showAssignTaskDialog} onOpenChange={setShowAssignTaskDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {!taskToAssign?.user_id || getAssignedUsers(taskToAssign?.template_id || '').find(u => u.user_id === taskToAssign?.user_id)?.full_name === 'Unknown' 
-                ? 'Assign Task to User(s)' 
-                : 'Assign Task to Another User(s)'}
-            </DialogTitle>
+            <DialogTitle>Assign Task to Users</DialogTitle>
             <DialogDescription>
               Assign "{taskToAssign?.title}" to user(s) in the template
             </DialogDescription>
