@@ -473,24 +473,26 @@ export default function LearningTemplates() {
 
       console.log('Existing calendar events for this template:', existingCalendarEvents);
 
-      // Find matching records by title
+      // Find matching records by title (regardless of description differences)
       const matchingEvents = existingCalendarEvents?.filter(event => 
         event.title === taskToDelete.title
       ) || [];
 
       console.log('Matching events by title:', matchingEvents);
 
-      // Delete each matching record by ID to be absolutely sure
-      for (const event of matchingEvents) {
-        const { error: deleteError } = await supabase
-          .from('calendar_events')
-          .delete()
-          .eq('id', event.id);
+      // Delete each matching record by ID to ensure complete removal
+      if (matchingEvents.length > 0) {
+        const deletePromises = matchingEvents.map(event => 
+          supabase.from('calendar_events').delete().eq('id', event.id)
+        );
         
-        console.log(`Deleted event ${event.id}:`, deleteError);
+        const deleteResults = await Promise.all(deletePromises);
+        deleteResults.forEach((result, index) => {
+          console.log(`Deleted event ${matchingEvents[index].id}:`, result.error);
+        });
       }
 
-      // Also delete from template_tasks table
+      // Also delete from template_tasks table by title and template
       const { error: templateError } = await supabase
         .from('template_tasks')
         .delete()
@@ -503,12 +505,11 @@ export default function LearningTemplates() {
       setTemplateTasks([]);
       setAssignments([]);
       
-      // Force a complete data refresh
-      await new Promise(resolve => setTimeout(resolve, 500)); // Small delay
-      await fetchAllTemplateData();
-      
-      // Also refresh the template list
-      await fetchTemplates();
+      // Force a complete data refresh with delay
+      setTimeout(async () => {
+        await fetchAllTemplateData();
+        await fetchTemplates();
+      }, 100);
       
       toast.success('Task deleted successfully');
     } catch (error) {
@@ -521,8 +522,27 @@ export default function LearningTemplates() {
     if (!user || !taskToAssign || selectedUserIds.length === 0) return;
 
     try {
-      // Create tasks for each selected user
-      const taskPromises = selectedUserIds.map(userId => {
+      // First, check for existing assignments to prevent duplicates
+      const { data: existingAssignments, error: checkError } = await supabase
+        .from('calendar_events')
+        .select('user_id')
+        .eq('template_id', taskToAssign.template_id)
+        .eq('title', taskToAssign.title)
+        .in('user_id', selectedUserIds);
+
+      if (checkError) throw checkError;
+
+      // Filter out users who already have this task
+      const alreadyAssignedUserIds = existingAssignments?.map(a => a.user_id) || [];
+      const newUserIds = selectedUserIds.filter(userId => !alreadyAssignedUserIds.includes(userId));
+
+      if (newUserIds.length === 0) {
+        toast.error('All selected users already have this task assigned');
+        return;
+      }
+
+      // Create tasks for each new user (avoiding duplicates)
+      const taskPromises = newUserIds.map(userId => {
         const taskData = {
           user_id: userId,
           title: taskToAssign.title,
@@ -547,8 +567,12 @@ export default function LearningTemplates() {
       if (hasErrors) {
         throw new Error('Some assignments failed');
       }
+
+      const message = alreadyAssignedUserIds.length > 0 
+        ? `Task assigned to ${newUserIds.length} new user(s). ${alreadyAssignedUserIds.length} user(s) already had this task.`
+        : `Task assigned to ${newUserIds.length} user(s) successfully`;
       
-      toast.success(`Task assigned to ${selectedUserIds.length} user(s) successfully`);
+      toast.success(message);
       setShowAssignTaskDialog(false);
       setTaskToAssign(null);
       setSelectedUserIds([]);
@@ -701,33 +725,30 @@ export default function LearningTemplates() {
   const getTemplateTasks = (templateId: string) => {
     const tasks = templateTasks.filter(task => task.template_id === templateId);
     
-    // Group tasks by title + description to avoid duplicates and count assigned users
-    const groupedTasks = tasks.reduce((acc, task) => {
+    // Group tasks by title + description to avoid duplicates
+    const taskMap = new Map<string, TemplateTask & { assignedUserIds: string[] }>();
+    
+    tasks.forEach(task => {
       // Skip tasks without user_id
-      if (!task.user_id) return acc;
+      if (!task.user_id) return;
       
       const taskKey = `${task.title}_${task.description || ''}_${task.template_id}`;
-      const existingTask = acc.find(t => `${t.title}_${t.description || ''}_${t.template_id}` === taskKey);
       
-      if (existingTask) {
-        // Task already exists, add this user to the assignedUserIds
-        if (!existingTask.assignedUserIds) {
-          existingTask.assignedUserIds = [existingTask.user_id];
-        }
+      if (taskMap.has(taskKey)) {
+        const existingTask = taskMap.get(taskKey)!;
+        // Only add user if not already in the list (prevents duplicates)
         if (!existingTask.assignedUserIds.includes(task.user_id)) {
           existingTask.assignedUserIds.push(task.user_id);
         }
       } else {
-        // New task, add it with initial assigned user
-        acc.push({
+        taskMap.set(taskKey, {
           ...task,
           assignedUserIds: [task.user_id]
         });
       }
-      return acc;
-    }, [] as (TemplateTask & { assignedUserIds?: string[] })[]);
+    });
     
-    return groupedTasks;
+    return Array.from(taskMap.values());
   };
 
   const getUnassignedUsers = (templateId: string) => {
