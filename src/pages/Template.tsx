@@ -473,32 +473,39 @@ export default function LearningTemplates() {
         !(task.title === taskToDelete.title && task.template_id === taskToDelete.template_id)
       ));
 
-      // Step 1: Delete the specific task by ID first
-      const { error: directDeleteError } = await supabase
+      // CRITICAL FIX: Delete ALL instances of this task across ALL users
+      // This handles the case where a task was assigned and has multiple copies
+      const { data: allMatchingTasks, error: fetchError } = await supabase
         .from('calendar_events')
-        .delete()
-        .eq('id', taskToDelete.id);
-
-      if (directDeleteError) {
-        console.error('Direct delete failed:', directDeleteError);
-      } else {
-        console.log('Direct delete successful');
-      }
-
-      // Step 2: Delete any other matching records by title and template_id
-      const { error: batchDeleteError } = await supabase
-        .from('calendar_events')
-        .delete()
+        .select('id, user_id, title')
         .eq('template_id', taskToDelete.template_id)
         .eq('title', taskToDelete.title);
 
-      if (batchDeleteError) {
-        console.error('Batch delete failed:', batchDeleteError);
-      } else {
-        console.log('Batch delete successful');
+      if (fetchError) {
+        console.error('Fetch error:', fetchError);
+        throw fetchError;
       }
 
-      // Step 3: Also clean up template_tasks table
+      console.log('All matching tasks found:', allMatchingTasks);
+
+      if (allMatchingTasks && allMatchingTasks.length > 0) {
+        // Delete ALL matching tasks by their IDs (across all users)
+        const allTaskIds = allMatchingTasks.map(task => task.id);
+        
+        const { error: deleteError } = await supabase
+          .from('calendar_events')
+          .delete()
+          .in('id', allTaskIds);
+
+        if (deleteError) {
+          console.error('Delete error:', deleteError);
+          throw deleteError;
+        }
+        
+        console.log(`Successfully deleted ${allMatchingTasks.length} task instances across all users`);
+      }
+
+      // Also clean up template_tasks table
       const { error: templateError } = await supabase
         .from('template_tasks')
         .delete()
@@ -507,44 +514,23 @@ export default function LearningTemplates() {
 
       if (templateError) {
         console.log('Template tasks delete error:', templateError);
-      } else {
-        console.log('Template tasks delete successful');
       }
 
-      // Step 4: Verify deletion worked by checking if record still exists
-      const { data: verificationData, error: verificationError } = await supabase
+      // Final verification - should be empty now
+      const { data: verificationData } = await supabase
         .from('calendar_events')
-        .select('id, title')
+        .select('id, title, user_id')
         .eq('template_id', taskToDelete.template_id)
         .eq('title', taskToDelete.title);
 
-      console.log('Post-deletion verification:', verificationData);
-
-      if (verificationData && verificationData.length > 0) {
-        console.error('WARNING: Records still exist after deletion!', verificationData);
-        // Try one more aggressive delete
-        const remainingIds = verificationData.map(item => item.id);
-        const { error: finalDeleteError } = await supabase
-          .from('calendar_events')
-          .delete()
-          .in('id', remainingIds);
-        
-        console.log('Final cleanup delete result:', finalDeleteError);
-      }
+      console.log('Final verification (should be empty):', verificationData);
       
-      toast.success('Task deleted successfully');
+      toast.success('Task deleted successfully from all users');
 
-      // Wait longer and then verify again before refreshing
-      setTimeout(async () => {
-        const { data: finalCheck } = await supabase
-          .from('calendar_events')
-          .select('id, title')
-          .eq('template_id', taskToDelete.template_id)
-          .eq('title', taskToDelete.title);
-        
-        console.log('Final verification before refresh:', finalCheck);
+      // Refresh data after a short delay
+      setTimeout(() => {
         fetchAllTemplateData();
-      }, 1000);
+      }, 300);
 
     } catch (error) {
       console.error('Delete task error:', error);
