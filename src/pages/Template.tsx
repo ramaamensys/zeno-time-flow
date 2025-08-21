@@ -40,6 +40,7 @@ interface TemplateTask {
   created_at: string;
   completed: boolean;
   notes?: string;
+  files?: string[];
 }
 
 interface TeamMember {
@@ -478,11 +479,16 @@ const LearningTemplates = () => {
     }
   };
 
-  const updateTaskNotes = async (taskId: string, notes: string) => {
+  const updateTaskNotes = async (taskId: string, notes: string, files?: string[]) => {
     try {
+      const updateData: any = { notes };
+      if (files) {
+        updateData.files = JSON.stringify(files);
+      }
+
       const { error } = await supabase
         .from('calendar_events')
-        .update({ notes })
+        .update(updateData)
         .eq('id', taskId);
 
       if (error) throw error;
@@ -734,7 +740,8 @@ const LearningTemplates = () => {
                 onToggleTaskComplete={toggleTaskCompletion}
                 onEditTask={handleEditTask}
                 onReassignTask={handleReassignTask}
-                onDeleteTask={deleteTask}
+                onDeleteTask={(taskId) => deleteTask(taskId)}
+                onUpdateTaskNotes={updateTaskNotes}
               />
             ))}
           </div>
