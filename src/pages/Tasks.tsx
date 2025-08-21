@@ -1436,7 +1436,15 @@ const Tasks = () => {
                       <Input
                         id="edit-start-time"
                         type="datetime-local"
-                        value={selectedEvent.start_time ? new Date(selectedEvent.start_time).toISOString().slice(0, 16) : ""}
+                        value={selectedEvent.start_time ? (() => {
+                          const date = new Date(selectedEvent.start_time);
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const day = String(date.getDate()).padStart(2, '0');
+                          const hours = String(date.getHours()).padStart(2, '0');
+                          const minutes = String(date.getMinutes()).padStart(2, '0');
+                          return `${year}-${month}-${day}T${hours}:${minutes}`;
+                        })() : ""}
                         onChange={(e) => setSelectedEvent({ ...selectedEvent, start_time: e.target.value ? new Date(e.target.value).toISOString() : "" })}
                       />
                     </div>
@@ -1446,7 +1454,15 @@ const Tasks = () => {
                       <Input
                         id="edit-end-time"
                         type="datetime-local"
-                        value={selectedEvent.end_time ? new Date(selectedEvent.end_time).toISOString().slice(0, 16) : ""}
+                        value={selectedEvent.end_time ? (() => {
+                          const date = new Date(selectedEvent.end_time);
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const day = String(date.getDate()).padStart(2, '0');
+                          const hours = String(date.getHours()).padStart(2, '0');
+                          const minutes = String(date.getMinutes()).padStart(2, '0');
+                          return `${year}-${month}-${day}T${hours}:${minutes}`;
+                        })() : ""}
                         onChange={(e) => setSelectedEvent({ ...selectedEvent, end_time: e.target.value ? new Date(e.target.value).toISOString() : "" })}
                       />
                     </div>
