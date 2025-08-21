@@ -63,14 +63,20 @@ const handler = async (req: Request): Promise<Response> => {
         // Try to get existing user and update their profile/role instead
         console.log('User already exists, attempting to update profile and role...');
         
-        const { data: existingUser, error: getUserError } = await supabase.auth.admin.getUserByEmail(email);
+        const { data: existingUsers, error: getUserError } = await supabase.auth.admin.listUsers();
         
-        if (existingUser?.user && !getUserError) {
-          console.log('Successfully found existing user, will update profile and role');
+        if (existingUsers?.users && !getUserError) {
+          const existingUser = existingUsers.users.find(u => u.email === email);
           
-          // Use existing user data for response
-          data = { user: existingUser.user };
-          error = null; // Clear the error since we handled it
+          if (existingUser) {
+            console.log('Successfully found existing user, will update profile and role');
+            
+            // Use existing user data for response
+            data = { user: existingUser };
+            error = null; // Clear the error since we handled it
+          } else {
+            throw new Error(`User with email ${email} already exists but cannot be accessed. Please use a different email or contact admin.`);
+          }
         } else {
           throw new Error(`User with email ${email} already exists but cannot be accessed. Please use a different email or contact admin.`);
         }
