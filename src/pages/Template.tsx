@@ -606,7 +606,16 @@ export default function LearningTemplates() {
 
       if (assignmentError) throw assignmentError;
 
-      // Get all tasks for this template and user (including subtasks)
+      // Remove all calendar events (user task assignments) for this user and template
+      const { error: calendarError } = await supabase
+        .from('calendar_events')
+        .delete()
+        .eq('template_id', templateId)
+        .eq('user_id', userId);
+
+      if (calendarError) throw calendarError;
+
+      // Get all tasks for this template and user from template_tasks table
       const { data: userTasks, error: tasksError } = await supabase
         .from('template_tasks')
         .select('id')
@@ -615,7 +624,7 @@ export default function LearningTemplates() {
 
       if (tasksError) throw tasksError;
 
-      // Remove user's tasks (this will only remove the user's link to the task)
+      // Remove user's tasks from template_tasks table 
       if (userTasks && userTasks.length > 0) {
         const taskIds = userTasks.map(task => task.id);
         const { error: deleteTasksError } = await supabase
