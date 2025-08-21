@@ -335,20 +335,6 @@ const Focus = () => {
             <div className="space-y-4 pt-4 border-t">
               <div className="grid gap-4">
                 <div className="space-y-2">
-                  <Label>Productivity Score (1-10)</Label>
-                  <div className="flex items-center gap-4">
-                    <input
-                      type="range"
-                      min="1"
-                      max="10"
-                      value={productivityScore}
-                      onChange={(e) => setProductivityScore(parseInt(e.target.value))}
-                      className="flex-1"
-                    />
-                    <span className="w-8 text-center">{productivityScore}</span>
-                  </div>
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="session-notes">Session Notes</Label>
                   <Textarea
                     id="session-notes"

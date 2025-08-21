@@ -90,6 +90,9 @@ const Tasks = () => {
     priority: "all",
     dateRange: "all",
   });
+
+  // Helper variable for admin permissions
+  const isAdminUser = userRole === 'admin' || userRole === 'super_admin';
   const [newEvent, setNewEvent] = useState({
     title: "",
     description: "",
@@ -362,9 +365,9 @@ const Tasks = () => {
       title: newEvent.title,
       description: newEvent.description || null,
       priority: newEvent.priority,
-      // Convert datetime-local to proper timestamp without timezone conversion (optional now)
-      start_time: newEvent.start_time ? new Date(newEvent.start_time).toISOString() : null,
-      end_time: newEvent.end_time ? new Date(newEvent.end_time).toISOString() : (newEvent.start_time ? new Date(newEvent.start_time).toISOString() : null),
+      // Preserve current date when creating tasks without changing time
+      start_time: newEvent.start_time ? new Date(newEvent.start_time).toISOString() : new Date().toISOString(),
+      end_time: newEvent.end_time ? new Date(newEvent.end_time).toISOString() : (newEvent.start_time ? new Date(newEvent.start_time).toISOString() : new Date().toISOString()),
       all_day: newEvent.all_day,
       event_type: newEvent.event_type,
       // If admin is assigning task, use assigned_user_id, otherwise use current user
@@ -449,8 +452,9 @@ const Tasks = () => {
       title: newSubTask.title,
       description: newSubTask.description || null,
       priority: newSubTask.priority,
-      start_time: newSubTask.start_time ? new Date(newSubTask.start_time).toISOString() : null,
-      end_time: newSubTask.end_time ? new Date(newSubTask.end_time).toISOString() : (newSubTask.start_time ? new Date(newSubTask.start_time).toISOString() : null),
+      // Preserve current date when creating sub-tasks
+      start_time: newSubTask.start_time ? new Date(newSubTask.start_time).toISOString() : new Date().toISOString(),
+      end_time: newSubTask.end_time ? new Date(newSubTask.end_time).toISOString() : (newSubTask.start_time ? new Date(newSubTask.start_time).toISOString() : new Date().toISOString()),
       all_day: newSubTask.all_day,
       event_type: newSubTask.event_type,
       // Use assigned user ID if specified and not "task-owner", otherwise use current user
@@ -800,8 +804,6 @@ const Tasks = () => {
   }
 
   console.log("Tasks page rendering", { user, userRole, eventsCount: events.length, filteredEventsCount: filteredEvents.length });
-
-  const isAdminUser = userRole === 'admin' || userRole === 'super_admin';
 
   return (
     <div className="space-y-6">

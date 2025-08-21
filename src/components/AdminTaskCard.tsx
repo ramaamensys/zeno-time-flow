@@ -403,15 +403,59 @@ export const AdminTaskCard = ({
                              </div>
                            </div>
                            
-                           <div className="flex items-center space-x-2">
-                             <Badge variant={getPriorityColor(subTask.priority)} className="text-xs">
-                               {subTask.priority}
-                             </Badge>
-                             {isAdmin && subTask.profiles && (
-                               <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
-                                 <Avatar className="h-4 w-4">
-                                   <AvatarFallback className="text-xs bg-gradient-to-br from-green-500 to-teal-600 text-white">
-                                     {getInitials(subTask.profiles.full_name || subTask.profiles.email)}
+                            <div className="flex items-center space-x-2">
+                              <Badge variant={getPriorityColor(subTask.priority)} className="text-xs">
+                                {subTask.priority}
+                              </Badge>
+                              
+                              {/* Sub-task action buttons */}
+                              <div className="flex items-center space-x-1 opacity-0 group-hover/sub:opacity-100 transition-opacity">
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0"
+                                    >
+                                      <MessageCircle className="h-3 w-3 text-gray-400 hover:text-blue-500" />
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="sm:max-w-lg">
+                                    <DialogHeader>
+                                      <DialogTitle>Sub-task Notes</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4">
+                                      <div>
+                                        <h4 className="font-medium mb-2">{subTask.title}</h4>
+                                        <p className="text-sm text-gray-600 dark:text-gray-300">{subTask.description}</p>
+                                      </div>
+                                      <Textarea
+                                        placeholder="Add notes for this sub-task..."
+                                        className="min-h-24"
+                                      />
+                                      <div className="flex justify-end space-x-2">
+                                        <Button variant="outline">Cancel</Button>
+                                        <Button>Save Notes</Button>
+                                      </div>
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
+                                
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => onEditTask(subTask)}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  <Edit className="h-3 w-3 text-gray-400 hover:text-blue-500" />
+                                </Button>
+                              </div>
+                              
+                              {isAdmin && subTask.profiles && (
+                                <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
+                                  <Avatar className="h-4 w-4">
+                                    <AvatarFallback className="text-xs bg-gradient-to-br from-green-500 to-teal-600 text-white">
+                                      {getInitials(subTask.profiles.full_name || subTask.profiles.email)}
                                    </AvatarFallback>
                                  </Avatar>
                                  <span>{subTask.profiles.full_name || subTask.profiles.email}</span>

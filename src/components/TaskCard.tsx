@@ -95,10 +95,10 @@ export const TaskCard = ({
   const canToggleComplete = isUserTask || (isAdmin && !isTemplateTask);
   
   // Determine if chat should be shown
-  // Chat should only show for template tasks or when viewing tasks assigned to others
-  // NOT for self-created tasks (regardless of admin status)
+  // Chat should NEVER show for personal tasks regardless of user role
+  // Only show for template tasks assigned by admin to other users
   const isSelfCreatedTask = currentUser && task.user_id === currentUser.id;
-  const shouldShowChat = isTemplateTask || (isAdmin && !isSelfCreatedTask);
+  const shouldShowChat = false; // Disabled chat for all personal tasks
 
   const StatusIcon = getStatusIcon(task.status, task.completed);
   const isCompleted = task.completed || task.status === 'completed';
