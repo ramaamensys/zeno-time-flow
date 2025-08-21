@@ -380,6 +380,54 @@ const Habits = () => {
     return days;
   };
 
+  const getWeeklyHabitProgress = (habitId: string) => {
+    const weekDays = getWeeklyCalendar();
+    const completedDays = weekDays.filter(day => {
+      const dateStr = day.toISOString().split('T')[0];
+      return getHabitCompletion(habitId, dateStr);
+    }).length;
+    return { completed: completedDays, total: 7 };
+  };
+
+  const toggleWeeklyHabitCompletion = async (habitId: string, date: Date) => {
+    if (!user) return;
+
+    const dateStr = date.toISOString().split('T')[0];
+    const targetUserId = selectedUserId || user.id;
+    const existingCompletion = completions.find(c => c.habit_id === habitId && c.date === dateStr);
+    
+    if (existingCompletion) {
+      const { error } = await supabase
+        .from('habit_completions')
+        .update({ completed: !existingCompletion.completed })
+        .eq('id', existingCompletion.id);
+
+      if (error) {
+        console.error('Error updating completion:', error);
+        toast.error('Failed to update habit completion');
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from('habit_completions')
+        .insert([{
+          habit_id: habitId,
+          user_id: targetUserId,
+          date: dateStr,
+          completed: true
+        }]);
+
+      if (error) {
+        console.error('Error creating completion:', error);
+        toast.error('Failed to mark habit as complete');
+        return;
+      }
+    }
+
+    toast.success(existingCompletion?.completed ? 'Day marked as incomplete' : 'Day completed!');
+    loadCompletions();
+  };
+
   const stats = getTodayStats();
   const weekDays = getWeeklyCalendar();
 
@@ -711,82 +759,117 @@ const Habits = () => {
                   <CardTitle>Weekly Habits</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     {habits.filter(h => h.frequency === 'weekly').map(habit => {
-                      const isCompleted = getHabitCompletion(habit.id, new Date().toISOString().split('T')[0]);
+                      const progress = getWeeklyHabitProgress(habit.id);
+                      const weekDays = getWeeklyCalendar();
+                      const today = new Date();
+                      
                       return (
-                        <div key={habit.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                          <div className="flex items-center space-x-4">
-                            <div 
-                              className="w-4 h-4 rounded-full" 
-                              style={{ backgroundColor: habit.color }}
-                            />
-                            <div>
-                              <h4 className="font-medium">{habit.title}</h4>
-                              {habit.description && (
-                                <p className="text-sm text-muted-foreground">{habit.description}</p>
-                              )}
-                              <div className="flex items-center space-x-4 mt-1">
-                                <div className="flex items-center space-x-1 text-sm text-muted-foreground">
-                                  <Flame className="w-3 h-3" />
-                                  <span>{habit.current_streak} week streak</span>
+                        <div key={habit.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center space-x-4">
+                              <div 
+                                className="w-4 h-4 rounded-full" 
+                                style={{ backgroundColor: habit.color }}
+                              />
+                              <div>
+                                <h4 className="font-medium">{habit.title}</h4>
+                                {habit.description && (
+                                  <p className="text-sm text-muted-foreground">{habit.description}</p>
+                                )}
+                                <div className="flex items-center space-x-4 mt-1">
+                                  <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                                    <Flame className="w-3 h-3" />
+                                    <span>{habit.current_streak} week streak</span>
+                                  </div>
+                                  <Badge variant="outline">
+                                    {categories.find(c => c.value === habit.category)?.label}
+                                  </Badge>
+                                  <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                                    <Check className="w-3 h-3" />
+                                    <span>{progress.completed}/{progress.total} days</span>
+                                  </div>
                                 </div>
-                                <Badge variant="outline">
-                                  {categories.find(c => c.value === habit.category)?.label}
-                                </Badge>
                               </div>
                             </div>
+                            <div className="flex items-center space-x-2">
+                              {(!selectedUserId || selectedUserId === user?.id) && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => startEditHabit(habit)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button variant="ghost" size="sm">
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Delete Habit</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Are you sure you want to delete "{habit.title}"? This action cannot be undone and will remove all completion history.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => deleteHabit(habit.id)}
+                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        >
+                                          Delete
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            {(!selectedUserId || selectedUserId === user?.id) && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => startEditHabit(habit)}
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="sm">
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Habit</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Are you sure you want to delete "{habit.title}"? This action cannot be undone and will remove all completion history.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => deleteHabit(habit.id)}
-                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      >
-                                        Delete
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </>
-                            )}
-                            <Button
-                              variant={isCompleted ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => toggleHabitCompletion(habit.id)}
-                              className={isCompleted ? "bg-green-500 hover:bg-green-600" : ""}
-                            >
-                              {isCompleted ? <Check className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
-                            </Button>
-                            {isCompleted && (selectedUserId && selectedUserId !== user?.id) && (
-                              <Badge variant="default" className="bg-green-500">
-                                <Check className="w-3 h-3 mr-1" />
-                                Completed
-                              </Badge>
-                            )}
+                          
+                          {/* Weekly Progress Bar */}
+                          <div className="mb-4">
+                            <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
+                              <span>Weekly Progress</span>
+                              <span>{Math.round((progress.completed / progress.total) * 100)}%</span>
+                            </div>
+                            <Progress value={(progress.completed / progress.total) * 100} className="h-2" />
+                          </div>
+                          
+                          {/* Interactive Week Calendar */}
+                          <div className="grid grid-cols-7 gap-2">
+                            {weekDays.map((day, index) => {
+                              const isCompleted = getHabitCompletion(habit.id, day.toISOString().split('T')[0]);
+                              const isToday = day.toDateString() === today.toDateString();
+                              const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                              
+                              return (
+                                <div key={index} className="text-center">
+                                  <div className="text-xs text-muted-foreground mb-1">
+                                    {dayNames[day.getDay()]}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground mb-2">
+                                    {day.getDate()}
+                                  </div>
+                                  <Button
+                                    variant={isCompleted ? "default" : "outline"}
+                                    size="sm"
+                                    className={`w-full h-8 ${isToday ? 'ring-2 ring-primary' : ''} ${
+                                      isCompleted ? 'bg-green-500 hover:bg-green-600' : ''
+                                    }`}
+                                    onClick={() => (!selectedUserId || selectedUserId === user?.id) && toggleWeeklyHabitCompletion(habit.id, day)}
+                                    disabled={selectedUserId && selectedUserId !== user?.id}
+                                  >
+                                    {isCompleted ? <Check className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                                  </Button>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );
