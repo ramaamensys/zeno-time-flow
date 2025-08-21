@@ -2,19 +2,16 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Switch } from "@/components/ui/switch";
-import { Plus, Users, BookOpen, CheckCircle, Clock, AlertCircle, Edit, ChevronDown, ChevronRight, Trash2, Copy, User, MoreVertical } from "lucide-react";
+import { Plus, BookOpen, Users, TrendingUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { TemplateCard } from "@/components/TemplateCard";
+import UserTemplateTasks from "@/components/UserTemplateTasks";
 
 interface LearningTemplate {
   id: string;
@@ -41,8 +38,8 @@ interface TemplateTask {
   status: string;
   due_date: string;
   created_at: string;
-  parent_task_id?: string | null;
-  sub_tasks?: TemplateTask[];
+  completed: boolean;
+  notes?: string;
 }
 
 interface TeamMember {
@@ -51,175 +48,141 @@ interface TeamMember {
   email: string;
 }
 
-export default function LearningTemplates() {
+const LearningTemplates = () => {
   const { user } = useAuth();
   const [templates, setTemplates] = useState<LearningTemplate[]>([]);
   const [assignments, setAssignments] = useState<TemplateAssignment[]>([]);
   const [templateTasks, setTemplateTasks] = useState<TemplateTask[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [expandedTemplates, setExpandedTemplates] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
-  
+  const [expandedTemplates, setExpandedTemplates] = useState(new Set<string>());
+
   // Dialog states
-  const [showCreateTemplate, setShowCreateTemplate] = useState(false);
-  const [showEditTemplate, setShowEditTemplate] = useState(false);
-  const [showCreateTask, setShowCreateTask] = useState(false);
-  const [showEditTask, setShowEditTask] = useState(false);
-  const [showSubTaskDialog, setShowSubTaskDialog] = useState(false);
-  const [showAssignTaskDialog, setShowAssignTaskDialog] = useState(false);
-  const [showReassignTaskDialog, setShowReassignTaskDialog] = useState(false);
-  const [showReassignSubTaskDialog, setShowReassignSubTaskDialog] = useState(false);
-  
-  // Selected states
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<LearningTemplate | null>(null);
-  const [selectedTask, setSelectedTask] = useState<TemplateTask | null>(null);
-  const [parentTaskForSubTask, setParentTaskForSubTask] = useState<TemplateTask | null>(null);
-  const [taskToAssign, setTaskToAssign] = useState<TemplateTask | null>(null);
-  const [taskToReassign, setTaskToReassign] = useState<TemplateTask | null>(null);
-  const [subTaskToReassign, setSubTaskToReassign] = useState<TemplateTask | null>(null);
-  
+
   // Form states
   const [templateForm, setTemplateForm] = useState({
     name: "",
     description: "",
-    technology: ""
+    technology: "",
   });
-  const [selectedUserId, setSelectedUserId] = useState("");
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]); // For multi-user assignment
+
   const [taskForm, setTaskForm] = useState({
     title: "",
     description: "",
     priority: "medium",
     due_date: "",
-    user_id: "",
-    start_time: "",
-    end_time: "",
-    all_day: false,
-    status: "pending"
-  });
-  const [subTaskForm, setSubTaskForm] = useState({
-    title: "",
-    description: "",
-    priority: "medium",
-    due_date: "",
-    start_time: "",
-    end_time: "",
-    all_day: false
   });
 
-  useEffect(() => {
-    checkUserRole();
-    fetchTeamMembers();
-  }, []);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
   useEffect(() => {
-    if (isAdmin !== null) {
-      fetchTemplates();
+    if (user) {
+      checkUserRole();
     }
-  }, [isAdmin]);
+  }, [user]);
 
   useEffect(() => {
-    // Fetch data for all expanded templates
+    if (user && isAdmin !== null) {
+      fetchTemplates();
+      fetchTeamMembers();
+    }
+  }, [user, isAdmin]);
+
+  useEffect(() => {
     if (expandedTemplates.size > 0) {
       fetchAllTemplateData();
     }
-  }, [expandedTemplates, isAdmin]); // Added isAdmin dependency to prevent unnecessary refetches
+  }, [expandedTemplates]);
 
   const checkUserRole = async () => {
     if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      const hasAdminRole = data?.some(role => role.role === 'admin' || role.role === 'super_admin');
-      setIsAdmin(hasAdminRole);
-      setIsAuthorized(hasAdminRole);
-    } catch (error) {
+    
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+    
+    if (data && data.length > 0) {
+      const roles = data.map(item => item.role);
+      setIsAdmin(roles.includes('super_admin') || roles.includes('admin'));
+    } else {
       setIsAdmin(false);
-      setIsAuthorized(false);
     }
   };
 
   const fetchTemplates = async () => {
-    if (!user) return;
-
     try {
-      let query = supabase.from('learning_templates').select('*');
-
       if (!isAdmin) {
-        // For regular users, only fetch templates they are assigned to
-        const { data: userAssignments, error: assignmentError } = await supabase
+        // Regular users see only assigned templates
+        const { data: userAssignments } = await supabase
           .from('template_assignments')
           .select('template_id')
-          .eq('user_id', user.id);
-
-        if (assignmentError) throw assignmentError;
+          .eq('user_id', user?.id);
 
         const templateIds = userAssignments?.map(a => a.template_id) || [];
         if (templateIds.length === 0) {
           setTemplates([]);
-          setLoading(false);
+          setIsLoading(false);
           return;
         }
 
-        query = query.in('id', templateIds);
+        const { data: templatesData } = await supabase
+          .from('learning_templates')
+          .select('*')
+          .in('id', templateIds)
+          .order('created_at', { ascending: false });
+
+        setTemplates(templatesData || []);
+      } else {
+        // Admins see all templates
+        const { data } = await supabase
+          .from('learning_templates')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        setTemplates(data || []);
       }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setTemplates(data || []);
     } catch (error) {
-      toast.error('Failed to fetch learning templates');
+      console.error('Error fetching templates:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const fetchTeamMembers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('user_id, full_name, email');
+    if (!isAdmin) return;
+    
+    const { data } = await supabase
+      .from('profiles')
+      .select('user_id, full_name, email');
 
-      if (error) throw error;
-      setTeamMembers(data || []);
-    } catch (error) {
-      toast.error('Failed to fetch team members');
-    }
+    setTeamMembers(data || []);
   };
 
   const fetchAllTemplateData = async () => {
-    const templateIds = Array.from(expandedTemplates);
     if (!user) return;
 
     try {
-      // FIXED: Fetch assignments for ALL templates (not just expanded ones)
-      // so we can show user counts even when templates are collapsed
+      // Fetch assignments for all templates
       let assignmentsQuery = supabase
         .from('template_assignments')
         .select('*');
 
       if (!isAdmin) {
-        // For regular users, only fetch their own assignments
         assignmentsQuery = assignmentsQuery.eq('user_id', user.id);
       }
 
-      const { data: assignmentsData, error: assignmentsError } = await assignmentsQuery;
-
-      if (assignmentsError) throw assignmentsError;
+      const { data: assignmentsData } = await assignmentsQuery;
       setAssignments(assignmentsData || []);
 
-      // Only fetch tasks for expanded templates to optimize performance
+      // Fetch tasks for expanded templates
+      const templateIds = Array.from(expandedTemplates);
       if (templateIds.length === 0) return;
 
-      // Fetch tasks from calendar_events for expanded templates with a fresh query
       let tasksQuery = supabase
         .from('calendar_events')
         .select('*')
@@ -227,115 +190,95 @@ export default function LearningTemplates() {
         .not('template_id', 'is', null);
 
       if (!isAdmin) {
-        // For regular users, only fetch their own tasks
         tasksQuery = tasksQuery.eq('user_id', user.id);
       }
 
-      const { data: tasksData, error: tasksError } = await tasksQuery
-        .order('created_at', { ascending: false });
+      const { data: tasksData } = await tasksQuery.order('created_at', { ascending: false });
 
-      if (tasksError) throw tasksError;
+      const transformedTasks = (tasksData || []).map(task => ({
+        id: task.id,
+        template_id: task.template_id,
+        user_id: task.user_id,
+        title: task.title,
+        description: task.description || '',
+        priority: task.priority || 'medium',
+        status: task.completed ? 'completed' : 'pending',
+        due_date: task.start_time,
+        created_at: task.created_at,
+        completed: task.completed || false,
+        notes: task.notes || '',
+      }));
 
-      // Transform calendar_events to match TemplateTask interface  
-      const transformedTasks = (tasksData || [])
-        .map(task => ({
-          id: task.id,
-          template_id: task.template_id,
-          user_id: task.user_id,
-          title: task.title,
-          description: task.description,
-          priority: task.priority || 'medium',
-          status: task.completed ? 'completed' : 'pending',
-          due_date: task.start_time,
-          created_by: task.user_id,
-          created_at: task.created_at,
-          updated_at: task.updated_at,
-          parent_task_id: null // calendar_events doesn't have sub-tasks
-        }))
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-      console.log('Fetched tasks after deletion:', transformedTasks.length);
       setTemplateTasks(transformedTasks);
     } catch (error) {
       console.error('Failed to fetch template data:', error);
-      toast.error('Failed to fetch template data');
     }
   };
 
   const createTemplate = async () => {
-    if (!user) return;
+    if (!user || !isAdmin) return;
 
     try {
       const { error } = await supabase
         .from('learning_templates')
-        .insert({
+        .insert([{
           ...templateForm,
-          created_by: user.id
-        });
+          created_by: user.id,
+        }]);
 
       if (error) throw error;
-      
-      toast.success('Learning template created successfully');
-      setShowCreateTemplate(false);
+
+      toast.success('Template created successfully');
+      setIsCreateDialogOpen(false);
       setTemplateForm({ name: "", description: "", technology: "" });
       fetchTemplates();
     } catch (error) {
-      toast.error('Failed to create learning template');
+      toast.error('Failed to create template');
     }
   };
 
-  const updateTemplate = async () => {
+  const createTask = async () => {
     if (!user || !selectedTemplate) return;
 
     try {
-      const { error } = await supabase
-        .from('learning_templates')
-        .update({
-          name: templateForm.name,
-          description: templateForm.description,
-          technology: templateForm.technology
-        })
-        .eq('id', selectedTemplate.id);
+      // Create tasks for selected users
+      const taskPromises = selectedUserIds.map(userId =>
+        supabase.from('calendar_events').insert([{
+          title: taskForm.title,
+          description: taskForm.description,
+          priority: taskForm.priority,
+          start_time: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
+          end_time: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
+          all_day: true,
+          event_type: 'task',
+          user_id: userId,
+          template_id: selectedTemplate.id,
+        }])
+      );
 
-      if (error) throw error;
-      
-      toast.success('Learning template updated successfully');
-      setShowEditTemplate(false);
-      setSelectedTemplate(null);
-      setTemplateForm({ name: "", description: "", technology: "" });
-      fetchTemplates();
+      await Promise.all(taskPromises);
+
+      toast.success('Task created and assigned successfully');
+      setIsTaskDialogOpen(false);
+      setTaskForm({ title: "", description: "", priority: "medium", due_date: "" });
+      setSelectedUserIds([]);
+      fetchAllTemplateData();
     } catch (error) {
-      toast.error('Failed to update learning template');
-    }
-  };
-
-  const deleteTemplate = async (templateId: string) => {
-    try {
-      const { error } = await supabase
-        .from('learning_templates')
-        .delete()
-        .eq('id', templateId);
-
-      if (error) throw error;
-      
-      toast.success('Learning template deleted successfully');
-      fetchTemplates();
-    } catch (error) {
-      toast.error('Failed to delete learning template');
+      toast.error('Failed to create task');
     }
   };
 
   const assignUserToTemplate = async (templateId: string, userId: string) => {
-    if (!user) return;
+    if (!user || !isAdmin) return;
 
     try {
       const { error } = await supabase
         .from('template_assignments')
-        .insert({
+        .insert([{
           template_id: templateId,
           user_id: userId,
-          assigned_by: user.id
-        });
+          assigned_by: user.id,
+        }]);
 
       if (error) throw error;
       
@@ -346,337 +289,24 @@ export default function LearningTemplates() {
     }
   };
 
-  const createTemplateTask = async (templateId: string) => {
-    if (!user || !taskForm.title.trim()) return;
-
-    try {
-      // Fix date handling to avoid timezone issues
-      let startTime = null;
-      let endTime = null;
-      
-      if (taskForm.due_date) {
-        // Create date in local timezone to avoid UTC conversion issues
-        const [year, month, day] = taskForm.due_date.split('-').map(Number);
-        const localDate = new Date(year, month - 1, day, 12, 0, 0); // Set to noon to avoid timezone issues
-        startTime = localDate.toISOString();
-        endTime = localDate.toISOString();
-      }
-
-      const taskData = {
-        user_id: taskForm.user_id || user.id, // Use current admin user if no specific user selected
-        title: taskForm.title,
-        description: taskForm.description || null,
-        priority: taskForm.priority,
-        start_time: startTime,
-        end_time: endTime,
-        all_day: true, // Set to all day to avoid time display issues
-        event_type: 'task',
-        template_id: templateId,
-      };
-
-      const { error } = await supabase
-        .from('calendar_events')
-        .insert([taskData]);
-
-      if (error) throw error;
-      
-      toast.success(taskForm.user_id ? 'Template task created and assigned to user' : 'Template task created (unassigned)');
-      setShowCreateTask(false);
-      resetTaskForm();
-      fetchAllTemplateData();
-    } catch (error) {
-      toast.error('Failed to create template task');
-    }
-  };
-
-  const createSubTask = async () => {
-    if (!user || !parentTaskForSubTask || !subTaskForm.title.trim()) return;
-
-    try {
-      const subTaskData = {
-        template_id: parentTaskForSubTask.template_id,
-        title: subTaskForm.title,
-        description: subTaskForm.description || null,
-        priority: subTaskForm.priority,
-        due_date: subTaskForm.due_date ? new Date(subTaskForm.due_date).toISOString() : null,
-        user_id: parentTaskForSubTask.user_id,
-        created_by: user.id,
-        status: 'pending',
-        parent_task_id: parentTaskForSubTask.id
-      };
-
-      const { error } = await supabase
-        .from('template_tasks')
-        .insert([subTaskData]);
-
-      if (error) throw error;
-      
-      toast.success('Sub-task created successfully');
-      setShowSubTaskDialog(false);
-      resetSubTaskForm();
-      setParentTaskForSubTask(null);
-      fetchAllTemplateData();
-    } catch (error) {
-      toast.error('Failed to create sub-task');
-    }
-  };
-
-  const updateTask = async () => {
-    if (!selectedTask) return;
-
-    try {
-      // Fix date handling for updates too
-      let startTime = null;
-      let endTime = null;
-      
-      if (taskForm.due_date) {
-        const [year, month, day] = taskForm.due_date.split('-').map(Number);
-        const localDate = new Date(year, month - 1, day, 12, 0, 0);
-        startTime = localDate.toISOString();
-        endTime = localDate.toISOString();
-      }
-
-      const { error } = await supabase
-        .from('calendar_events')
-        .update({
-          title: taskForm.title,
-          description: taskForm.description,
-          priority: taskForm.priority,
-          start_time: startTime,
-          end_time: endTime,
-          all_day: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', selectedTask.id);
-
-      if (error) throw error;
-      
-      toast.success('Task updated successfully');
-      setShowEditTask(false);
-      setSelectedTask(null);
-      resetTaskForm();
-      fetchAllTemplateData();
-    } catch (error) {
-      toast.error('Failed to update task');
-    }
-  };
-
-  const deleteTask = async (taskId: string) => {
-    try {
-      // Find the task to delete
-      const taskToDelete = templateTasks.find(t => t.id === taskId);
-      if (!taskToDelete) {
-        throw new Error('Task not found');
-      }
-
-      console.log('Deleting task:', taskToDelete);
-
-      // STEP 1: Delete from calendar_events using a comprehensive approach
-      const { error: calendarDeleteError } = await supabase
-        .from('calendar_events')
-        .delete()
-        .or(`id.eq.${taskToDelete.id},and(template_id.eq.${taskToDelete.template_id},title.eq.${taskToDelete.title})`);
-
-      if (calendarDeleteError) {
-        console.error('Calendar delete error:', calendarDeleteError);
-        throw calendarDeleteError;
-      }
-
-      console.log('Calendar events deleted successfully');
-
-      // STEP 2: Delete from template_tasks table
-      const { error: templateDeleteError } = await supabase
-        .from('template_tasks')
-        .delete()
-        .eq('template_id', taskToDelete.template_id)
-        .eq('title', taskToDelete.title);
-
-      if (templateDeleteError) {
-        console.error('Template tasks delete error:', templateDeleteError);
-        throw templateDeleteError;
-      }
-
-      console.log('Template tasks deleted successfully');
-
-      // STEP 3: Verify deletion worked
-      const { data: remainingTasks } = await supabase
-        .from('calendar_events')
-        .select('id, title, user_id')
-        .eq('template_id', taskToDelete.template_id)
-        .eq('title', taskToDelete.title);
-
-      console.log('Remaining tasks after deletion:', remainingTasks);
-
-      // STEP 4: Update local state immediately
-      setTemplateTasks(prev => prev.filter(task => 
-        !(task.title === taskToDelete.title && task.template_id === taskToDelete.template_id)
-      ));
-
-      toast.success('Task deleted successfully');
-
-      // STEP 5: Wait longer before refreshing to ensure DB consistency
-      setTimeout(() => {
-        console.log('Refreshing template data...');
-        fetchAllTemplateData();
-      }, 1000);
-
-    } catch (error) {
-      console.error('Delete task error:', error);
-      toast.error('Failed to delete task');
-      // Restore by refreshing data
-      fetchAllTemplateData();
-    }
-  };
-
-  const assignTaskToUser = async () => {
-    if (!user || !taskToAssign || selectedUserIds.length === 0) return;
-
-    try {
-      // First, check for existing assignments to prevent duplicates
-      const { data: existingAssignments, error: checkError } = await supabase
-        .from('calendar_events')
-        .select('user_id')
-        .eq('template_id', taskToAssign.template_id)
-        .eq('title', taskToAssign.title)
-        .in('user_id', selectedUserIds);
-
-      if (checkError) throw checkError;
-
-      // Filter out users who already have this task
-      const alreadyAssignedUserIds = existingAssignments?.map(a => a.user_id) || [];
-      const newUserIds = selectedUserIds.filter(userId => !alreadyAssignedUserIds.includes(userId));
-
-      if (newUserIds.length === 0) {
-        toast.error('All selected users already have this task assigned');
-        return;
-      }
-
-      // Create tasks for each new user (avoiding duplicates)
-      const taskPromises = newUserIds.map(userId => {
-        const taskData = {
-          user_id: userId,
-          title: taskToAssign.title,
-          description: taskToAssign.description || null,
-          priority: taskToAssign.priority,
-          start_time: taskToAssign.due_date ? new Date(taskToAssign.due_date).toISOString() : null,
-          end_time: taskToAssign.due_date ? new Date(taskToAssign.due_date).toISOString() : null,
-          all_day: true,
-          event_type: 'task',
-          template_id: taskToAssign.template_id,
-        };
-
-        return supabase
-          .from('calendar_events')
-          .insert([taskData]);
-      });
-
-      const results = await Promise.all(taskPromises);
-      
-      // Check if any failed
-      const hasErrors = results.some(result => result.error);
-      if (hasErrors) {
-        throw new Error('Some assignments failed');
-      }
-
-      const message = alreadyAssignedUserIds.length > 0 
-        ? `Task assigned to ${newUserIds.length} new user(s). ${alreadyAssignedUserIds.length} user(s) already had this task.`
-        : `Task assigned to ${newUserIds.length} user(s) successfully`;
-      
-      toast.success(message);
-      setShowAssignTaskDialog(false);
-      setTaskToAssign(null);
-      setSelectedUserIds([]);
-      fetchAllTemplateData();
-    } catch (error) {
-      toast.error('Failed to assign task to users');
-    }
-  };
-
-  const reassignTask = async () => {
-    if (!user || !taskToReassign || !selectedUserId) return;
-
-    try {
-      const { error } = await supabase
-        .from('calendar_events')
-        .update({ 
-          user_id: selectedUserId,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', taskToReassign.id);
-
-      if (error) throw error;
-      
-      toast.success('Task reassigned successfully');
-      setShowReassignTaskDialog(false);
-      setTaskToReassign(null);
-      setSelectedUserId("");
-      fetchAllTemplateData();
-    } catch (error) {
-      toast.error('Failed to reassign task');
-    }
-  };
-
-  const reassignSubTask = async () => {
-    if (!user || !subTaskToReassign || !selectedUserId) return;
-
-    try {
-      const { error } = await supabase
-        .from('template_tasks')
-        .update({ user_id: selectedUserId })
-        .eq('id', subTaskToReassign.id);
-
-      if (error) throw error;
-      
-      toast.success('Sub-task reassigned successfully');
-      setShowReassignSubTaskDialog(false);
-      setSubTaskToReassign(null);
-      setSelectedUserId("");
-      fetchAllTemplateData();
-    } catch (error) {
-      toast.error('Failed to reassign sub-task');
-    }
-  };
-
   const removeUserFromTemplate = async (templateId: string, userId: string) => {
+    if (!isAdmin) return;
+
     try {
       // Remove template assignment
-      const { error: assignmentError } = await supabase
+      await supabase
         .from('template_assignments')
         .delete()
         .eq('template_id', templateId)
         .eq('user_id', userId);
 
-      if (assignmentError) throw assignmentError;
-
-      // Remove all calendar events (user task assignments) for this user and template
-      const { error: calendarError } = await supabase
+      // Remove associated tasks
+      await supabase
         .from('calendar_events')
         .delete()
         .eq('template_id', templateId)
         .eq('user_id', userId);
 
-      if (calendarError) throw calendarError;
-
-      // Get all tasks for this template and user from template_tasks table
-      const { data: userTasks, error: tasksError } = await supabase
-        .from('template_tasks')
-        .select('id')
-        .eq('template_id', templateId)
-        .eq('user_id', userId);
-
-      if (tasksError) throw tasksError;
-
-      // Remove user's tasks from template_tasks table 
-      if (userTasks && userTasks.length > 0) {
-        const taskIds = userTasks.map(task => task.id);
-        const { error: deleteTasksError } = await supabase
-          .from('template_tasks')
-          .delete()
-          .in('id', taskIds);
-
-        if (deleteTasksError) throw deleteTasksError;
-      }
-      
       toast.success('User removed from template successfully');
       fetchAllTemplateData();
     } catch (error) {
@@ -684,39 +314,55 @@ export default function LearningTemplates() {
     }
   };
 
-  const toggleTaskCompletion = async (taskId: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
-    const isCompleted = newStatus === 'completed';
-    
+  const updateTaskNotes = async (taskId: string, notes: string) => {
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .update({ notes })
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      toast.success('Notes updated successfully');
+      fetchAllTemplateData();
+    } catch (error) {
+      toast.error('Failed to update notes');
+    }
+  };
+
+  const toggleTaskCompletion = async (taskId: string, completed: boolean) => {
     try {
       const { error } = await supabase
         .from('calendar_events')
         .update({ 
-          completed: isCompleted,
-          completed_at: isCompleted ? new Date().toISOString() : null,
-          updated_at: new Date().toISOString()
+          completed: !completed,
+          completed_at: !completed ? new Date().toISOString() : null 
         })
         .eq('id', taskId);
 
       if (error) throw error;
-      
-      toast.success(`Task ${isCompleted ? 'completed' : 'reopened'}`);
+
+      toast.success(`Task marked as ${!completed ? 'completed' : 'pending'}`);
       fetchAllTemplateData();
     } catch (error) {
       toast.error('Failed to update task status');
     }
   };
 
-  const toggleTemplateExpanded = (templateId: string) => {
-    setExpandedTemplates(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(templateId)) {
-        newSet.delete(templateId);
-      } else {
-        newSet.add(templateId);
-      }
-      return newSet;
-    });
+  const deleteTask = async (taskId: string) => {
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .delete()
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      toast.success('Task deleted successfully');
+      fetchAllTemplateData();
+    } catch (error) {
+      toast.error('Failed to delete task');
+    }
   };
 
   const getAssignedUsers = (templateId: string) => {
@@ -733,181 +379,67 @@ export default function LearningTemplates() {
   };
 
   const getTemplateTasks = (templateId: string) => {
-    const tasks = templateTasks.filter(task => task.template_id === templateId);
-    
-    // Group tasks by title + description to avoid duplicates
-    const taskMap = new Map<string, TemplateTask & { assignedUserIds: string[] }>();
-    
-    tasks.forEach(task => {
-      // Skip tasks without user_id
-      if (!task.user_id) return;
-      
-      const taskKey = `${task.title}_${task.description || ''}_${task.template_id}`;
-      
-      if (taskMap.has(taskKey)) {
-        const existingTask = taskMap.get(taskKey)!;
-        // Only add user if not already in the list (prevents duplicates)
-        if (!existingTask.assignedUserIds.includes(task.user_id)) {
-          existingTask.assignedUserIds.push(task.user_id);
-        }
-      } else {
-        taskMap.set(taskKey, {
-          ...task,
-          assignedUserIds: [task.user_id]
-        });
-      }
-    });
-    
-    return Array.from(taskMap.values());
+    return templateTasks.filter(task => task.template_id === templateId);
   };
 
   const getUnassignedUsers = (templateId: string) => {
     const assignedUserIds = assignments
       .filter(a => a.template_id === templateId)
       .map(a => a.user_id);
+    
     return teamMembers.filter(member => !assignedUserIds.includes(member.user_id));
   };
 
-  const resetTaskForm = () => {
-    setTaskForm({
-      title: "",
-      description: "",
-      priority: "medium",
-      due_date: "",
-      user_id: "",
-      start_time: "",
-      end_time: "",
-      all_day: false,
-      status: "pending"
+  const toggleTemplateExpanded = (templateId: string) => {
+    setExpandedTemplates(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(templateId)) {
+        newSet.delete(templateId);
+      } else {
+        newSet.add(templateId);
+      }
+      return newSet;
     });
   };
 
-  const resetSubTaskForm = () => {
-    setSubTaskForm({
-      title: "",
-      description: "",
-      priority: "medium",
-      due_date: "",
-      start_time: "",
-      end_time: "",
-      all_day: false
-    });
-  };
-
-  const openEditTemplate = (template: LearningTemplate) => {
-    setSelectedTemplate(template);
-    setTemplateForm({
-      name: template.name,
-      description: template.description || "",
-      technology: template.technology
-    });
-    setShowEditTemplate(true);
-  };
-
-  const openEditTask = (task: TemplateTask) => {
-    setSelectedTask(task);
-    setTaskForm({
-      title: task.title,
-      description: task.description || "",
-      priority: task.priority,
-      due_date: task.due_date ? format(new Date(task.due_date), 'yyyy-MM-dd') : "",
-      user_id: task.user_id,
-      start_time: "",
-      end_time: "",
-      all_day: false,
-      status: task.status
-    });
-    setShowEditTask(true);
-  };
-
-  const openSubTaskDialog = (parentTask: TemplateTask) => {
-    setParentTaskForSubTask(parentTask);
-    setShowSubTaskDialog(true);
-  };
-
-  const openAssignTaskDialog = (task: TemplateTask) => {
-    setTaskToAssign(task);
-    setSelectedUserIds([]); // Reset multi-select
-    setShowAssignTaskDialog(true);
-  };
-
-  const openReassignTaskDialog = (task: TemplateTask) => {
-    setTaskToReassign(task);
-    setShowReassignTaskDialog(true);
-  };
-
-  const openReassignSubTaskDialog = (subTask: TemplateTask) => {
-    setSubTaskToReassign(subTask);
-    setShowReassignSubTaskDialog(true);
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'destructive';
-      case 'medium': return 'secondary';
-      case 'low': return 'outline';
-      default: return 'secondary';
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'default';
-      case 'in_progress': return 'secondary';
-      case 'pending': return 'outline';
-      default: return 'outline';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed': return CheckCircle;
-      case 'in_progress': return Clock;
-      case 'pending': return AlertCircle;
-      default: return AlertCircle;
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
   }
 
-  if (isAuthorized === false) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96 space-y-4">
-        <BookOpen className="h-16 w-16 text-muted-foreground" />
-        <h2 className="text-2xl font-bold">Access Denied</h2>
-        <p className="text-muted-foreground">You don't have permission to access this page.</p>
-      </div>
-    );
+  if (!isAdmin) {
+    return <UserTemplateTasks />;
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Templates</h1>
-          <p className="text-muted-foreground">
-            {isAdmin ? 'Manage employee templates and assignments' : 'View your assigned templates and tasks'}
-          </p>
-        </div>
-        {isAdmin && (
-          <Dialog open={showCreateTemplate} onOpenChange={setShowCreateTemplate}>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Learning Templates
+            </h1>
+            <p className="text-gray-600 dark:text-gray-300 mt-2">
+              Create and manage learning templates with tasks and assignments
+            </p>
+          </div>
+          
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
+              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg">
+                <Plus className="mr-2 h-5 w-5" />
                 Create Template
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Create Learning Template</DialogTitle>
+                <DialogTitle>Create New Template</DialogTitle>
                 <DialogDescription>
-                  Create a new learning template for employee training
+                  Create a new learning template to organize tasks and assignments.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
@@ -915,742 +447,223 @@ export default function LearningTemplates() {
                   <Label htmlFor="name">Template Name</Label>
                   <Input
                     id="name"
+                    placeholder="e.g., React Development"
                     value={templateForm.name}
-                    onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
-                    placeholder="e.g., Java Full Stack"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="technology">Technology</Label>
-                  <Input
-                    id="technology"
-                    value={templateForm.technology}
-                    onChange={(e) => setTemplateForm({ ...templateForm, technology: e.target.value })}
-                    placeholder="e.g., Java, Python, .NET"
+                    onChange={(e) => setTemplateForm(prev => ({ ...prev, name: e.target.value }))}
                   />
                 </div>
                 <div>
                   <Label htmlFor="description">Description</Label>
                   <Textarea
                     id="description"
+                    placeholder="Brief description of the learning template"
                     value={templateForm.description}
-                    onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
-                    placeholder="Describe the learning template..."
+                    onChange={(e) => setTemplateForm(prev => ({ ...prev, description: e.target.value }))}
                   />
                 </div>
-                <Button onClick={createTemplate} className="w-full">
-                  Create Template
-                </Button>
+                <div>
+                  <Label htmlFor="technology">Technology/Category</Label>
+                  <Input
+                    id="technology"
+                    placeholder="e.g., React, Python, Java"
+                    value={templateForm.technology}
+                    onChange={(e) => setTemplateForm(prev => ({ ...prev, technology: e.target.value }))}
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={createTemplate} disabled={!templateForm.name.trim()}>
+                    Create Template
+                  </Button>
+                </div>
               </div>
             </DialogContent>
           </Dialog>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100 text-sm">Total Templates</p>
+                  <p className="text-3xl font-bold">{templates.length}</p>
+                </div>
+                <BookOpen className="h-12 w-12 text-blue-200" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-100 text-sm">Active Assignments</p>
+                  <p className="text-3xl font-bold">{assignments.length}</p>
+                </div>
+                <Users className="h-12 w-12 text-green-200" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white border-0 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-100 text-sm">Total Tasks</p>
+                  <p className="text-3xl font-bold">{templateTasks.length}</p>
+                </div>
+                <TrendingUp className="h-12 w-12 text-purple-200" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Templates Grid */}
+        {templates.length === 0 ? (
+          <Card className="text-center py-12">
+            <CardContent>
+              <BookOpen className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                No templates created yet
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
+                Get started by creating your first learning template
+              </p>
+              <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Your First Template
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            {templates.map((template) => (
+              <TemplateCard
+                key={template.id}
+                template={template}
+                assignedUsers={getAssignedUsers(template.id)}
+                tasks={getTemplateTasks(template.id)}
+                unassignedUsers={getUnassignedUsers(template.id)}
+                isExpanded={expandedTemplates.has(template.id)}
+                isAdmin={isAdmin}
+                onToggleExpanded={() => toggleTemplateExpanded(template.id)}
+                onAssignUser={(userId) => assignUserToTemplate(template.id, userId)}
+                onRemoveUser={(userId) => removeUserFromTemplate(template.id, userId)}
+                onAddTask={() => {
+                  setSelectedTemplate(template);
+                  setIsTaskDialogOpen(true);
+                }}
+                onEditTemplate={() => {
+                  // TODO: Implement edit functionality
+                  toast.info('Edit functionality coming soon');
+                }}
+              />
+            ))}
+          </div>
         )}
-      </div>
 
-      {/* Templates with Collapsible Structure */}
-      <div className="space-y-4">
-        {templates.map((template) => {
-          const isExpanded = expandedTemplates.has(template.id);
-          const assignedUsers = getAssignedUsers(template.id);
-          const templateTasksList = getTemplateTasks(template.id);
-          const unassignedUsers = getUnassignedUsers(template.id);
-
-          return (
-            <Card key={template.id} className="w-full">
-              <Collapsible 
-                open={isExpanded} 
-                onOpenChange={() => toggleTemplateExpanded(template.id)}
-              >
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                        <div>
-                          <CardTitle className="text-lg">{template.name}</CardTitle>
-                          <CardDescription className="flex items-center gap-2">
-                            <Badge variant="outline">{template.technology}</Badge>
-                            <span className="text-sm">
-                              {assignedUsers.length} user{assignedUsers.length !== 1 ? 's' : ''} assigned
-                            </span>
-                          </CardDescription>
-                        </div>
-                      </div>
-                       <div className="flex items-center gap-2">
-                         {isAdmin && (
-                           <>
-                             {/* Assign User Dropdown */}
-                             <DropdownMenu>
-                               <DropdownMenuTrigger asChild>
-                                 <Button variant="outline" size="sm" onClick={(e) => e.stopPropagation()}>
-                                   <Users className="mr-2 h-4 w-4" />
-                                   Assign User
-                                 </Button>
-                               </DropdownMenuTrigger>
-                               <DropdownMenuContent>
-                                 {unassignedUsers.length > 0 ? (
-                                   unassignedUsers.map((member) => (
-                                     <DropdownMenuItem
-                                       key={member.user_id}
-                                       onClick={(e) => {
-                                         e.stopPropagation();
-                                         assignUserToTemplate(template.id, member.user_id);
-                                       }}
-                                     >
-                                       {member.full_name} ({member.email})
-                                     </DropdownMenuItem>
-                                   ))
-                                 ) : (
-                                   <DropdownMenuItem disabled>
-                                     All users assigned
-                                   </DropdownMenuItem>
-                                 )}
-                               </DropdownMenuContent>
-                             </DropdownMenu>
-                             
-                             {/* Template Actions */}
-                             <DropdownMenu>
-                               <DropdownMenuTrigger asChild>
-                                 <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                                   <Edit className="h-4 w-4" />
-                                 </Button>
-                               </DropdownMenuTrigger>
-                               <DropdownMenuContent>
-                                 <DropdownMenuItem onClick={(e) => {
-                                   e.stopPropagation();
-                                   openEditTemplate(template);
-                                 }}>
-                                   <Edit className="mr-2 h-4 w-4" />
-                                   Edit Template
-                                 </DropdownMenuItem>
-                                 <DropdownMenuItem 
-                                   onClick={(e) => {
-                                     e.stopPropagation();
-                                     deleteTemplate(template.id);
-                                   }}
-                                   className="text-destructive"
-                                 >
-                                   <Trash2 className="mr-2 h-4 w-4" />
-                                   Delete Template
-                                 </DropdownMenuItem>
-                               </DropdownMenuContent>
-                             </DropdownMenu>
-                           </>
-                         )}
-                       </div>
-                    </div>
-                  </CardHeader>
-                </CollapsibleTrigger>
-
-                <CollapsibleContent>
-                  <CardContent className="pt-0">
-                    {template.description && (
-                      <p className="text-sm text-muted-foreground mb-4">{template.description}</p>
-                    )}
-                    
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                       {/* Assigned Users */}
-                       <div className="space-y-3">
-                         <h3 className="font-semibold">Assigned Users</h3>
-                         <div className="space-y-2">
-                           {assignedUsers.map((user) => (
-                             <Card key={user.user_id}>
-                               <CardContent className="p-3">
-                                    <div className="flex justify-between items-center">
-                                      <div>
-                                        <p className="font-medium text-sm">{user.full_name}</p>
-                                        <p className="text-xs text-muted-foreground">{user.email}</p>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <Badge variant="outline" className="text-xs">
-                                          {templateTasksList.filter(t => t.assignedUserIds?.includes(user.user_id)).length} tasks
-                                        </Badge>
-                                        {isAdmin && (
-                                          <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                                <MoreVertical className="h-3 w-3" />
-                                              </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent>
-                                              <DropdownMenuItem 
-                                                onClick={() => removeUserFromTemplate(template.id, user.user_id)}
-                                                className="text-destructive"
-                                              >
-                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                Remove User from Template
-                                              </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                          </DropdownMenu>
-                                        )}
-                                      </div>
-                                    </div>
-                               </CardContent>
-                             </Card>
-                           ))}
-                           {assignedUsers.length === 0 && (
-                             <p className="text-sm text-muted-foreground">No users assigned yet</p>
-                           )}
-                         </div>
-                       </div>
-
-                      {/* Template Tasks */}
-                      <div className="space-y-3">
-                         <div className="flex justify-between items-center">
-                           <h3 className="font-semibold">Tasks</h3>
-                           {isAdmin && (
-                             <Button
-                               variant="outline"
-                               size="sm"
-                               onClick={() => {
-                                 setSelectedTemplate(template);
-                                 setShowCreateTask(true);
-                               }}
-                               disabled={false}
-                             >
-                               <Plus className="mr-2 h-4 w-4" />
-                               Add Task
-                             </Button>
-                           )}
-                         </div>
-                         <div className="space-y-2 max-h-96 overflow-y-auto">
-                           {templateTasksList.map((task) => {
-                             const assignedUsers = getAssignedUsers(template.id);
-                             const taskAssignedUsers = task.assignedUserIds 
-                               ? assignedUsers.filter(u => task.assignedUserIds!.includes(u.user_id))
-                               : [assignedUsers.find(u => u.user_id === task.user_id)].filter(Boolean);
-                             
-                             const StatusIcon = getStatusIcon(task.status);
-                             return (
-                               <Card key={task.id} className="border-l-4 border-l-primary/20">
-                                 <CardContent className="p-3">
-                                   <div className="flex justify-between items-start">
-                                     <div className="flex-1">
-                                       <div className="flex items-center gap-2 mb-1">
-                                         <StatusIcon className="h-3 w-3" />
-                                         <h4 className="font-medium text-sm">{task.title}</h4>
-                                       </div>
-                                       {task.description && (
-                                         <p className="text-xs text-muted-foreground mb-1">{task.description}</p>
-                                       )}
-                                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                         <span>
-                                           {task.assignedUserIds && task.assignedUserIds.length > 0
-                                             ? (task.assignedUserIds.length === 1 
-                                                 ? taskAssignedUsers[0]?.full_name || 'Unknown'
-                                                 : `${task.assignedUserIds.length} users assigned`)
-                                             : 'No users assigned'}
-                                         </span>
-                                         <span>• Created: {
-                                           task.created_at 
-                                             ? (new Date(task.created_at).toDateString() === new Date().toDateString() 
-                                                 ? 'Today' 
-                                                 : format(new Date(task.created_at), 'MMM dd'))
-                                             : 'Unknown'
-                                         }</span>
-                                         {task.due_date && (
-                                           <span>• Due: {format(new Date(task.due_date), 'MMM dd')}</span>
-                                         )}
-                                       </div>
-                                     </div>
-                                      <div className="flex items-center gap-1 ml-2">
-                                        <Badge variant={getPriorityColor(task.priority)} className="text-xs px-1 py-0">
-                                          {task.priority}
-                                        </Badge>
-                                        <Switch
-                                          checked={task.status === 'completed'}
-                                          onCheckedChange={() => toggleTaskCompletion(task.id, task.status)}
-                                        />
-                                        {isAdmin && (
-                                          <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                                <Edit className="h-3 w-3" />
-                                              </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent>
-                                              <DropdownMenuItem onClick={() => openEditTask(task)}>
-                                                <Edit className="mr-2 h-4 w-4" />
-                                                Edit Task
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem onClick={() => openSubTaskDialog(task)}>
-                                                <Plus className="mr-2 h-4 w-4" />
-                                                Add Sub-task
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem onClick={() => openAssignTaskDialog(task)}>
-                                                <Copy className="mr-2 h-4 w-4" />
-                                                Assign to Users
-                                              </DropdownMenuItem>
-                                              {task.user_id && (
-                                                <DropdownMenuItem onClick={() => openReassignTaskDialog(task)}>
-                                                  <User className="mr-2 h-4 w-4" />
-                                                  Reassign Task
-                                                </DropdownMenuItem>
-                                              )}
-                                              <DropdownMenuItem 
-                                                onClick={() => deleteTask(task.id)}
-                                                className="text-destructive"
-                                              >
-                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                Delete Task
-                                              </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                          </DropdownMenu>
-                                        )}
-                                      </div>
-                                   </div>
-                                   
-                                   {/* Sub-tasks */}
-                                   {task.sub_tasks && task.sub_tasks.length > 0 && (
-                                     <div className="mt-2 pl-4 border-l-2 border-muted space-y-1">
-                                       {task.sub_tasks.map((subTask) => {
-                                         const SubStatusIcon = getStatusIcon(subTask.status);
-                                         return (
-                                           <div key={subTask.id} className="flex items-center justify-between text-xs p-2 bg-muted/30 rounded">
-                                             <div className="flex items-center gap-2 flex-1">
-                                               <SubStatusIcon className="h-3 w-3" />
-                                               <span className="font-medium">{subTask.title}</span>
-                                               {subTask.description && (
-                                                 <span className="text-muted-foreground">- {subTask.description}</span>
-                                               )}
-                                             </div>
-                                              <div className="flex items-center gap-1">
-                                                <Badge variant={getPriorityColor(subTask.priority)} className="text-xs px-1 py-0">
-                                                  {subTask.priority}
-                                                </Badge>
-                                                <Switch
-                                                  checked={subTask.status === 'completed'}
-                                                  onCheckedChange={() => toggleTaskCompletion(subTask.id, subTask.status)}
-                                                />
-                                                {isAdmin && (
-                                                  <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                                        <MoreVertical className="h-3 w-3" />
-                                                      </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent>
-                                                      <DropdownMenuItem onClick={() => openReassignSubTaskDialog(subTask)}>
-                                                        <User className="mr-2 h-4 w-4" />
-                                                        Reassign Sub-task
-                                                      </DropdownMenuItem>
-                                                      <DropdownMenuItem onClick={() => openAssignTaskDialog(subTask)}>
-                                                        <Copy className="mr-2 h-4 w-4" />
-                                                        Assign to Another User
-                                                      </DropdownMenuItem>
-                                                      <DropdownMenuItem 
-                                                        onClick={() => deleteTask(subTask.id)}
-                                                        className="text-destructive"
-                                                      >
-                                                        <Trash2 className="mr-2 h-4 w-4" />
-                                                        Delete Sub-task
-                                                      </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                  </DropdownMenu>
-                                                )}
-                                              </div>
-                                           </div>
-                                         );
-                                       })}
-                                     </div>
-                                   )}
-                                 </CardContent>
-                               </Card>
-                             );
-                           })}
-                           {templateTasksList.length === 0 && (
-                             <p className="text-sm text-muted-foreground">No tasks created yet</p>
-                           )}
-                         </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </CollapsibleContent>
-              </Collapsible>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Edit Template Dialog */}
-      <Dialog open={showEditTemplate} onOpenChange={setShowEditTemplate}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Learning Template</DialogTitle>
-            <DialogDescription>
-              Update the learning template details
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-name">Template Name</Label>
-              <Input
-                id="edit-name"
-                value={templateForm.name}
-                onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
-                placeholder="e.g., Java Full Stack"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-technology">Technology</Label>
-              <Input
-                id="edit-technology"
-                value={templateForm.technology}
-                onChange={(e) => setTemplateForm({ ...templateForm, technology: e.target.value })}
-                placeholder="e.g., Java, Python, .NET"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                value={templateForm.description}
-                onChange={(e) => setTemplateForm({ ...templateForm, description: e.target.value })}
-                placeholder="Describe the learning template..."
-              />
-            </div>
-            <Button onClick={updateTemplate} className="w-full">
-              Update Template
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Task Dialog */}
-      <Dialog open={showCreateTask} onOpenChange={setShowCreateTask}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Template Task</DialogTitle>
-            <DialogDescription>
-              Create a task for a user in {selectedTemplate?.name}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="task-user">Assign to User (Optional)</Label>
-              <Select value={taskForm.user_id} onValueChange={(value) => setTaskForm({ ...taskForm, user_id: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a user (or leave unassigned)" />
-                </SelectTrigger>
-                <SelectContent>
+        {/* Task Creation Dialog */}
+        <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Create Task</DialogTitle>
+              <DialogDescription>
+                Create a new task for the "{selectedTemplate?.name}" template.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="task-title">Task Title</Label>
+                <Input
+                  id="task-title"
+                  placeholder="Enter task title"
+                  value={taskForm.title}
+                  onChange={(e) => setTaskForm(prev => ({ ...prev, title: e.target.value }))}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="task-description">Description</Label>
+                <Textarea
+                  id="task-description"
+                  placeholder="Enter task description"
+                  value={taskForm.description}
+                  onChange={(e) => setTaskForm(prev => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="task-priority">Priority</Label>
+                  <Select value={taskForm.priority} onValueChange={(value) => setTaskForm(prev => ({ ...prev, priority: value }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="task-due-date">Due Date</Label>
+                  <Input
+                    id="task-due-date"
+                    type="date"
+                    value={taskForm.due_date}
+                    onChange={(e) => setTaskForm(prev => ({ ...prev, due_date: e.target.value }))}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <Label>Assign to Users</Label>
+                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded p-2 mt-2">
                   {getAssignedUsers(selectedTemplate?.id || '').map((user) => (
-                    <SelectItem key={user.user_id} value={user.user_id}>
-                      {user.full_name}
-                    </SelectItem>
+                    <div key={user.user_id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`user-${user.user_id}`}
+                        checked={selectedUserIds.includes(user.user_id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedUserIds(prev => [...prev, user.user_id]);
+                          } else {
+                            setSelectedUserIds(prev => prev.filter(id => id !== user.user_id));
+                          }
+                        }}
+                      />
+                      <label htmlFor={`user-${user.user_id}`} className="text-sm">
+                        {user.full_name}
+                      </label>
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="task-title">Task Title</Label>
-              <Input
-                id="task-title"
-                value={taskForm.title}
-                onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
-                placeholder="e.g., Learn Spring Boot"
-              />
-            </div>
-            <div>
-              <Label htmlFor="task-description">Description</Label>
-              <Textarea
-                id="task-description"
-                value={taskForm.description}
-                onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
-                placeholder="Describe the task..."
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="task-priority">Priority</Label>
-                <Select value={taskForm.priority} onValueChange={(value) => setTaskForm({ ...taskForm, priority: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                  </SelectContent>
-                </Select>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="task-due-date">Due Date</Label>
-                <Input
-                  id="task-due-date"
-                  type="date"
-                  value={taskForm.due_date}
-                  onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })}
-                />
+              
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={createTask} 
+                  disabled={!taskForm.title.trim() || selectedUserIds.length === 0}
+                >
+                  Create Task
+                </Button>
               </div>
             </div>
-            <Button onClick={() => createTemplateTask(selectedTemplate?.id || '')} className="w-full">
-              Create Task
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Task Dialog */}
-      <Dialog open={showEditTask} onOpenChange={setShowEditTask}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Task</DialogTitle>
-            <DialogDescription>
-              Update the task details
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-task-title">Task Title</Label>
-              <Input
-                id="edit-task-title"
-                value={taskForm.title}
-                onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
-                placeholder="e.g., Learn Spring Boot"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-task-description">Description</Label>
-              <Textarea
-                id="edit-task-description"
-                value={taskForm.description}
-                onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
-                placeholder="Describe the task..."
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-task-priority">Priority</Label>
-                <Select value={taskForm.priority} onValueChange={(value) => setTaskForm({ ...taskForm, priority: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="edit-task-due-date">Due Date</Label>
-                <Input
-                  id="edit-task-due-date"
-                  type="date"
-                  value={taskForm.due_date}
-                  onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })}
-                />
-              </div>
-            </div>
-            <Button onClick={updateTask} className="w-full">
-              Update Task
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Sub-task Dialog */}
-      <Dialog open={showSubTaskDialog} onOpenChange={setShowSubTaskDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Sub-task</DialogTitle>
-            <DialogDescription>
-              Create a sub-task for "{parentTaskForSubTask?.title}"
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="subtask-title">Sub-task Title</Label>
-              <Input
-                id="subtask-title"
-                value={subTaskForm.title}
-                onChange={(e) => setSubTaskForm({ ...subTaskForm, title: e.target.value })}
-                placeholder="e.g., Learn Spring Boot Basics"
-              />
-            </div>
-            <div>
-              <Label htmlFor="subtask-description">Description</Label>
-              <Textarea
-                id="subtask-description"
-                value={subTaskForm.description}
-                onChange={(e) => setSubTaskForm({ ...subTaskForm, description: e.target.value })}
-                placeholder="Describe the sub-task..."
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="subtask-priority">Priority</Label>
-                <Select value={subTaskForm.priority} onValueChange={(value) => setSubTaskForm({ ...subTaskForm, priority: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="subtask-due-date">Due Date</Label>
-                <Input
-                  id="subtask-due-date"
-                  type="date"
-                  value={subTaskForm.due_date}
-                  onChange={(e) => setSubTaskForm({ ...subTaskForm, due_date: e.target.value })}
-                />
-              </div>
-            </div>
-            <Button onClick={createSubTask} className="w-full">
-              Create Sub-task
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Assign Task to User(s) Dialog */}
-      <Dialog open={showAssignTaskDialog} onOpenChange={setShowAssignTaskDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Assign Task to Users</DialogTitle>
-            <DialogDescription>
-              Assign "{taskToAssign?.title}" to user(s) in the template
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Select User(s)</Label>
-              <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-2">
-                {getAssignedUsers(taskToAssign?.template_id || '')
-                  .filter(user => {
-                    // Filter out users who already have this task assigned
-                    if (!taskToAssign) return true;
-                    const existingTask = templateTasks.find(t => 
-                      t.template_id === taskToAssign.template_id &&
-                      t.title === taskToAssign.title &&
-                      t.description === taskToAssign.description &&
-                      t.user_id === user.user_id
-                    );
-                    return !existingTask;
-                  })
-                  .map((user) => (
-                  <div key={user.user_id} className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id={`user-${user.user_id}`}
-                      checked={selectedUserIds.includes(user.user_id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedUserIds([...selectedUserIds, user.user_id]);
-                        } else {
-                          setSelectedUserIds(selectedUserIds.filter(id => id !== user.user_id));
-                        }
-                      }}
-                      className="rounded border-gray-300"
-                    />
-                    <Label htmlFor={`user-${user.user_id}`} className="text-sm font-normal cursor-pointer">
-                      {user.full_name} ({user.email})
-                    </Label>
-                  </div>
-                ))}
-                {getAssignedUsers(taskToAssign?.template_id || '')
-                  .filter(user => {
-                    if (!taskToAssign) return true;
-                    const existingTask = templateTasks.find(t => 
-                      t.template_id === taskToAssign.template_id &&
-                      t.title === taskToAssign.title &&
-                      t.description === taskToAssign.description &&
-                      t.user_id === user.user_id
-                    );
-                    return !existingTask;
-                  }).length === 0 && (
-                  <p className="text-sm text-muted-foreground">All users already have this task assigned</p>
-                )}
-              </div>
-              {selectedUserIds.length > 0 && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  {selectedUserIds.length} user(s) selected
-                </p>
-              )}
-            </div>
-            <Button 
-              onClick={assignTaskToUser} 
-              className="w-full"
-              disabled={selectedUserIds.length === 0}
-            >
-              Assign Task to {selectedUserIds.length} User(s)
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Reassign Task Dialog */}
-      <Dialog open={showReassignTaskDialog} onOpenChange={setShowReassignTaskDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reassign Task</DialogTitle>
-            <DialogDescription>
-              Reassign "{taskToReassign?.title}" to a different user
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="reassign-user">Select New User</Label>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a user" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getAssignedUsers(taskToReassign?.template_id || '').map((user) => (
-                    <SelectItem key={user.user_id} value={user.user_id}>
-                      {user.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={reassignTask} className="w-full">
-              Reassign Task
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Reassign Sub-task Dialog */}
-      <Dialog open={showReassignSubTaskDialog} onOpenChange={setShowReassignSubTaskDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reassign Sub-task</DialogTitle>
-            <DialogDescription>
-              Reassign "{subTaskToReassign?.title}" to a different user
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="reassign-subtask-user">Select New User</Label>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a user" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getAssignedUsers(subTaskToReassign?.template_id || '').map((user) => (
-                    <SelectItem key={user.user_id} value={user.user_id}>
-                      {user.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={reassignSubTask} className="w-full">
-              Reassign Sub-task
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
-}
+};
+
+export default LearningTemplates;

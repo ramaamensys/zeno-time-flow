@@ -90,6 +90,7 @@ export type Database = {
           end_time: string | null
           event_type: string | null
           id: string
+          notes: string | null
           parent_task_id: string | null
           priority: string | null
           start_time: string | null
@@ -107,6 +108,7 @@ export type Database = {
           end_time?: string | null
           event_type?: string | null
           id?: string
+          notes?: string | null
           parent_task_id?: string | null
           priority?: string | null
           start_time?: string | null
@@ -124,6 +126,7 @@ export type Database = {
           end_time?: string | null
           event_type?: string | null
           id?: string
+          notes?: string | null
           parent_task_id?: string | null
           priority?: string | null
           start_time?: string | null

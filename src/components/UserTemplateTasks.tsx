@@ -5,8 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle, Clock, AlertCircle, BookOpen } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { CheckCircle, Clock, AlertCircle, BookOpen, MessageCircle, Save, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 interface TemplateTask {
   id: string;
@@ -17,6 +21,8 @@ interface TemplateTask {
   status: string;
   due_date: string;
   created_at: string;
+  completed: boolean;
+  notes?: string;
 }
 
 interface LearningTemplate {
@@ -111,7 +117,9 @@ export default function UserTemplateTasks() {
           priority: task.priority,
           status: task.completed ? 'completed' : 'pending',
           due_date: task.start_time || '',
-          created_at: task.created_at
+          created_at: task.created_at,
+          completed: task.completed || false,
+          notes: task.notes || '',
         }))
       }));
 
