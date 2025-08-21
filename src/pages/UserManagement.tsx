@@ -277,11 +277,29 @@ export default function UserManagement() {
     if (!editingUser) return;
 
     try {
+      // Determine final manager_id
+      let finalManagerId = editingUser.manager_id === "none" ? null : editingUser.manager_id;
+      
+      // If editing an admin, set super admin as their manager
+      if (editingUser.role === 'admin') {
+        const { data: superAdminData, error: superAdminError } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'super_admin')
+          .limit(1)
+          .single();
+          
+        if (superAdminData && !superAdminError) {
+          finalManagerId = superAdminData.user_id;
+        }
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({ 
           full_name: editingUser.full_name,
-          email: editingUser.email
+          email: editingUser.email,
+          manager_id: finalManagerId
         })
         .eq('user_id', editingUser.user_id);
 
@@ -661,6 +679,41 @@ export default function UserManagement() {
                       placeholder="John Doe"
                     />
                   </div>
+                  {/* Only show manager assignment for regular users */}
+                  {editingUser?.role === 'user' && (
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="edit_manager" className="text-right">
+                        Assign Manager
+                      </Label>
+                      <Select
+                        value={editingUser?.manager_id || "none"}
+                        onValueChange={(value) => setEditingUser(editingUser ? { ...editingUser, manager_id: value } : null)}
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Select a manager (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Manager</SelectItem>
+                          {managers.filter(manager => manager.user_id && manager.full_name && manager.user_id !== editingUser?.user_id).map((manager) => (
+                            <SelectItem key={manager.user_id} value={manager.user_id}>
+                              {manager.full_name} ({manager.email})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {/* Show info for admin users */}
+                  {editingUser?.role === 'admin' && (
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label className="text-right text-sm text-muted-foreground">
+                        Manager
+                      </Label>
+                      <div className="col-span-3 text-sm text-muted-foreground">
+                        Super Admin (automatically assigned)
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button
