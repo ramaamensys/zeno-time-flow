@@ -344,8 +344,8 @@ export const AdminTaskCard = ({
                     </>
                   )}
                   
-                  {/* Chat - Only show for template tasks assigned to others */}
-                  {task.template_id && currentUser && task.user_id !== currentUser.id && (
+                  {/* Chat - Show for template tasks created by admin/manager */}
+                  {task.template_id && (
                     <TaskChat
                       taskId={task.id}
                       taskTitle={task.title}
