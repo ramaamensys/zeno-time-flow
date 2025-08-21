@@ -33,8 +33,9 @@ const Layout = ({ children }: LayoutProps) => {
           .select('role')
           .eq('user_id', user.id);
 
-        const isAdmin = roles?.some(r => r.role === 'admin' || r.role === 'super_admin') || false;
-        setHasMultipleApps(isAdmin);
+        // Only super admins can see the app switcher
+        const isSuperAdmin = roles?.some(r => r.role === 'super_admin') || false;
+        setHasMultipleApps(isSuperAdmin);
       } catch (error) {
         console.error('Error checking multi-app access:', error);
       }

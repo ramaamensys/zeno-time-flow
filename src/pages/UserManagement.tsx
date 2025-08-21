@@ -591,8 +591,8 @@ export default function UserManagement() {
                       </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="user">User</SelectItem>
-                          <SelectItem value="admin">Manager</SelectItem>
-                          <SelectItem value="super_admin">Super Admin</SelectItem>
+                          {currentUserRole === 'super_admin' && <SelectItem value="admin">Manager</SelectItem>}
+                          {currentUserRole === 'super_admin' && <SelectItem value="super_admin">Super Admin</SelectItem>}
                         </SelectContent>
                     </Select>
                   </div>
@@ -606,7 +606,7 @@ export default function UserManagement() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="calendar">Zeno Time Flow (Calendar)</SelectItem>
-                        <SelectItem value="scheduler">Roster Joy (Scheduler)</SelectItem>
+                        {currentUserRole === 'super_admin' && <SelectItem value="scheduler">Roster Joy (Scheduler)</SelectItem>}
                       </SelectContent>
                     </Select>
                   </div>
@@ -778,19 +778,20 @@ export default function UserManagement() {
                       <div className="flex items-center gap-2">
                         {userProfile.user_id !== user?.id && userProfile.status === 'active' && (
                           <>
-                            <Select
-                              value={userProfile.role}
-                              onValueChange={(value) => updateUserRole(userProfile.user_id, value as 'user' | 'admin' | 'super_admin')}
-                            >
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="user">User</SelectItem>
-                                <SelectItem value="admin">Admin</SelectItem>
-                                <SelectItem value="super_admin">Super Admin</SelectItem>
-                              </SelectContent>
-                            </Select>
+                             <Select
+                               value={userProfile.role}
+                               onValueChange={(value) => updateUserRole(userProfile.user_id, value as 'user' | 'admin' | 'super_admin')}
+                               disabled={currentUserRole !== 'super_admin' && (userProfile.role === 'admin' || userProfile.role === 'super_admin')}
+                             >
+                               <SelectTrigger className="w-32">
+                                 <SelectValue />
+                               </SelectTrigger>
+                               <SelectContent>
+                                 <SelectItem value="user">User</SelectItem>
+                                 {currentUserRole === 'super_admin' && <SelectItem value="admin">Admin</SelectItem>}
+                                 {currentUserRole === 'super_admin' && <SelectItem value="super_admin">Super Admin</SelectItem>}
+                               </SelectContent>
+                             </Select>
                             <Button
                               variant="outline"
                               size="sm"

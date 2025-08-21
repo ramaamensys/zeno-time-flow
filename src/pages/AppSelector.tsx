@@ -38,14 +38,14 @@ const AppSelector = () => {
           return;
         }
 
-        const isAdmin = roles?.some(r => r.role === 'admin' || r.role === 'super_admin') || false;
-        const hasCalendar = roles?.some(r => r.app_type === 'calendar') || isAdmin;
-        const hasScheduler = roles?.some(r => r.app_type === 'scheduler') || isAdmin;
+        const isSuperAdmin = roles?.some(r => r.role === 'super_admin') || false;
+        const hasCalendar = roles?.some(r => r.app_type === 'calendar') || true; // Everyone gets calendar access
+        const hasScheduler = isSuperAdmin; // Only super admins get scheduler access
 
         setUserAccess({
           hasCalendar,
           hasScheduler,
-          isAdmin
+          isAdmin: isSuperAdmin // Only super admins are considered "admin" for app switching
         });
       } catch (error) {
         console.error('Error checking user access:', error);
@@ -113,7 +113,7 @@ const AppSelector = () => {
             <h1 className="text-3xl font-bold">Welcome to Zeno Platform</h1>
           </div>
           <p className="text-muted-foreground text-lg">
-            {isAdmin ? 'As an admin, you have access to both applications. Choose one to continue:' : 'Select an application to continue:'}
+            {isAdmin ? 'As a super admin, you have access to both applications. Choose one to continue:' : 'Welcome to Zeno Time Flow - Your Personal Productivity Platform'}
           </p>
           <p className="text-sm text-muted-foreground mt-2">
             Logged in as: <span className="font-medium">{user?.email}</span>
@@ -206,7 +206,7 @@ const AppSelector = () => {
         {isAdmin && (
           <div className="mt-8 text-center">
             <p className="text-sm text-muted-foreground">
-              💡 <strong>Admin Tip:</strong> You can switch between apps anytime using the app switcher in the header
+              💡 <strong>Super Admin Tip:</strong> You can switch between apps anytime using the app switcher in the header
             </p>
           </div>
         )}
