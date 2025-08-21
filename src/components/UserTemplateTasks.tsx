@@ -23,6 +23,7 @@ interface TemplateTask {
   created_at: string;
   completed: boolean;
   notes?: string;
+  files?: string[];
 }
 
 interface LearningTemplate {
@@ -41,6 +42,9 @@ function UserTemplateTasks() {
   const { user } = useAuth();
   const [templatesWithTasks, setTemplatesWithTasks] = useState<TemplateWithTasks[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<TemplateTask | null>(null);
+  const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
+  const [newNote, setNewNote] = useState('');
 
   useEffect(() => {
     fetchUserTemplateTasks();
@@ -120,6 +124,7 @@ function UserTemplateTasks() {
           created_at: task.created_at,
           completed: task.completed || false,
           notes: task.notes || '',
+          files: Array.isArray(task.files) ? (task.files as string[]) : [],
         }))
       }));
 
@@ -148,6 +153,39 @@ function UserTemplateTasks() {
       fetchUserTemplateTasks();
     } catch (error) {
       toast.error('Failed to update task status');
+    }
+  };
+
+  const addTaskNote = async (taskId: string, newNote: string) => {
+    if (!newNote.trim()) return;
+
+    try {
+      // Get current task to append to existing notes
+      const { data: currentTask } = await supabase
+        .from('calendar_events')
+        .select('notes')
+        .eq('id', taskId)
+        .single();
+
+      const currentNotes = currentTask?.notes || "";
+      const timestamp = new Date().toLocaleString();
+      
+      // Append new note with timestamp
+      const updatedNotes = currentNotes 
+        ? `${currentNotes}\n\n[${timestamp}] ${newNote}`
+        : `[${timestamp}] ${newNote}`;
+
+      const { error } = await supabase
+        .from('calendar_events')
+        .update({ notes: updatedNotes })
+        .eq('id', taskId);
+
+      if (error) throw error;
+      
+      toast.success('Progress note added');
+      fetchUserTemplateTasks();
+    } catch (error) {
+      toast.error('Failed to add progress note');
     }
   };
 
@@ -248,7 +286,7 @@ function UserTemplateTasks() {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <StatusIcon className="h-4 w-4" />
-                            <h4 className="font-medium">{task.title}</h4>
+                             <h4 className="font-medium">{task.title}</h4>
                           </div>
                           {task.description && (
                             <p className="text-sm text-muted-foreground mb-3">{task.description}</p>
@@ -257,6 +295,15 @@ function UserTemplateTasks() {
                             <p className="text-sm text-muted-foreground">
                               Due: {new Date(task.due_date).toLocaleDateString()}
                             </p>
+                          )}
+                          {/* Notes Preview */}
+                          {task.notes && (
+                            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                              <div className="flex items-start space-x-1">
+                                <MessageCircle className="h-3 w-3 text-blue-500 mt-0.5 flex-shrink-0" />
+                                <p className="text-xs text-blue-700 dark:text-blue-300 line-clamp-2">{task.notes}</p>
+                              </div>
+                            </div>
                           )}
                         </div>
                         <div className="flex flex-col gap-2 items-end">
@@ -269,6 +316,17 @@ function UserTemplateTasks() {
                             </Badge>
                           </div>
                           <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedTask(task);
+                                setIsNotesDialogOpen(true);
+                              }}
+                            >
+                              <MessageCircle className="h-3 w-3 mr-1" />
+                              Notes
+                            </Button>
                             {task.status === 'pending' && (
                               <Button
                                 size="sm"
@@ -306,6 +364,70 @@ function UserTemplateTasks() {
           </CardContent>
         </Card>
       ))}
+
+      {/* Notes Dialog */}
+      <Dialog open={isNotesDialogOpen} onOpenChange={setIsNotesDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <MessageCircle className="h-5 w-5" />
+              <span>Task Progress Notes</span>
+            </DialogTitle>
+          </DialogHeader>
+          {selectedTask && (
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-medium mb-2">{selectedTask.title}</h4>
+                <p className="text-sm text-muted-foreground">{selectedTask.description}</p>
+              </div>
+              
+              {selectedTask.notes && (
+                <div>
+                  <Label className="text-sm font-medium">Previous Notes:</Label>
+                  <div className="mt-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-md border">
+                    <pre className="text-sm whitespace-pre-wrap">{selectedTask.notes}</pre>
+                  </div>
+                </div>
+              )}
+              
+              <div>
+                <Label htmlFor="new-note">Add Progress Note:</Label>
+                <Textarea
+                  id="new-note"
+                  placeholder="Describe your progress, challenges, or thoughts about this task..."
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  className="min-h-24 mt-1"
+                />
+              </div>
+              
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => {
+                  setIsNotesDialogOpen(false);
+                  setNewNote('');
+                  setSelectedTask(null);
+                }}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={() => {
+                    if (selectedTask) {
+                      addTaskNote(selectedTask.id, newNote);
+                      setIsNotesDialogOpen(false);
+                      setNewNote('');
+                      setSelectedTask(null);
+                    }
+                  }}
+                  disabled={!newNote.trim()}
+                >
+                  <Save className="h-4 w-4 mr-1" />
+                  Add Note
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -220,6 +220,7 @@ const LearningTemplates = () => {
         created_at: task.created_at,
         completed: task.completed || false,
         notes: task.notes || '',
+        files: Array.isArray(task.files) ? (task.files as string[]) : [],
       }));
 
       setTemplateTasks(transformedTasks);

@@ -584,6 +584,57 @@ const Tasks = () => {
     }
   };
 
+  // New function for cumulative notes (append instead of replace)
+  const appendTaskNote = async (taskId: string, newNote: string, files?: string[]) => {
+    // First, get the current notes
+    const { data: currentTask } = await supabase
+      .from("calendar_events")
+      .select("notes, files")
+      .eq("id", taskId)
+      .single();
+
+    const currentNotes = currentTask?.notes || "";
+    const currentFiles = Array.isArray(currentTask?.files) ? currentTask.files : [];
+    const timestamp = new Date().toLocaleString();
+    
+    // Append new note with timestamp
+    const updatedNotes = currentNotes 
+      ? `${currentNotes}\n\n[${timestamp}] ${newNote}`
+      : `[${timestamp}] ${newNote}`;
+    
+    // Merge files (avoid duplicates)
+    const mergedFiles = [...currentFiles];
+    if (files) {
+      files.forEach((file: string) => {
+        if (!mergedFiles.includes(file)) {
+          mergedFiles.push(file);
+        }
+      });
+    }
+
+    const { error } = await supabase
+      .from("calendar_events")
+      .update({ 
+        notes: updatedNotes,
+        files: mergedFiles
+      })
+      .eq("id", taskId);
+
+    if (error) {
+      toast({
+        title: "Error adding note",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Note added",
+        description: "New progress note has been added successfully",
+      });
+      fetchEvents();
+    }
+  };
+
   const openEventDetails = (event: CalendarEvent) => {
     setSelectedEvent(event);
     setIsDetailDialogOpen(true);
@@ -1090,7 +1141,7 @@ const Tasks = () => {
                 onAddSubTask={openSubTaskDialog}
                 onEditTask={openEventDetails}
                 onViewDetails={openEventDetails}
-                onUpdateNotes={updateTaskNotes}
+                onUpdateNotes={appendTaskNote}
                 isAdmin={isAdminUser}
               />
             ))}
