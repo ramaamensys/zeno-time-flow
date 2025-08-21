@@ -169,12 +169,11 @@ function UserTemplateTasks() {
         .single();
 
       const currentNotes = currentTask?.notes || "";
-      const timestamp = new Date().toLocaleString();
       
-      // Append new note with timestamp
+      // For template tasks, don't add timestamps - just append the note
       const updatedNotes = currentNotes 
-        ? `${currentNotes}\n\n[${timestamp}] ${newNote}`
-        : `[${timestamp}] ${newNote}`;
+        ? `${currentNotes}\n\n${newNote}`
+        : newNote;
 
       const { error } = await supabase
         .from('calendar_events')
