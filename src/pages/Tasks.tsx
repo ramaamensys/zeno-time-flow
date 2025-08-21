@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Calendar, Clock, Flag, CheckSquare, Trash2, Filter, User, X, ChevronRight, List, Edit, Check, ChevronDown, BookOpen, AlertCircle } from "lucide-react";
+import { Plus, Calendar, Clock, Flag, CheckSquare, Trash2, Filter, User, X, ChevronRight, List, Edit, Check, ChevronDown, BookOpen, AlertCircle, RefreshCw } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
@@ -83,6 +83,7 @@ const Tasks = () => {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [parentTaskForSubTask, setParentTaskForSubTask] = useState<CalendarEvent | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [filters, setFilters] = useState({
     teamMember: "all",
     priority: "all",
@@ -120,11 +121,26 @@ const Tasks = () => {
   useEffect(() => {
     if (user && userRole !== null) {
       fetchEvents();
-      setupRealtimeSubscription();
+      const cleanup = setupRealtimeSubscription();
       // Fetch templates for users only
       if (userRole === 'user') {
         fetchUserTemplateTasks();
       }
+      
+      // Setup page visibility change listener for refresh
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          console.log('Page became visible, refreshing tasks...');
+          refreshData();
+        }
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      return () => {
+        cleanup();
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
     }
   }, [user, userRole]);
 
@@ -144,12 +160,16 @@ const Tasks = () => {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: '*', // Listen to all changes (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'calendar_events'
         },
-        () => {
-          fetchEvents();
+        (payload) => {
+          console.log('Real-time event received:', payload);
+          // Force refresh when any calendar_events change occurs
+          setTimeout(() => {
+            refreshData();
+          }, 500); // Small delay to ensure database consistency
         }
       )
       .subscribe();
@@ -157,6 +177,24 @@ const Tasks = () => {
     return () => {
       supabase.removeChannel(channel);
     };
+  };
+
+  const refreshData = async () => {
+    console.log('Refreshing all task data...');
+    await fetchEvents();
+    if (userRole === 'user') {
+      await fetchUserTemplateTasks();
+    }
+  };
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshData();
+    toast({
+      title: "Refreshed",
+      description: "Task data has been refreshed",
+    });
+    setTimeout(() => setIsRefreshing(false), 1000);
   };
 
   const fetchUserRole = async () => {
@@ -498,9 +536,9 @@ const Tasks = () => {
   const toggleTaskCompletion = async (eventId: string, completed: boolean) => {
     const { error } = await supabase
       .from("calendar_events")
-      .update({
-        completed: completed,
-        completed_at: completed ? new Date().toISOString() : null,
+      .update({ 
+        completed: !completed,
+        completed_at: !completed ? new Date().toISOString() : null 
       })
       .eq("id", eventId);
 
@@ -512,124 +550,131 @@ const Tasks = () => {
       });
     } else {
       toast({
-        title: completed ? "Task completed" : "Task reopened",
-        description: completed 
-          ? "The task has been marked as completed" 
-          : "The task has been reopened",
+        title: "Task updated",
+        description: `Task marked as ${!completed ? "completed" : "pending"}`,
       });
       fetchEvents();
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high": return "destructive";
-      case "medium": return "default";
-      case "low": return "secondary";
-      default: return "default";
-    }
+  const openEventDetails = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+    setIsDetailDialogOpen(true);
   };
 
-  const getEventTypeColor = (eventType: string) => {
-    switch (eventType) {
-      case "task": return "default";
-      case "meeting": return "outline";
-      case "reminder": return "secondary";
-      default: return "secondary";
-    }
+  const openEditDialog = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+    setIsDetailDialogOpen(false);
+    setIsEditDialogOpen(true);
   };
-
-  const clearFilters = () => {
-    setFilters({
-      teamMember: "all",
-      priority: "all",
-      dateRange: "all",
-    });
-  };
-
-  const hasActiveFilters = filters.teamMember !== "all" || filters.priority !== "all" || filters.dateRange !== "all";
 
   const fetchUserTemplateTasks = async () => {
-    if (!user) return;
+    if (!user) {
+      setTemplatesLoading(false);
+      return;
+    }
 
     try {
-      setTemplatesLoading(true);
-      // First, get all template assignments for the user
-      const { data: assignments, error: assignmentsError } = await supabase
+      // First, get template assignments for this user
+      const { data: assignments, error: assignmentError } = await supabase
         .from('template_assignments')
         .select('template_id')
         .eq('user_id', user.id);
 
-      if (assignmentsError) throw assignmentsError;
+      if (assignmentError) {
+        console.error('Error fetching template assignments:', assignmentError);
+        setTemplatesLoading(false);
+        return;
+      }
 
       if (!assignments || assignments.length === 0) {
+        setTemplatesWithTasks([]);
         setTemplatesLoading(false);
         return;
       }
 
       const templateIds = assignments.map(a => a.template_id);
 
-      // Get template details
+      // Get templates info
       const { data: templates, error: templatesError } = await supabase
         .from('learning_templates')
         .select('*')
         .in('id', templateIds);
 
-      if (templatesError) throw templatesError;
+      if (templatesError) {
+        console.error('Error fetching templates:', templatesError);
+        setTemplatesLoading(false);
+        return;
+      }
 
-      // Get tasks from calendar_events table for each template
+      // Get tasks for these templates from calendar_events
       const { data: tasks, error: tasksError } = await supabase
         .from('calendar_events')
         .select('*')
-        .eq('user_id', user.id)
         .in('template_id', templateIds)
-        .not('template_id', 'is', null)
-        .order('created_at', { ascending: false });
+        .eq('user_id', user.id)
+        .not('template_id', 'is', null);
 
-      if (tasksError) throw tasksError;
+      if (tasksError) {
+        console.error('Error fetching template tasks:', tasksError);
+        setTemplatesLoading(false);
+        return;
+      }
 
-      // Combine templates with their tasks, transforming calendar_events to TemplateTask format
-      const templatesWithTasksData: TemplateWithTasks[] = (templates || []).map(template => ({
+      // Combine templates with their tasks
+      const templatesWithTasksData = (templates || []).map(template => ({
         template,
         tasks: (tasks || []).filter(task => task.template_id === template.id).map(task => ({
           id: task.id,
-          template_id: task.template_id!,
+          template_id: task.template_id,
           title: task.title,
           description: task.description || '',
-          priority: task.priority,
+          priority: task.priority || 'medium',
           status: task.completed ? 'completed' : 'pending',
-          due_date: task.start_time || '',
-          created_at: task.created_at
+          due_date: task.start_time,
+          created_at: task.created_at,
         }))
       }));
 
       setTemplatesWithTasks(templatesWithTasksData);
     } catch (error) {
-      toast({ title: "Error", description: "Failed to fetch template tasks", variant: "destructive" });
+      console.error('Error in fetchUserTemplateTasks:', error);
     } finally {
       setTemplatesLoading(false);
     }
   };
 
-  const updateTaskStatus = async (taskId: string, newStatus: string) => {
-    try {
-      const completed = newStatus === 'completed';
-      const { error } = await supabase
-        .from('calendar_events')
-        .update({ 
-          completed: completed,
-          completed_at: completed ? new Date().toISOString() : null 
-        })
-        .eq('id', taskId);
+  const updateTemplateTaskStatus = async (taskId: string, completed: boolean) => {
+    const { error } = await supabase
+      .from('calendar_events')
+      .update({ 
+        completed: completed,
+        completed_at: completed ? new Date().toISOString() : null 
+      })
+      .eq('id', taskId);
 
-      if (error) throw error;
-      
-      toast({ title: "Success", description: "Task status updated" });
+    if (error) {
+      toast({
+        title: "Error updating task",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Task updated",
+        description: `Task marked as ${completed ? "completed" : "pending"}`,
+      });
       fetchUserTemplateTasks();
-      // Also refresh the main events list to show updated progress
-      fetchEvents();
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to update task status", variant: "destructive" });
+      fetchEvents(); // Also refresh main events
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'destructive';
+      case 'medium': return 'default';
+      case 'low': return 'secondary';
+      default: return 'default';
     }
   };
 
@@ -679,245 +724,250 @@ const Tasks = () => {
             Manage your tasks and events in one place
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-black hover:bg-gray-800 text-white">
-              <Plus className="mr-2 h-4 w-4" />
-              New Task
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Create New Task</DialogTitle>
-              <DialogDescription>
-                Add a new task to your calendar. Fill in the details below.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="primary-task"
-                  checked={newEvent.is_primary_task}
-                  onCheckedChange={(checked) => setNewEvent({ ...newEvent, is_primary_task: checked })}
-                />
-                <Label htmlFor="primary-task">Primary Task</Label>
-              </div>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-black hover:bg-gray-800 text-white">
+                <Plus className="mr-2 h-4 w-4" />
+                New Task
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Create New Task</DialogTitle>
+                <DialogDescription>
+                  Add a new task to your calendar. Fill in the details below.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="primary-task"
+                    checked={newEvent.is_primary_task}
+                    onCheckedChange={(checked) => setNewEvent({ ...newEvent, is_primary_task: checked })}
+                  />
+                  <Label htmlFor="primary-task">Primary Task</Label>
+                </div>
 
-              {/* User Assignment - Only for Admins */}
-              {isAdminUser && (
+                {/* User Assignment - Only for Admins */}
+                {isAdminUser && (
+                  <div className="grid gap-2">
+                    <Label>Assign to User</Label>
+                    <Select
+                      value={newEvent.assigned_user_id}
+                      onValueChange={(value) => setNewEvent({ ...newEvent, assigned_user_id: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Assign to myself" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Assign to myself</SelectItem>
+                        {teamMembers.map((member) => (
+                          <SelectItem key={member.user_id} value={member.user_id}>
+                            {member.full_name} ({member.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="grid gap-2">
-                  <Label>Assign to User</Label>
-                  <Select
-                    value={newEvent.assigned_user_id}
-                    onValueChange={(value) => setNewEvent({ ...newEvent, assigned_user_id: value })}
-                  >
+                  <Label htmlFor="title">Title *</Label>
+                  <Input
+                    id="title"
+                    placeholder="Enter task title"
+                    value={newEvent.title}
+                    onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Enter task description"
+                    value={newEvent.description}
+                    onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="priority">Priority</Label>
+                  <Select value={newEvent.priority} onValueChange={(value) => setNewEvent({ ...newEvent, priority: value })}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Assign to myself" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={user?.id ?? "self"}>Assign to myself</SelectItem>
-                      {teamMembers.map((member) => (
-                        <SelectItem key={member.user_id} value={member.user_id}>
-                          {member.full_name || member.email}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-              )}
-              <div className="grid gap-2">
-                <Label htmlFor="title">Title</Label>
-                <Input
-                  id="title"
-                  value={newEvent.title}
-                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                  placeholder="Enter task title"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={newEvent.description}
-                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                  placeholder="Enter task description"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Priority</Label>
-                <Select
-                  value={newEvent.priority}
-                  onValueChange={(value) => setNewEvent({ ...newEvent, priority: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>Event Type</Label>
-                <Select
-                  value={newEvent.event_type}
-                  onValueChange={(value) => setNewEvent({ ...newEvent, event_type: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="task">Task</SelectItem>
-                    <SelectItem value="meeting">Meeting</SelectItem>
-                    <SelectItem value="reminder">Reminder</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="start_time">Start Time (Optional)</Label>
-                <Input
-                  id="start_time"
-                  type="datetime-local"
-                  value={newEvent.start_time}
-                  onChange={(e) => setNewEvent({ ...newEvent, start_time: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="end_time">End Time (Optional)</Label>
-                <Input
-                  id="end_time"
-                  type="datetime-local"
-                  value={newEvent.end_time}
-                  onChange={(e) => setNewEvent({ ...newEvent, end_time: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={createEvent}>Create Task</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
 
-        {/* Sub-task Creation Dialog */}
-        <Dialog open={isSubTaskDialogOpen} onOpenChange={setIsSubTaskDialogOpen}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Create Sub-task</DialogTitle>
-              <DialogDescription>
-                Add a sub-task to "{parentTaskForSubTask?.title}". Fill in the details below.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              {/* User Assignment - Only for Admins */}
-              {isAdminUser && (
-                <div className="grid gap-2">
-                  <Label>Assign to User</Label>
-                  <Select
-                    value={newSubTask.assigned_user_id}
-                    onValueChange={(value) => setNewSubTask({ ...newSubTask, assigned_user_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Assign to myself" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={user?.id ?? "self"}>Assign to myself</SelectItem>
-                      {teamMembers.map((member) => (
-                        <SelectItem key={member.user_id} value={member.user_id}>
-                          {member.full_name || member.email}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="all-day"
+                    checked={newEvent.all_day}
+                    onCheckedChange={(checked) => setNewEvent({ ...newEvent, all_day: checked })}
+                  />
+                  <Label htmlFor="all-day">All Day</Label>
                 </div>
-              )}
 
-              <div className="grid gap-2">
-                <Label htmlFor="sub-title">Title</Label>
-                <Input
-                  id="sub-title"
-                  value={newSubTask.title}
-                  onChange={(e) => setNewSubTask({ ...newSubTask, title: e.target.value })}
-                  placeholder="Enter sub-task title"
-                />
+                {!newEvent.all_day && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label htmlFor="start-time">Start Time</Label>
+                      <Input
+                        id="start-time"
+                        type="datetime-local"
+                        value={newEvent.start_time}
+                        onChange={(e) => setNewEvent({ ...newEvent, start_time: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="end-time">End Time</Label>
+                      <Input
+                        id="end-time"
+                        type="datetime-local"
+                        value={newEvent.end_time}
+                        onChange={(e) => setNewEvent({ ...newEvent, end_time: e.target.value })}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="sub-description">Description</Label>
-                <Textarea
-                  id="sub-description"
-                  value={newSubTask.description}
-                  onChange={(e) => setNewSubTask({ ...newSubTask, description: e.target.value })}
-                  placeholder="Enter sub-task description"
-                />
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={createEvent}>Create Task</Button>
               </div>
-              <div className="grid gap-2">
-                <Label>Priority</Label>
-                <Select
-                  value={newSubTask.priority}
-                  onValueChange={(value) => setNewSubTask({ ...newSubTask, priority: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>Event Type</Label>
-                <Select
-                  value={newSubTask.event_type}
-                  onValueChange={(value) => setNewSubTask({ ...newSubTask, event_type: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="task">Task</SelectItem>
-                    <SelectItem value="meeting">Meeting</SelectItem>
-                    <SelectItem value="reminder">Reminder</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="sub-start_time">Start Time (Optional)</Label>
-                <Input
-                  id="sub-start_time"
-                  type="datetime-local"
-                  value={newSubTask.start_time}
-                  onChange={(e) => setNewSubTask({ ...newSubTask, start_time: e.target.value })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="sub-end_time">End Time (Optional)</Label>
-                <Input
-                  id="sub-end_time"
-                  type="datetime-local"
-                  value={newSubTask.end_time}
-                  onChange={(e) => setNewSubTask({ ...newSubTask, end_time: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setIsSubTaskDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={createSubTask}>Create Sub-task</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      
+      {/* Sub-task Creation Dialog */}
+      <Dialog open={isSubTaskDialogOpen} onOpenChange={setIsSubTaskDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create Sub-task</DialogTitle>
+            <DialogDescription>
+              Add a sub-task to "{parentTaskForSubTask?.title}". Fill in the details below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {/* User Assignment - Only for Admins */}
+            {isAdminUser && (
+              <div className="grid gap-2">
+                <Label>Assign to User</Label>
+                <Select
+                  value={newSubTask.assigned_user_id}
+                  onValueChange={(value) => setNewSubTask({ ...newSubTask, assigned_user_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Assign to task owner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Assign to task owner</SelectItem>
+                    {teamMembers.map((member) => (
+                      <SelectItem key={member.user_id} value={member.user_id}>
+                        {member.full_name} ({member.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="grid gap-2">
+              <Label htmlFor="sub-title">Title *</Label>
+              <Input
+                id="sub-title"
+                placeholder="Enter sub-task title"
+                value={newSubTask.title}
+                onChange={(e) => setNewSubTask({ ...newSubTask, title: e.target.value })}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="sub-description">Description</Label>
+              <Textarea
+                id="sub-description"
+                placeholder="Enter sub-task description"
+                value={newSubTask.description}
+                onChange={(e) => setNewSubTask({ ...newSubTask, description: e.target.value })}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="sub-priority">Priority</Label>
+              <Select value={newSubTask.priority} onValueChange={(value) => setNewSubTask({ ...newSubTask, priority: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="sub-all-day"
+                checked={newSubTask.all_day}
+                onCheckedChange={(checked) => setNewSubTask({ ...newSubTask, all_day: checked })}
+              />
+              <Label htmlFor="sub-all-day">All Day</Label>
+            </div>
+
+            {!newSubTask.all_day && (
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="sub-start-time">Start Time</Label>
+                  <Input
+                    id="sub-start-time"
+                    type="datetime-local"
+                    value={newSubTask.start_time}
+                    onChange={(e) => setNewSubTask({ ...newSubTask, start_time: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="sub-end-time">End Time</Label>
+                  <Input
+                    id="sub-end-time"
+                    type="datetime-local"
+                    value={newSubTask.end_time}
+                    onChange={(e) => setNewSubTask({ ...newSubTask, end_time: e.target.value })}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setIsSubTaskDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={createSubTask}>Create Sub-task</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Admin Filters - Only show for admins */}
       {isAdminUser && (
         <Card>
@@ -927,66 +977,53 @@ const Tasks = () => {
                 <Filter className="mr-2 h-4 w-4" />
                 Filters
               </CardTitle>
-              {hasActiveFilters && (
-                <Button variant="outline" size="sm" onClick={clearFilters}>
-                  <X className="mr-2 h-4 w-4" />
-                  Clear Filters
-                </Button>
-              )}
             </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
+              <div className="grid gap-2">
                 <Label>Team Member</Label>
-                <Select
-                  value={filters.teamMember}
-                  onValueChange={(value) => setFilters({ ...filters, teamMember: value })}
-                >
+                <Select value={filters.teamMember} onValueChange={(value) => setFilters({ ...filters, teamMember: value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="All team members" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All team members</SelectItem>
+                    <SelectItem value="all">All Members</SelectItem>
                     {teamMembers.map((member) => (
                       <SelectItem key={member.user_id} value={member.user_id}>
-                        {member.full_name || member.email}
+                        {member.full_name} ({member.email})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+
+              <div className="grid gap-2">
                 <Label>Priority</Label>
-                <Select
-                  value={filters.priority}
-                  onValueChange={(value) => setFilters({ ...filters, priority: value })}
-                >
+                <Select value={filters.priority} onValueChange={(value) => setFilters({ ...filters, priority: value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="All priorities" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All priorities</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="all">All Priorities</SelectItem>
+                    <SelectItem value="high">High Priority</SelectItem>
+                    <SelectItem value="medium">Medium Priority</SelectItem>
+                    <SelectItem value="low">Low Priority</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+
+              <div className="grid gap-2">
                 <Label>Date Range</Label>
-                <Select
-                  value={filters.dateRange}
-                  onValueChange={(value) => setFilters({ ...filters, dateRange: value })}
-                >
+                <Select value={filters.dateRange} onValueChange={(value) => setFilters({ ...filters, dateRange: value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="All dates" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All dates</SelectItem>
+                    <SelectItem value="all">All Dates</SelectItem>
                     <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="week">This Week</SelectItem>
-                    <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="week">Next 7 Days</SelectItem>
+                    <SelectItem value="month">Next 30 Days</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -995,247 +1032,161 @@ const Tasks = () => {
         </Card>
       )}
 
-      {/* Task List */}
-      <div className="grid gap-4">
+      {/* Tasks List */}
+      <div className="space-y-4">
         {filteredEvents.length === 0 ? (
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <CheckSquare className="h-12 w-12 text-muted-foreground mb-4" />
-              <CardTitle className="mb-2">
-                {hasActiveFilters ? "No tasks match your filters" : "No events yet"}
-              </CardTitle>
-              <CardDescription className="text-center">
-                {hasActiveFilters 
-                  ? "Try adjusting your filters to see more tasks"
-                  : "Create your first event to get started with your productivity journey"
+            <CardContent className="p-6 text-center">
+              <List className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No tasks found</h3>
+              <p className="text-muted-foreground mb-4">
+                {events.length === 0 
+                  ? "Get started by creating your first task" 
+                  : "Try adjusting your filters to see more tasks"
                 }
-              </CardDescription>
+              </p>
+              {events.length === 0 && (
+                <Button onClick={() => setIsDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Task
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
           filteredEvents.map((event) => (
-            <div key={event.id} className="space-y-2">
-              {/* Primary Task */}
-              <Card className="hover:shadow-md transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                     <div className="space-y-1 flex-1">
-                        <div className="flex items-center space-x-2 flex-wrap">
-                          <CardTitle className="text-lg">{event.title}</CardTitle>
-                          <Badge variant={getPriorityColor(event.priority)}>
-                            <Flag className="w-3 h-3 mr-1" />
-                            {event.priority}
-                          </Badge>
-                          <Badge variant={getEventTypeColor(event.event_type)}>
-                            {event.event_type}
-                          </Badge>
-                          {/* Show template badge if task is from template */}
-                          {event.template_id && (
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                              <BookOpen className="w-3 h-3 mr-1" />
-                              From Template
-                            </Badge>
-                          )}
-                          {/* Show "Assigned" badge if task was assigned by admin */}
-                          {event.user_id !== user?.id && (
-                            <Badge variant="outline" className="text-xs">
-                              Assigned
-                            </Badge>
-                          )}
+            <Card key={event.id} className="relative">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <h3 className="text-lg font-semibold">{event.title}</h3>
+                      <Badge variant={getPriorityColor(event.priority)}>{event.priority}</Badge>
+                      {event.completed && (
+                        <Badge variant="default" className="bg-green-100 text-green-800">
+                          <CheckSquare className="mr-1 h-3 w-3" />
+                          Completed
+                        </Badge>
+                      )}
+                      {event.template_id && (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                          <BookOpen className="mr-1 h-3 w-3" />
+                          Template Task
+                        </Badge>
+                      )}
+                    </div>
+                    {event.description && (
+                      <p className="text-sm text-muted-foreground mb-3">{event.description}</p>
+                    )}
+                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                      {event.start_time && (
+                        <div className="flex items-center space-x-1">
+                          <Calendar className="h-4 w-4" />
+                          <span>
+                            {event.all_day 
+                              ? format(new Date(event.start_time), "MMM dd, yyyy")
+                              : format(new Date(event.start_time), "MMM dd, yyyy 'at' h:mm a")
+                            }
+                          </span>
                         </div>
-                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <div className="flex items-center">
-       <Calendar className="w-4 h-4 mr-1" />
-       {event.all_day ? (
-         <>
-           {format(new Date(event.start_time), "MMM dd, yyyy")}
-           {event.end_time && event.end_time !== event.start_time && (
-             <> - {format(new Date(event.end_time), "MMM dd, yyyy")}</>
-           )}
-         </>
-       ) : (
-         <>
-           {(() => {
-             // Parse the stored ISO string and treat it as if it were local time
-             // This compensates for the timezone offset issue
-             const startTime = new Date(event.start_time);
-             const endTime = new Date(event.end_time);
-             
-             // Get timezone offset and adjust the display
-             const timezoneOffset = startTime.getTimezoneOffset() * 60000;
-             const adjustedStart = new Date(startTime.getTime() + timezoneOffset);
-             const adjustedEnd = new Date(endTime.getTime() + timezoneOffset);
-             
-             return (
-               <>
-                 {format(adjustedStart, "MMM dd, h:mm a")}
-                 {event.end_time && event.end_time !== event.start_time && (
-                   <>
-                     {" - "}
-                     {adjustedStart.toDateString() === adjustedEnd.toDateString()
-                       ? format(adjustedEnd, "h:mm a")
-                       : format(adjustedEnd, "MMM dd, h:mm a")}
-                   </>
-                 )}
-               </>
-             );
-           })()}
-         </>
-       )}
-                         </div>
-                         {/* Only show user info for admins */}
-                         {isAdminUser && (
-                           <div className="flex items-center">
-                             <User className="w-4 h-4 mr-1" />
-                             {event.profiles?.full_name || event.profiles?.email || "Unknown"}
-                           </div>
-                         )}
-                       </div>
-                     </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleTaskCompletion(event.id, !event.completed)}
-                          className={event.completed ? "bg-green-100 text-green-800" : ""}
-                        >
-                          <Check className="w-4 h-4 mr-1" />
-                          {event.completed ? "Completed" : "Mark Complete"}
-                        </Button>
-                        {/* Only show edit/delete options if user is admin or task owner - but NOT for template tasks assigned by admin */}
-                        {(isAdminUser || (event.user_id === user?.id && !event.template_id)) && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedEvent(event);
-                                setIsEditDialogOpen(true);
-                              }}
-                            >
-                              <Edit className="w-4 h-4 mr-1" />
-                              Edit
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openSubTaskDialog(event)}
-                            >
-                              <Plus className="w-4 h-4 mr-1" />
-                              Add Sub-task
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                      )}
+                      {isAdminUser && event.profiles && (
+                        <div className="flex items-center space-x-1">
+                          <User className="h-4 w-4" />
+                          <span>{event.profiles.full_name || event.profiles.email}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </CardHeader>
-              </Card>
-
-              {/* Sub-tasks Collapsible */}
-              {event.sub_tasks && event.sub_tasks.length > 0 && (
-                <Collapsible className="ml-6">
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" className="w-full justify-start p-2">
-                      <ChevronDown className="h-4 w-4 mr-2" />
-                      <span>Sub-tasks ({event.sub_tasks.length})</span>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant={event.completed ? "outline" : "default"}
+                      size="sm"
+                      onClick={() => toggleTaskCompletion(event.id, event.completed || false)}
+                    >
+                      {event.completed ? (
+                        <>
+                          <X className="mr-1 h-3 w-3" />
+                          Mark Incomplete
+                        </>
+                      ) : (
+                        <>
+                          <Check className="mr-1 h-3 w-3" />
+                          Mark Complete
+                        </>
+                      )}
                     </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-2">
-                    {event.sub_tasks.map((subTask) => (
-                      <Card 
-                        key={subTask.id} 
-                        className="hover:shadow-sm transition-shadow bg-muted/30 border-l-4 border-l-primary"
-                      >
-                        <CardHeader className="py-3">
-                          <div className="flex items-start justify-between">
-                            <div className="space-y-1 flex-1">
-                              <div className="flex items-center space-x-2">
-                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                                <CardTitle className={`text-base ${subTask.completed ? 'line-through opacity-60' : ''}`}>
-                                  {subTask.title}
-                                </CardTitle>
-                                <Badge variant={getPriorityColor(subTask.priority)} className="text-xs">
-                                  {subTask.priority}
-                                </Badge>
-                                {subTask.completed && (
-                                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
-                                    Completed
-                                  </Badge>
-                                )}
-                              </div>
-                              {subTask.start_time && (
-                                <div className="flex items-center space-x-4 text-sm text-muted-foreground ml-6">
-                                  <div className="flex items-center">
-                                    <Calendar className="w-3 h-3 mr-1" />
-                                    {subTask.all_day ? (
-                                      <>
-                                        {format(new Date(subTask.start_time), "MMM dd")}
-                                        {subTask.end_time && subTask.end_time !== subTask.start_time && (
-                                          <> - {format(new Date(subTask.end_time), "MMM dd")}</>
-                                        )}
-                                      </>
-                                    ) : (
-                                      <>
-                                        {(() => {
-                                          const startTime = new Date(subTask.start_time);
-                                          const endTime = new Date(subTask.end_time);
-                                          const timezoneOffset = startTime.getTimezoneOffset() * 60000;
-                                          const adjustedStart = new Date(startTime.getTime() + timezoneOffset);
-                                          const adjustedEnd = new Date(endTime.getTime() + timezoneOffset);
-                                          
-                                          return (
-                                            <>
-                                              {format(adjustedStart, "MMM dd, h:mm a")}
-                                              {subTask.end_time && subTask.end_time !== subTask.start_time && (
-                                                <>
-                                                  {" - "}
-                                                  {adjustedStart.toDateString() === adjustedEnd.toDateString()
-                                                    ? format(adjustedEnd, "h:mm a")
-                                                    : format(adjustedEnd, "MMM dd, h:mm a")}
-                                                </>
-                                              )}
-                                            </>
-                                          );
-                                        })()}
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openSubTaskDialog(event)}
+                    >
+                      <Plus className="mr-1 h-3 w-3" />
+                      Add Sub-task
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEventDetails(event)}
+                    >
+                      <Edit className="mr-1 h-3 w-3" />
+                      Edit
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Sub-tasks */}
+                {event.sub_tasks && event.sub_tasks.length > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex items-center mb-3">
+                      <ChevronRight className="h-4 w-4 text-muted-foreground mr-1" />
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Sub-tasks ({event.sub_tasks.length})
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {event.sub_tasks.map((subTask) => (
+                        <div key={subTask.id} className="flex items-center justify-between bg-muted/50 rounded-lg p-3">
+                          <div className="flex items-center space-x-3">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleTaskCompletion(subTask.id, subTask.completed || false)}
+                              className="h-6 w-6 p-0"
+                            >
+                              {subTask.completed ? (
+                                <CheckSquare className="h-4 w-4 text-green-600" />
+                              ) : (
+                                <div className="h-4 w-4 border border-muted-foreground/50 rounded" />
+                              )}
+                            </Button>
+                            <div>
+                              <p className={`text-sm ${subTask.completed ? 'line-through text-muted-foreground' : ''}`}>
+                                {subTask.title}
+                              </p>
+                              {subTask.description && (
+                                <p className="text-xs text-muted-foreground">{subTask.description}</p>
                               )}
                             </div>
-                             <div className="flex gap-2">
-                               <Button
-                                 variant="outline"
-                                 size="sm"
-                                 onClick={() => toggleTaskCompletion(subTask.id, !subTask.completed)}
-                                 className={subTask.completed ? "bg-green-100 text-green-800" : ""}
-                               >
-                                 <Check className="w-4 h-4 mr-1" />
-                                 {subTask.completed ? "Done" : "Complete"}
-                               </Button>
-                               {/* Only show edit options if user is admin or task owner - but NOT for template tasks assigned by admin */}
-                               {(isAdminUser || (subTask.user_id === user?.id && !subTask.template_id)) && (
-                                 <Button
-                                   variant="outline"
-                                   size="sm"
-                                   onClick={() => {
-                                     setSelectedEvent(subTask);
-                                     setIsEditDialogOpen(true);
-                                   }}
-                                 >
-                                   <Edit className="w-4 h-4 mr-1" />
-                                   Edit
-                                 </Button>
-                               )}
-                             </div>
                           </div>
-                        </CardHeader>
-                      </Card>
-                    ))}
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </div>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant={getPriorityColor(subTask.priority)} className="text-xs">
+                              {subTask.priority}
+                            </Badge>
+                            {isAdminUser && subTask.profiles && (
+                              <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+                                <User className="h-3 w-3" />
+                                <span>{subTask.profiles.full_name || subTask.profiles.email}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           ))
         )}
       </div>
@@ -1254,208 +1205,208 @@ const Tasks = () => {
             ) : templatesWithTasks.length === 0 ? (
               <Card>
                 <CardContent className="p-6 text-center">
-                  <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No Learning Templates Assigned</h3>
+                  <BookOpen className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No learning templates assigned</h3>
                   <p className="text-muted-foreground">
-                    You don't have any learning templates assigned yet. Check back later or contact your manager.
+                    Contact your administrator to get assigned to learning templates
                   </p>
                 </CardContent>
               </Card>
             ) : (
               <div className="space-y-4">
-                {templatesWithTasks.map(({ template, tasks }) => (
-                  <Card key={template.id}>
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-xl">{template.name}</CardTitle>
-                          <CardDescription className="text-sm">
-                            {template.technology} • {tasks.length} tasks
-                          </CardDescription>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-primary">
-                            {getTemplateProgress(tasks)}%
+                {templatesWithTasks.map(({ template, tasks }) => {
+                  const progress = getTemplateProgress(tasks);
+                  const completedTasks = tasks.filter(task => task.status === 'completed').length;
+                  
+                  return (
+                    <Card key={template.id}>
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-1">
+                            <CardTitle className="flex items-center space-x-2">
+                              <BookOpen className="h-5 w-5" />
+                              <span>{template.name}</span>
+                            </CardTitle>
+                            <CardDescription>
+                              {template.description && (
+                                <span className="mr-4">{template.description}</span>
+                              )}
+                              {template.technology && (
+                                <Badge variant="outline">{template.technology}</Badge>
+                              )}
+                            </CardDescription>
                           </div>
-                          <p className="text-sm text-muted-foreground">Complete</p>
+                          <div className="text-right">
+                            <div className="text-sm text-muted-foreground mb-1">
+                              {completedTasks} of {tasks.length} tasks completed
+                            </div>
+                            <div className="w-32">
+                              <Progress value={progress} className="h-2" />
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="mt-4">
-                        <Progress value={getTemplateProgress(tasks)} className="h-2" />
-                      </div>
-                      {template.description && (
-                        <p className="text-sm text-muted-foreground mt-2">{template.description}</p>
-                      )}
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {tasks.map((task) => {
-                          const StatusIcon = getStatusIcon(task.status);
-                          return (
-                            <Card key={task.id} className="border-l-4 border-l-primary/20">
-                              <CardContent className="p-4">
-                                <div className="flex justify-between items-start">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <StatusIcon className="h-4 w-4" />
-                                      <h4 className="font-medium">{task.title}</h4>
-                                    </div>
-                                    {task.description && (
-                                      <p className="text-sm text-muted-foreground mb-3">{task.description}</p>
-                                    )}
-                                    {task.due_date && (
-                                      <p className="text-sm text-muted-foreground">
-                                        Due: {new Date(task.due_date).toLocaleDateString()}
+                      </CardHeader>
+                      
+                      {tasks.length > 0 && (
+                        <CardContent>
+                          <div className="space-y-3">
+                            {tasks.map((task) => {
+                              const StatusIcon = getStatusIcon(task.status);
+                              return (
+                                <div key={task.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                                  <div className="flex items-center space-x-3">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => updateTemplateTaskStatus(task.id, task.status !== 'completed')}
+                                      className="h-6 w-6 p-0"
+                                    >
+                                      {task.status === 'completed' ? (
+                                        <CheckSquare className="h-4 w-4 text-green-600" />
+                                      ) : (
+                                        <div className="h-4 w-4 border border-muted-foreground/50 rounded" />
+                                      )}
+                                    </Button>
+                                    <div>
+                                      <p className={`text-sm font-medium ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
+                                        {task.title}
                                       </p>
-                                    )}
+                                      {task.description && (
+                                        <p className="text-xs text-muted-foreground">{task.description}</p>
+                                      )}
+                                      {task.due_date && (
+                                        <div className="flex items-center space-x-1 text-xs text-muted-foreground mt-1">
+                                          <Calendar className="h-3 w-3" />
+                                          <span>Due: {format(new Date(task.due_date), "MMM dd, yyyy")}</span>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="flex flex-col gap-2 items-end">
-                                    <div className="flex gap-2">
-                                      <Badge variant={getPriorityColor(task.priority)}>
-                                        {task.priority}
-                                      </Badge>
-                                      <Badge variant={getStatusColor(task.status)}>
-                                        {task.status.replace('_', ' ')}
-                                      </Badge>
-                                    </div>
-                                    <div className="flex gap-2">
-                                      {task.status === 'pending' && (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => updateTaskStatus(task.id, 'in_progress')}
-                                        >
-                                          Start
-                                        </Button>
-                                      )}
-                                      {task.status === 'in_progress' && (
-                                        <Button
-                                          size="sm"
-                                          onClick={() => updateTaskStatus(task.id, 'completed')}
-                                        >
-                                          Complete
-                                        </Button>
-                                      )}
-                                      {task.status === 'completed' && (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => updateTaskStatus(task.id, 'in_progress')}
-                                        >
-                                          Reopen
-                                        </Button>
-                                      )}
-                                    </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Badge variant={getPriorityColor(task.priority)} className="text-xs">
+                                      {task.priority}
+                                    </Badge>
+                                    <Badge variant={getStatusColor(task.status)} className="text-xs">
+                                      <StatusIcon className="mr-1 h-3 w-3" />
+                                      {task.status}
+                                    </Badge>
                                   </div>
                                 </div>
-                              </CardContent>
-                            </Card>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                              );
+                            })}
+                          </div>
+                        </CardContent>
+                      )}
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Task Detail Dialog */}
+      {/* Task Details Dialog */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           {selectedEvent && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center justify-between pr-12">
-                  {selectedEvent.title}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => deleteEvent(selectedEvent.id)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                <DialogTitle className="flex items-center space-x-2">
+                  <span>{selectedEvent.title}</span>
+                  <Badge variant={getPriorityColor(selectedEvent.priority)}>{selectedEvent.priority}</Badge>
                 </DialogTitle>
+                <DialogDescription>
+                  Task details and actions
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 {selectedEvent.description && (
                   <div>
                     <Label className="text-sm font-medium">Description</Label>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {selectedEvent.description}
-                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">{selectedEvent.description}</p>
                   </div>
                 )}
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium">Priority</Label>
-                    <div className="mt-1">
-                      <Badge variant={getPriorityColor(selectedEvent.priority)}>
-                        <Flag className="w-3 h-3 mr-1" />
-                        {selectedEvent.priority}
-                      </Badge>
-                    </div>
+                    <p className="text-sm text-muted-foreground mt-1 capitalize">{selectedEvent.priority}</p>
                   </div>
+                  
                   <div>
-                    <Label className="text-sm font-medium">Type</Label>
-                    <div className="mt-1">
-                      <Badge variant={getEventTypeColor(selectedEvent.event_type)}>
-                        {selectedEvent.event_type}
-                      </Badge>
-                    </div>
+                    <Label className="text-sm font-medium">Status</Label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {selectedEvent.completed ? "Completed" : "Pending"}
+                    </p>
                   </div>
                 </div>
 
-                 <div>
-                   <Label className="text-sm font-medium">Date & Time</Label>
-                   <p className="text-sm text-muted-foreground mt-1">
-                     {selectedEvent.all_day ? (
-                       format(new Date(selectedEvent.start_time), "EEEE, MMMM dd, yyyy")
-                     ) : (
-                       <>
-                         {(() => {
-                           const startTime = new Date(selectedEvent.start_time);
-                           const endTime = new Date(selectedEvent.end_time);
-                           const timezoneOffset = startTime.getTimezoneOffset() * 60000;
-                           const adjustedStart = new Date(startTime.getTime() + timezoneOffset);
-                           const adjustedEnd = new Date(endTime.getTime() + timezoneOffset);
-                           
-                           return (
-                             <>
-                               {format(adjustedStart, "EEEE, MMMM dd, yyyy 'at' h:mm a")}
-                               {selectedEvent.end_time && selectedEvent.end_time !== selectedEvent.start_time && (
-                                 <> - {format(adjustedEnd, "h:mm a")}</>
-                               )}
-                             </>
-                           );
-                         })()}
-                       </>
-                     )}
-                   </p>
-                 </div>
+                {selectedEvent.start_time && (
+                  <div>
+                    <Label className="text-sm font-medium">
+                      {selectedEvent.all_day ? "Date" : "Start Time"}
+                    </Label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {selectedEvent.all_day 
+                        ? format(new Date(selectedEvent.start_time), "MMMM dd, yyyy")
+                        : format(new Date(selectedEvent.start_time), "MMMM dd, yyyy 'at' h:mm a")
+                      }
+                    </p>
+                  </div>
+                )}
 
-                 {/* Only show creator info for admins */}
-                 {isAdminUser && (
-                   <div>
-                     <Label className="text-sm font-medium">Created by</Label>
-                     <div className="flex items-center mt-1">
-                       <User className="w-4 h-4 mr-2" />
-                       <span className="text-sm">
-                         {selectedEvent.profiles?.full_name || selectedEvent.profiles?.email || "Unknown"}
-                       </span>
-                     </div>
-                   </div>
-                 )}
+                {!selectedEvent.all_day && selectedEvent.end_time && (
+                  <div>
+                    <Label className="text-sm font-medium">End Time</Label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {format(new Date(selectedEvent.end_time), "MMMM dd, yyyy 'at' h:mm a")}
+                    </p>
+                  </div>
+                )}
+
+                {isAdminUser && selectedEvent.profiles && (
+                  <div>
+                    <Label className="text-sm font-medium">Assigned to</Label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {selectedEvent.profiles.full_name || selectedEvent.profiles.email}
+                    </p>
+                  </div>
+                )}
+
+                {selectedEvent.completed_at && (
+                  <div>
+                    <Label className="text-sm font-medium">Completed on</Label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {format(new Date(selectedEvent.completed_at), "MMMM dd, yyyy 'at' h:mm a")}
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <Label className="text-sm font-medium">Created on</Label>
                   <p className="text-sm text-muted-foreground mt-1">
                     {format(new Date(selectedEvent.created_at), "MMMM dd, yyyy 'at' h:mm a")}
                   </p>
+                </div>
+              </div>
+
+              <div className="flex justify-between pt-4">
+                <Button
+                  variant="destructive"
+                  onClick={() => deleteEvent(selectedEvent.id)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+                <div className="space-x-2">
+                  <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>
+                    Close
+                  </Button>
+                  <Button onClick={() => openEditDialog(selectedEvent)}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </Button>
                 </div>
               </div>
             </>
@@ -1471,7 +1422,7 @@ const Tasks = () => {
               <DialogHeader>
                 <DialogTitle>Edit Task</DialogTitle>
                 <DialogDescription>
-                  Update the details of "{selectedEvent.title}".
+                  Make changes to your task here.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
@@ -1481,89 +1432,72 @@ const Tasks = () => {
                     id="edit-title"
                     value={selectedEvent.title}
                     onChange={(e) => setSelectedEvent({ ...selectedEvent, title: e.target.value })}
-                    placeholder="Enter task title"
                   />
                 </div>
+
                 <div className="grid gap-2">
                   <Label htmlFor="edit-description">Description</Label>
                   <Textarea
                     id="edit-description"
                     value={selectedEvent.description || ""}
                     onChange={(e) => setSelectedEvent({ ...selectedEvent, description: e.target.value })}
-                    placeholder="Enter task description"
                   />
                 </div>
+
                 <div className="grid gap-2">
-                  <Label>Priority</Label>
-                  <Select
-                    value={selectedEvent.priority}
-                    onValueChange={(value) => setSelectedEvent({ ...selectedEvent, priority: value })}
-                  >
+                  <Label htmlFor="edit-priority">Priority</Label>
+                  <Select value={selectedEvent.priority} onValueChange={(value) => setSelectedEvent({ ...selectedEvent, priority: value })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
                       <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid gap-2">
-                  <Label>Event Type</Label>
-                  <Select
-                    value={selectedEvent.event_type}
-                    onValueChange={(value) => setSelectedEvent({ ...selectedEvent, event_type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="task">Task</SelectItem>
-                      <SelectItem value="meeting">Meeting</SelectItem>
-                      <SelectItem value="reminder">Reminder</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-start_time">Start Time</Label>
-                  <Input
-                    id="edit-start_time"
-                    type="datetime-local"
-                    value={selectedEvent.start_time ? format(new Date(selectedEvent.start_time), "yyyy-MM-dd'T'HH:mm") : ""}
-                    onChange={(e) => setSelectedEvent({ ...selectedEvent, start_time: new Date(e.target.value).toISOString() })}
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="edit-all-day"
+                    checked={selectedEvent.all_day}
+                    onCheckedChange={(checked) => setSelectedEvent({ ...selectedEvent, all_day: checked })}
                   />
+                  <Label htmlFor="edit-all-day">All Day</Label>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-end_time">End Time</Label>
-                  <Input
-                    id="edit-end_time"
-                    type="datetime-local"
-                    value={selectedEvent.end_time ? format(new Date(selectedEvent.end_time), "yyyy-MM-dd'T'HH:mm") : ""}
-                    onChange={(e) => setSelectedEvent({ ...selectedEvent, end_time: new Date(e.target.value).toISOString() })}
-                  />
-                </div>
+
+                {!selectedEvent.all_day && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-start-time">Start Time</Label>
+                      <Input
+                        id="edit-start-time"
+                        type="datetime-local"
+                        value={selectedEvent.start_time ? new Date(selectedEvent.start_time).toISOString().slice(0, 16) : ""}
+                        onChange={(e) => setSelectedEvent({ ...selectedEvent, start_time: e.target.value ? new Date(e.target.value).toISOString() : "" })}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-end-time">End Time</Label>
+                      <Input
+                        id="edit-end-time"
+                        type="datetime-local"
+                        value={selectedEvent.end_time ? new Date(selectedEvent.end_time).toISOString().slice(0, 16) : ""}
+                        onChange={(e) => setSelectedEvent({ ...selectedEvent, end_time: e.target.value ? new Date(e.target.value).toISOString() : "" })}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
-              <div className="flex justify-between">
-                <Button 
-                  variant="destructive" 
-                  onClick={() => {
-                    deleteEvent(selectedEvent.id);
-                    setIsEditDialogOpen(false);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancel
                 </Button>
-                <div className="flex space-x-2">
-                  <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={() => updateEvent(selectedEvent)}>
-                    Update Task
-                  </Button>
-                </div>
+                <Button onClick={() => updateEvent(selectedEvent)}>
+                  Update Task
+                </Button>
               </div>
             </>
           )}
