@@ -125,7 +125,7 @@ export default function LearningTemplates() {
     if (expandedTemplates.size > 0) {
       fetchAllTemplateData();
     }
-  }, [expandedTemplates]);
+  }, [expandedTemplates, isAdmin]); // Added isAdmin dependency to prevent unnecessary refetches
 
   const checkUserRole = async () => {
     if (!user) return;
@@ -501,15 +501,15 @@ export default function LearningTemplates() {
 
       console.log('Template tasks delete error:', templateError);
       
-      // Clear local state and force refresh
-      setTemplateTasks([]);
-      setAssignments([]);
+      // Remove the deleted task from local state immediately
+      setTemplateTasks(prev => prev.filter(task => 
+        !(task.title === taskToDelete.title && task.template_id === taskToDelete.template_id)
+      ));
       
-      // Force a complete data refresh with delay
-      setTimeout(async () => {
-        await fetchAllTemplateData();
-        await fetchTemplates();
-      }, 100);
+      // Refresh data after a short delay to ensure DB changes are reflected
+      setTimeout(() => {
+        fetchAllTemplateData();
+      }, 200);
       
       toast.success('Task deleted successfully');
     } catch (error) {
