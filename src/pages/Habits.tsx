@@ -3,8 +3,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Calendar, Check, Plus, Flame, Trophy, Clock, Users } from 'lucide-react';
+import { Calendar, Check, Plus, Flame, Trophy, Clock, Users, Edit, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -37,6 +38,8 @@ const Habits = () => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completions, setCompletions] = useState<HabitCompletion[]>([]);
   const [isAddingHabit, setIsAddingHabit] = useState(false);
+  const [isEditingHabit, setIsEditingHabit] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [users, setUsers] = useState<Array<{ id: string; full_name: string; email: string }>>([]);
@@ -48,6 +51,15 @@ const Habits = () => {
     description: '',
     category: 'health',
     frequency: 'daily' as const,
+    target_count: 1,
+    color: '#10b981'
+  });
+
+  const [editHabitForm, setEditHabitForm] = useState({
+    title: '',
+    description: '',
+    category: 'health',
+    frequency: 'daily' as 'daily' | 'weekly',
     target_count: 1,
     color: '#10b981'
   });
@@ -207,6 +219,77 @@ const Habits = () => {
       setIsAddingHabit(false);
       toast.success('Habit created successfully');
       loadHabits();
+    }
+  };
+
+  const startEditHabit = (habit: Habit) => {
+    setEditingHabit(habit);
+    setEditHabitForm({
+      title: habit.title,
+      description: habit.description || '',
+      category: habit.category,
+      frequency: habit.frequency,
+      target_count: habit.target_count,
+      color: habit.color
+    });
+    setIsEditingHabit(true);
+  };
+
+  const updateHabit = async () => {
+    if (!editingHabit || !editHabitForm.title.trim()) {
+      toast.error('Please enter a title for the habit');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('habits')
+      .update({
+        title: editHabitForm.title,
+        description: editHabitForm.description,
+        category: editHabitForm.category,
+        frequency: editHabitForm.frequency,
+        target_count: editHabitForm.target_count,
+        color: editHabitForm.color
+      })
+      .eq('id', editingHabit.id);
+
+    if (error) {
+      console.error('Error updating habit:', error);
+      toast.error('Failed to update habit');
+    } else {
+      setIsEditingHabit(false);
+      setEditingHabit(null);
+      toast.success('Habit updated successfully');
+      loadHabits();
+    }
+  };
+
+  const deleteHabit = async (habitId: string) => {
+    // First delete all completions for this habit
+    const { error: completionsError } = await supabase
+      .from('habit_completions')
+      .delete()
+      .eq('habit_id', habitId);
+
+    if (completionsError) {
+      console.error('Error deleting habit completions:', completionsError);
+      toast.error('Failed to delete habit completions');
+      return;
+    }
+
+    // Then delete the habit itself
+    const { error } = await supabase
+      .from('habits')
+      .delete()
+      .eq('id', habitId);
+
+    if (error) {
+      console.error('Error deleting habit:', error);
+      toast.error('Failed to delete habit');
+    } else {
+      toast.success('Habit deleted successfully');
+      loadHabits();
+      loadCompletions();
     }
   };
 
@@ -400,6 +483,76 @@ const Habits = () => {
           )}
         </div>
 
+        {/* Edit Habit Dialog */}
+        <Dialog open={isEditingHabit} onOpenChange={setIsEditingHabit}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Habit</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-title">Title</Label>
+                <Input
+                  id="edit-title"
+                  value={editHabitForm.title}
+                  onChange={(e) => setEditHabitForm({ ...editHabitForm, title: e.target.value })}
+                  placeholder="e.g., Morning Exercise"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-description">Description (optional)</Label>
+                <Input
+                  id="edit-description"
+                  value={editHabitForm.description}
+                  onChange={(e) => setEditHabitForm({ ...editHabitForm, description: e.target.value })}
+                  placeholder="e.g., 30 minutes of cardio"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-category">Category</Label>
+                <Select value={editHabitForm.category} onValueChange={(value) => setEditHabitForm({ ...editHabitForm, category: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(cat => (
+                      <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-frequency">Frequency</Label>
+                <Select value={editHabitForm.frequency} onValueChange={(value: any) => setEditHabitForm({ ...editHabitForm, frequency: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="edit-color">Color</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {colors.map(color => (
+                    <button
+                      key={color}
+                      className={`w-8 h-8 rounded-full border-2 ${editHabitForm.color === color ? 'border-foreground' : 'border-transparent'}`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => setEditHabitForm({ ...editHabitForm, color })}
+                    />
+                  ))}
+                </div>
+              </div>
+              <Button onClick={updateHabit} className="w-full">
+                Update Habit
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
@@ -492,22 +645,57 @@ const Habits = () => {
                               </div>
                             </div>
                           </div>
-                          {(!selectedUserId || selectedUserId === user?.id) && (
+                          <div className="flex items-center space-x-2">
+                            {(!selectedUserId || selectedUserId === user?.id) && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => startEditHabit(habit)}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Habit</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete "{habit.title}"? This action cannot be undone and will remove all completion history.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => deleteHabit(habit.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            )}
                             <Button
                               variant={isCompleted ? "default" : "outline"}
                               size="sm"
                               onClick={() => toggleHabitCompletion(habit.id)}
                               className={isCompleted ? "bg-green-500 hover:bg-green-600" : ""}
                             >
-                              <Check className="w-4 h-4" />
+                              {isCompleted ? <Check className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                             </Button>
-                          )}
-                          {isCompleted && (selectedUserId && selectedUserId !== user?.id) && (
-                            <Badge variant="default" className="bg-green-500">
-                              <Check className="w-3 h-3 mr-1" />
-                              Completed
-                            </Badge>
-                          )}
+                            {isCompleted && (selectedUserId && selectedUserId !== user?.id) && (
+                              <Badge variant="default" className="bg-green-500">
+                                <Check className="w-3 h-3 mr-1" />
+                                Completed
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       );
                     })
@@ -549,22 +737,57 @@ const Habits = () => {
                               </div>
                             </div>
                           </div>
-                          {(!selectedUserId || selectedUserId === user?.id) && (
+                          <div className="flex items-center space-x-2">
+                            {(!selectedUserId || selectedUserId === user?.id) && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => startEditHabit(habit)}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete Habit</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to delete "{habit.title}"? This action cannot be undone and will remove all completion history.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => deleteHabit(habit.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            )}
                             <Button
                               variant={isCompleted ? "default" : "outline"}
                               size="sm"
                               onClick={() => toggleHabitCompletion(habit.id)}
                               className={isCompleted ? "bg-green-500 hover:bg-green-600" : ""}
                             >
-                              <Check className="w-4 h-4" />
+                              {isCompleted ? <Check className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                             </Button>
-                          )}
-                          {isCompleted && (selectedUserId && selectedUserId !== user?.id) && (
-                            <Badge variant="default" className="bg-green-500">
-                              <Check className="w-3 h-3 mr-1" />
-                              Completed
-                            </Badge>
-                          )}
+                            {isCompleted && (selectedUserId && selectedUserId !== user?.id) && (
+                              <Badge variant="default" className="bg-green-500">
+                                <Check className="w-3 h-3 mr-1" />
+                                Completed
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
