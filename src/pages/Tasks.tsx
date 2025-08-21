@@ -419,6 +419,16 @@ const Tasks = () => {
       return;
     }
 
+    // Check if parent task already has a sub-task (limit to 1)
+    if (parentTaskForSubTask.sub_tasks && parentTaskForSubTask.sub_tasks.length >= 1) {
+      toast({
+        title: "Sub-task limit reached",
+        description: "Each task can only have one sub-task",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // For RLS compliance: 
     // - If current user is the parent task owner, use current user's ID
     // - If admin is creating sub-task for another user, use admin's ID but assign to parent task
@@ -827,14 +837,6 @@ const Tasks = () => {
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="primary-task"
-                    checked={newEvent.is_primary_task}
-                    onCheckedChange={(checked) => setNewEvent({ ...newEvent, is_primary_task: checked })}
-                  />
-                  <Label htmlFor="primary-task">Primary Task</Label>
-                </div>
 
                 {/* User Assignment - Only for Admins */}
                 {isAdminUser && (

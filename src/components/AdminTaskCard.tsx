@@ -310,15 +310,17 @@ export const AdminTaskCard = ({
                   
                   {!isTemplateTask && (
                     <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onAddSubTask(task)}
-                        className="h-8"
-                      >
-                        <Plus className="mr-1 h-3 w-3" />
-                        Sub-task
-                      </Button>
+                      {(!task.sub_tasks || task.sub_tasks.length === 0) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onAddSubTask(task)}
+                          className="h-8"
+                        >
+                          <Plus className="mr-1 h-3 w-3" />
+                          Sub-task
+                        </Button>
+                      )}
                       
                       <Button
                         variant="outline"
@@ -375,49 +377,59 @@ export const AdminTaskCard = ({
                     </CollapsibleTrigger>
                     
                     <CollapsibleContent className="mt-3 space-y-2">
-                      {task.sub_tasks!.map((subTask) => (
-                        <div key={subTask.id} className="group/sub flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                          <div className="flex items-center space-x-3 flex-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => onToggleComplete(subTask.id, subTask.completed || false)}
-                              className="h-6 w-6 p-0"
-                            >
-                              {subTask.completed ? (
-                                <CheckSquare className="h-4 w-4 text-green-600" />
-                              ) : (
-                                <div className="h-4 w-4 border border-gray-400 rounded transition-colors hover:border-blue-500" />
-                              )}
-                            </Button>
-                            
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-sm font-medium ${subTask.completed ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                                {subTask.title}
-                              </p>
-                              {subTask.description && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{subTask.description}</p>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center space-x-2">
-                            <Badge variant={getPriorityColor(subTask.priority)} className="text-xs">
-                              {subTask.priority}
-                            </Badge>
-                            {isAdmin && subTask.profiles && (
-                              <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
-                                <Avatar className="h-4 w-4">
-                                  <AvatarFallback className="text-xs bg-gradient-to-br from-green-500 to-teal-600 text-white">
-                                    {getInitials(subTask.profiles.full_name || subTask.profiles.email)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span>{subTask.profiles.full_name || subTask.profiles.email}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                       {task.sub_tasks!.map((subTask) => (
+                         <div key={subTask.id} className="group/sub flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                           <div className="flex items-center space-x-3 flex-1">
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => onToggleComplete(subTask.id, subTask.completed || false)}
+                               className="h-6 w-6 p-0"
+                             >
+                               {subTask.completed ? (
+                                 <CheckSquare className="h-4 w-4 text-green-600" />
+                               ) : (
+                                 <div className="h-4 w-4 border border-gray-400 rounded transition-colors hover:border-blue-500" />
+                               )}
+                             </Button>
+                             
+                             <div className="flex-1 min-w-0">
+                               <p className={`text-sm font-medium ${subTask.completed ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+                                 {subTask.title}
+                               </p>
+                               {subTask.description && (
+                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{subTask.description}</p>
+                               )}
+                             </div>
+                           </div>
+                           
+                           <div className="flex items-center space-x-2">
+                             <Badge variant={getPriorityColor(subTask.priority)} className="text-xs">
+                               {subTask.priority}
+                             </Badge>
+                             {isAdmin && subTask.profiles && (
+                               <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
+                                 <Avatar className="h-4 w-4">
+                                   <AvatarFallback className="text-xs bg-gradient-to-br from-green-500 to-teal-600 text-white">
+                                     {getInitials(subTask.profiles.full_name || subTask.profiles.email)}
+                                   </AvatarFallback>
+                                 </Avatar>
+                                 <span>{subTask.profiles.full_name || subTask.profiles.email}</span>
+                               </div>
+                             )}
+                             
+                             {/* Sub-task Action Buttons */}
+                             <div className="flex items-center space-x-1 opacity-0 group-hover/sub:opacity-100 transition-opacity">
+                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                 <MessageCircle className="h-3 w-3 text-gray-400 hover:text-blue-500" />
+                               </Button>
+                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                 <Edit className="h-3 w-3 text-gray-400 hover:text-blue-500" />
+                               </Button>
+                             </div>
+                           </div>
+                         </div>
+                       ))}
                     </CollapsibleContent>
                   </div>
                 </Collapsible>

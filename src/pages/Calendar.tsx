@@ -652,40 +652,6 @@ const Calendar = () => {
               <Button onClick={createEvent} className="w-full sm:w-auto">{editingEvent ? "Update Event" : "Create Event"}</Button>
             </div>
             
-            {!editingEvent && (
-              <div className="flex justify-center pt-4 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    // Create the event first, then open sub-event dialog
-                    const eventToCreate = {
-                      title: newEvent.title || "Primary Event",
-                      description: newEvent.description || "",
-                      start_time: newEvent.start_time || format(new Date(), "yyyy-MM-dd'T'HH:mm"),
-                      end_time: newEvent.end_time || format(new Date(new Date().getTime() + 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm"),
-                      all_day: newEvent.all_day,
-                      event_type: newEvent.event_type,
-                      priority: newEvent.priority,
-                      parent_task_id: null,
-                    };
-                    
-                    // Create a temporary event object for sub-event creation
-                    const tempEvent: CalendarEvent = {
-                      id: 'temp-' + Date.now(),
-                      ...eventToCreate,
-                      created_at: new Date().toISOString(),
-                      user_id: user?.id || '',
-                      completed: false,
-                    };
-                    
-                    openSubEventDialog(tempEvent);
-                  }}
-                  className="w-full"
-                >
-                  + Add Sub-Event
-                </Button>
-              </div>
-            )}
           </div>
         </DialogContent>
       </Dialog>
