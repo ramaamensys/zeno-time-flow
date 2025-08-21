@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,16 @@ export const AdminTaskCard = ({
   const [notes, setNotes] = useState(task.notes || "");
   const [files, setFiles] = useState<string[]>(task.files || []);
   const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Get current user
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    };
+    getCurrentUser();
+  }, []);
   
   const StatusIcon = getStatusIcon(task.completed || false);
   const isCompleted = task.completed || false;
@@ -334,17 +344,19 @@ export const AdminTaskCard = ({
                     </>
                   )}
                   
-                  {/* Task Chat */}
-                  <TaskChat
-                    taskId={task.id}
-                    taskTitle={task.title}
-                    assignedUsers={isAdmin && task.profiles ? [{
-                      user_id: task.user_id,
-                      full_name: task.profiles.full_name,
-                      email: task.profiles.email
-                    }] : []}
-                    isAdmin={isAdmin}
-                  />
+                  {/* Chat - Only show for template tasks assigned to others */}
+                  {task.template_id && currentUser && task.user_id !== currentUser.id && (
+                    <TaskChat
+                      taskId={task.id}
+                      taskTitle={task.title}
+                      assignedUsers={isAdmin && task.profiles ? [{
+                        user_id: task.user_id,
+                        full_name: task.profiles.full_name,
+                        email: task.profiles.email
+                      }] : []}
+                      isAdmin={isAdmin}
+                    />
+                  )}
                 </div>
               </div>
 
@@ -461,16 +473,6 @@ export const AdminTaskCard = ({
                                  <span>{subTask.profiles.full_name || subTask.profiles.email}</span>
                                </div>
                              )}
-                             
-                             {/* Sub-task Action Buttons */}
-                             <div className="flex items-center space-x-1 opacity-0 group-hover/sub:opacity-100 transition-opacity">
-                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                 <MessageCircle className="h-3 w-3 text-gray-400 hover:text-blue-500" />
-                               </Button>
-                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                 <Edit className="h-3 w-3 text-gray-400 hover:text-blue-500" />
-                               </Button>
-                             </div>
                            </div>
                          </div>
                        ))}
