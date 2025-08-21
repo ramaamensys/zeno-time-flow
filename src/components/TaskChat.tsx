@@ -134,21 +134,32 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
           }
         }
       } else {
-        // User: find existing chat room where user is the user_id and admin is admin_id
-        const { data: userChat, error: userChatError } = await supabase
+        // User: find existing chat room where user is the user_id and there's an admin as admin_id
+        console.log('User looking for chats for task:', taskId, 'user:', user.id);
+        
+        const { data: userChats, error: userChatError } = await supabase
           .from('task_chats')
-          .select('id, admin_id')
+          .select('id, admin_id, user_id')
           .eq('task_id', taskId)
-          .eq('user_id', user.id)
-          .neq('admin_id', user.id) // Make sure admin_id is NOT the same as user_id
-          .maybeSingle();
+          .eq('user_id', user.id);
 
         if (userChatError) {
-          console.error('Error fetching user chat:', userChatError);
+          console.error('Error fetching user chats:', userChatError);
+          throw userChatError;
         }
 
-        existingChatId = userChat?.id || null;
-        console.log('User chat search result:', userChat, 'for task:', taskId, 'user:', user.id);
+        console.log('Found user chats:', userChats);
+        
+        // Find the first chat where admin_id is different from user_id
+        const validChat = userChats?.find(chat => chat.admin_id !== chat.user_id);
+        
+        if (validChat) {
+          existingChatId = validChat.id;
+          console.log('User found valid chat:', validChat);
+        } else {
+          console.log('No valid chat found for user. Available chats:', userChats);
+          existingChatId = null;
+        }
       }
 
       if (existingChatId) {
@@ -389,7 +400,7 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
               ? selectedUser 
                 ? `Chatting with: ${assignedUsers.find(u => u.user_id === selectedUser)?.full_name || assignedUsers.find(u => u.user_id === selectedUser)?.email}`
                 : 'Select a user to chat with'
-              : 'Chat with Admin about this task'
+              : 'Chatting with Admin'
             }
           </div>
         </DialogHeader>

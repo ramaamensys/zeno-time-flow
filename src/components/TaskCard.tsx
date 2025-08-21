@@ -7,6 +7,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { FileUpload } from "@/components/ui/file-upload";
 import { CheckSquare, Clock, Flag, MessageCircle, User, Edit, Trash2, Calendar, Save, BookOpen } from "lucide-react";
+import { TaskChat } from "@/components/TaskChat";
+import { TaskNotes } from "@/components/TaskNotes";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -278,6 +280,35 @@ export const TaskCard = ({
                         </div>
                       </DialogContent>
                     </Dialog>
+                  )}
+
+                  {/* Chat and Notes for template tasks or admins */}
+                  {(isUserTask || isAdmin) && (
+                    <>
+                      {/* TaskNotes Component */}
+                      <TaskNotes
+                        taskId={task.id}
+                        taskTitle={task.title}
+                        assignedUsers={user ? [{
+                          user_id: task.user_id,
+                          full_name: user.full_name,
+                          email: user.email
+                        }] : []}
+                        isAdmin={isAdmin}
+                      />
+                      
+                      {/* TaskChat Component */}
+                      <TaskChat
+                        taskId={task.id}
+                        taskTitle={task.title}
+                        assignedUsers={user ? [{
+                          user_id: task.user_id,
+                          full_name: user.full_name,
+                          email: user.email
+                        }] : []}
+                        isAdmin={isAdmin}
+                      />
+                    </>
                   )}
 
                   {/* Admin Actions - Only show for non-template tasks or admins */}
