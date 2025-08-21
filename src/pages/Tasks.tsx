@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Calendar, Clock, Flag, CheckSquare, Trash2, Filter, User, X, ChevronRight, List, Edit, Check, ChevronDown, BookOpen, AlertCircle, RefreshCw } from "lucide-react";
+import { AdminTaskCard } from "@/components/AdminTaskCard";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
@@ -1054,140 +1055,19 @@ const Tasks = () => {
             </CardContent>
           </Card>
         ) : (
-          filteredEvents.map((event) => (
-            <Card key={event.id} className="relative">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <h3 className="text-lg font-semibold">{event.title}</h3>
-                      <Badge variant={getPriorityColor(event.priority)}>{event.priority}</Badge>
-                      {event.completed && (
-                        <Badge variant="default" className="bg-green-100 text-green-800">
-                          <CheckSquare className="mr-1 h-3 w-3" />
-                          Completed
-                        </Badge>
-                      )}
-                      {event.template_id && (
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                          <BookOpen className="mr-1 h-3 w-3" />
-                          Template Task
-                        </Badge>
-                      )}
-                    </div>
-                    {event.description && (
-                      <p className="text-sm text-muted-foreground mb-3">{event.description}</p>
-                    )}
-                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                      {event.start_time && (
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>
-                            {event.all_day 
-                              ? format(new Date(event.start_time), "MMM dd, yyyy")
-                              : format(new Date(event.start_time), "MMM dd, yyyy 'at' h:mm a")
-                            }
-                          </span>
-                        </div>
-                      )}
-                      {isAdminUser && event.profiles && (
-                        <div className="flex items-center space-x-1">
-                          <User className="h-4 w-4" />
-                          <span>{event.profiles.full_name || event.profiles.email}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant={event.completed ? "outline" : "default"}
-                      size="sm"
-                      onClick={() => toggleTaskCompletion(event.id, event.completed || false)}
-                    >
-                      {event.completed ? (
-                        <>
-                          <X className="mr-1 h-3 w-3" />
-                          Mark Incomplete
-                        </>
-                      ) : (
-                        <>
-                          <Check className="mr-1 h-3 w-3" />
-                          Mark Complete
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openSubTaskDialog(event)}
-                    >
-                      <Plus className="mr-1 h-3 w-3" />
-                      Add Sub-task
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEventDetails(event)}
-                    >
-                      <Edit className="mr-1 h-3 w-3" />
-                      Edit
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Sub-tasks */}
-                {event.sub_tasks && event.sub_tasks.length > 0 && (
-                  <div className="mt-4 pt-4 border-t">
-                    <div className="flex items-center mb-3">
-                      <ChevronRight className="h-4 w-4 text-muted-foreground mr-1" />
-                      <span className="text-sm font-medium text-muted-foreground">
-                        Sub-tasks ({event.sub_tasks.length})
-                      </span>
-                    </div>
-                    <div className="space-y-2">
-                      {event.sub_tasks.map((subTask) => (
-                        <div key={subTask.id} className="flex items-center justify-between bg-muted/50 rounded-lg p-3">
-                          <div className="flex items-center space-x-3">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => toggleTaskCompletion(subTask.id, subTask.completed || false)}
-                              className="h-6 w-6 p-0"
-                            >
-                              {subTask.completed ? (
-                                <CheckSquare className="h-4 w-4 text-green-600" />
-                              ) : (
-                                <div className="h-4 w-4 border border-muted-foreground/50 rounded" />
-                              )}
-                            </Button>
-                            <div>
-                              <p className={`text-sm ${subTask.completed ? 'line-through text-muted-foreground' : ''}`}>
-                                {subTask.title}
-                              </p>
-                              {subTask.description && (
-                                <p className="text-xs text-muted-foreground">{subTask.description}</p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Badge variant={getPriorityColor(subTask.priority)} className="text-xs">
-                              {subTask.priority}
-                            </Badge>
-                            {isAdminUser && subTask.profiles && (
-                              <div className="flex items-center space-x-1 text-xs text-muted-foreground">
-                                <User className="h-3 w-3" />
-                                <span>{subTask.profiles.full_name || subTask.profiles.email}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))
+          <div className="grid gap-6">
+            {filteredEvents.map((event) => (
+              <AdminTaskCard
+                key={event.id}
+                task={event}
+                onToggleComplete={toggleTaskCompletion}
+                onAddSubTask={openSubTaskDialog}
+                onEditTask={openEventDetails}
+                onViewDetails={openEventDetails}
+                isAdmin={isAdminUser}
+              />
+            ))}
+          </div>
         )}
       </div>
 
