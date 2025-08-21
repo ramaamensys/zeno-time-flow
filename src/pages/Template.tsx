@@ -87,6 +87,7 @@ export default function LearningTemplates() {
     technology: ""
   });
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]); // For multi-user assignment
   const [taskForm, setTaskForm] = useState({
     title: "",
     description: "",
@@ -471,33 +472,43 @@ export default function LearningTemplates() {
   };
 
   const assignTaskToUser = async () => {
-    if (!user || !taskToAssign || !selectedUserId) return;
+    if (!user || !taskToAssign || selectedUserIds.length === 0) return;
 
     try {
-      const taskData = {
-        template_id: taskToAssign.template_id,
-        title: taskToAssign.title,
-        description: taskToAssign.description,
-        priority: taskToAssign.priority,
-        due_date: taskToAssign.due_date,
-        user_id: selectedUserId,
-        created_by: user.id,
-        status: 'pending'
-      };
+      // Create tasks for each selected user
+      const taskPromises = selectedUserIds.map(userId => {
+        const taskData = {
+          user_id: userId,
+          title: taskToAssign.title,
+          description: taskToAssign.description || null,
+          priority: taskToAssign.priority,
+          start_time: taskToAssign.due_date ? new Date(taskToAssign.due_date).toISOString() : null,
+          end_time: taskToAssign.due_date ? new Date(taskToAssign.due_date).toISOString() : null,
+          all_day: true,
+          event_type: 'task',
+          template_id: taskToAssign.template_id,
+        };
 
-      const { error } = await supabase
-        .from('template_tasks')
-        .insert([taskData]);
+        return supabase
+          .from('calendar_events')
+          .insert([taskData]);
+      });
 
-      if (error) throw error;
+      const results = await Promise.all(taskPromises);
       
-      toast.success('Task assigned to user successfully');
+      // Check if any failed
+      const hasErrors = results.some(result => result.error);
+      if (hasErrors) {
+        throw new Error('Some assignments failed');
+      }
+      
+      toast.success(`Task assigned to ${selectedUserIds.length} user(s) successfully`);
       setShowAssignTaskDialog(false);
       setTaskToAssign(null);
-      setSelectedUserId("");
+      setSelectedUserIds([]);
       fetchAllTemplateData();
     } catch (error) {
-      toast.error('Failed to assign task to user');
+      toast.error('Failed to assign task to users');
     }
   };
 
@@ -506,8 +517,11 @@ export default function LearningTemplates() {
 
     try {
       const { error } = await supabase
-        .from('template_tasks')
-        .update({ user_id: selectedUserId })
+        .from('calendar_events')
+        .update({ 
+          user_id: selectedUserId,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', taskToReassign.id);
 
       if (error) throw error;
@@ -699,6 +713,7 @@ export default function LearningTemplates() {
 
   const openAssignTaskDialog = (task: TemplateTask) => {
     setTaskToAssign(task);
+    setSelectedUserIds([]); // Reset multi-select
     setShowAssignTaskDialog(true);
   };
 
@@ -1004,19 +1019,19 @@ export default function LearningTemplates() {
                                       {task.description && (
                                         <p className="text-xs text-muted-foreground mb-1">{task.description}</p>
                                       )}
-                                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                         <span>{assignedUser?.full_name || 'Unknown'}</span>
-                                         <span>• Created: {
-                                           task.created_at 
-                                             ? (new Date(task.created_at).toDateString() === new Date().toDateString() 
-                                                 ? 'Today' 
-                                                 : format(new Date(task.created_at), 'MMM dd'))
-                                             : 'Unknown'
-                                         }</span>
-                                         {task.due_date && (
-                                           <span>• Due: {format(new Date(task.due_date), 'MMM dd')}</span>
-                                         )}
-                                       </div>
+                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                       <span>{assignedUser?.full_name || 'Unknown'}</span>
+                                       <span>• Created: {
+                                         task.created_at 
+                                           ? (new Date(task.created_at).toDateString() === new Date().toDateString() 
+                                               ? 'Today' 
+                                               : format(new Date(task.created_at), 'MMM dd'))
+                                           : 'Unknown'
+                                       }</span>
+                                       {task.due_date && (
+                                         <span>• Due: {format(new Date(task.due_date), 'MMM dd')}</span>
+                                       )}
+                                     </div>
                                     </div>
                                      <div className="flex items-center gap-1 ml-2">
                                        <Badge variant={getPriorityColor(task.priority)} className="text-xs px-1 py-0">
@@ -1033,31 +1048,40 @@ export default function LearningTemplates() {
                                                <Edit className="h-3 w-3" />
                                              </Button>
                                            </DropdownMenuTrigger>
-                                           <DropdownMenuContent>
-                                             <DropdownMenuItem onClick={() => openEditTask(task)}>
-                                               <Edit className="mr-2 h-4 w-4" />
-                                               Edit Task
-                                             </DropdownMenuItem>
-                                             <DropdownMenuItem onClick={() => openSubTaskDialog(task)}>
-                                               <Plus className="mr-2 h-4 w-4" />
-                                               Add Sub-task
-                                             </DropdownMenuItem>
-                                             <DropdownMenuItem onClick={() => openAssignTaskDialog(task)}>
-                                               <Copy className="mr-2 h-4 w-4" />
-                                               Assign to Another User
-                                             </DropdownMenuItem>
-                                             <DropdownMenuItem onClick={() => openReassignTaskDialog(task)}>
-                                               <User className="mr-2 h-4 w-4" />
-                                               Reassign Task
-                                             </DropdownMenuItem>
-                                             <DropdownMenuItem 
-                                               onClick={() => deleteTask(task.id)}
-                                               className="text-destructive"
-                                             >
-                                               <Trash2 className="mr-2 h-4 w-4" />
-                                               Delete Task
-                                             </DropdownMenuItem>
-                                           </DropdownMenuContent>
+                                            <DropdownMenuContent>
+                                              <DropdownMenuItem onClick={() => openEditTask(task)}>
+                                                <Edit className="mr-2 h-4 w-4" />
+                                                Edit Task
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem onClick={() => openSubTaskDialog(task)}>
+                                                <Plus className="mr-2 h-4 w-4" />
+                                                Add Sub-task
+                                              </DropdownMenuItem>
+                                              {!task.user_id || assignedUser?.full_name === 'Unknown' ? (
+                                                <DropdownMenuItem onClick={() => openAssignTaskDialog(task)}>
+                                                  <User className="mr-2 h-4 w-4" />
+                                                  Assign to User
+                                                </DropdownMenuItem>
+                                              ) : (
+                                                <DropdownMenuItem onClick={() => openAssignTaskDialog(task)}>
+                                                  <Copy className="mr-2 h-4 w-4" />
+                                                  Assign to Another User
+                                                </DropdownMenuItem>
+                                              )}
+                                              {task.user_id && assignedUser?.full_name !== 'Unknown' && (
+                                                <DropdownMenuItem onClick={() => openReassignTaskDialog(task)}>
+                                                  <User className="mr-2 h-4 w-4" />
+                                                  Reassign Task
+                                                </DropdownMenuItem>
+                                              )}
+                                              <DropdownMenuItem 
+                                                onClick={() => deleteTask(task.id)}
+                                                className="text-destructive"
+                                              >
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                Delete Task
+                                              </DropdownMenuItem>
+                                            </DropdownMenuContent>
                                          </DropdownMenu>
                                        )}
                                      </div>
@@ -1371,33 +1395,59 @@ export default function LearningTemplates() {
         </DialogContent>
       </Dialog>
 
-      {/* Assign Task to Another User Dialog */}
+      {/* Assign Task to User(s) Dialog */}
       <Dialog open={showAssignTaskDialog} onOpenChange={setShowAssignTaskDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign Task to Another User</DialogTitle>
+            <DialogTitle>
+              {!taskToAssign?.user_id || getAssignedUsers(taskToAssign?.template_id || '').find(u => u.user_id === taskToAssign?.user_id)?.full_name === 'Unknown' 
+                ? 'Assign Task to User(s)' 
+                : 'Assign Task to Another User(s)'}
+            </DialogTitle>
             <DialogDescription>
-              Assign "{taskToAssign?.title}" to another user in the same template
+              Assign "{taskToAssign?.title}" to user(s) in the template
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="assign-user">Select User</Label>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a user" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getAssignedUsers(taskToAssign?.template_id || '').map((user) => (
-                    <SelectItem key={user.user_id} value={user.user_id}>
-                      {user.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Select User(s)</Label>
+              <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-2">
+                {getAssignedUsers(taskToAssign?.template_id || '').map((user) => (
+                  <div key={user.user_id} className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id={`user-${user.user_id}`}
+                      checked={selectedUserIds.includes(user.user_id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedUserIds([...selectedUserIds, user.user_id]);
+                        } else {
+                          setSelectedUserIds(selectedUserIds.filter(id => id !== user.user_id));
+                        }
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                    <Label htmlFor={`user-${user.user_id}`} className="text-sm font-normal cursor-pointer">
+                      {user.full_name} ({user.email})
+                    </Label>
+                  </div>
+                ))}
+                {getAssignedUsers(taskToAssign?.template_id || '').length === 0 && (
+                  <p className="text-sm text-muted-foreground">No users assigned to this template</p>
+                )}
+              </div>
+              {selectedUserIds.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {selectedUserIds.length} user(s) selected
+                </p>
+              )}
             </div>
-            <Button onClick={assignTaskToUser} className="w-full">
-              Assign Task
+            <Button 
+              onClick={assignTaskToUser} 
+              className="w-full"
+              disabled={selectedUserIds.length === 0}
+            >
+              Assign Task to {selectedUserIds.length} User(s)
             </Button>
           </div>
         </DialogContent>
