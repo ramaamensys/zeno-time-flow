@@ -216,7 +216,7 @@ export default function LearningTemplates() {
       if (assignmentsError) throw assignmentsError;
       setAssignments(assignmentsData || []);
 
-      // Fetch tasks from calendar_events for expanded templates
+      // Fetch tasks from calendar_events for expanded templates with a fresh query
       let tasksQuery = supabase
         .from('calendar_events')
         .select('*')
@@ -228,7 +228,8 @@ export default function LearningTemplates() {
         tasksQuery = tasksQuery.eq('user_id', user.id);
       }
 
-      const { data: tasksData, error: tasksError } = await tasksQuery.order('created_at', { ascending: false });
+      const { data: tasksData, error: tasksError } = await tasksQuery
+        .order('created_at', { ascending: false });
 
       if (tasksError) throw tasksError;
 
@@ -250,8 +251,10 @@ export default function LearningTemplates() {
         }))
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
+      console.log('Fetched tasks after deletion:', transformedTasks.length);
       setTemplateTasks(transformedTasks);
     } catch (error) {
+      console.error('Failed to fetch template data:', error);
       toast.error('Failed to fetch template data');
     }
   };
@@ -457,7 +460,7 @@ export default function LearningTemplates() {
 
   const deleteTask = async (taskId: string) => {
     try {
-      // Delete all calendar events with the same title and template_id
+      // Find the task to delete
       const taskToDelete = templateTasks.find(t => t.id === taskId);
       if (!taskToDelete) {
         throw new Error('Task not found');
@@ -465,56 +468,55 @@ export default function LearningTemplates() {
 
       console.log('Deleting task:', taskToDelete);
 
-      // First, let's see what records actually exist
-      const { data: existingCalendarEvents, error: fetchError } = await supabase
+      // Immediately remove from local state to provide instant feedback
+      setTemplateTasks(prev => prev.filter(task => 
+        !(task.title === taskToDelete.title && task.template_id === taskToDelete.template_id)
+      ));
+
+      // Delete all matching calendar events (by title and template_id)
+      const { data: allEvents, error: fetchError } = await supabase
         .from('calendar_events')
-        .select('*')
-        .eq('template_id', taskToDelete.template_id);
+        .select('id, title')
+        .eq('template_id', taskToDelete.template_id)
+        .eq('title', taskToDelete.title);
 
-      console.log('Existing calendar events for this template:', existingCalendarEvents);
+      if (fetchError) throw fetchError;
 
-      // Find matching records by title (regardless of description differences)
-      const matchingEvents = existingCalendarEvents?.filter(event => 
-        event.title === taskToDelete.title
-      ) || [];
+      if (allEvents && allEvents.length > 0) {
+        // Delete all matching events by their IDs
+        const { error: deleteError } = await supabase
+          .from('calendar_events')
+          .delete()
+          .eq('template_id', taskToDelete.template_id)
+          .eq('title', taskToDelete.title);
 
-      console.log('Matching events by title:', matchingEvents);
-
-      // Delete each matching record by ID to ensure complete removal
-      if (matchingEvents.length > 0) {
-        const deletePromises = matchingEvents.map(event => 
-          supabase.from('calendar_events').delete().eq('id', event.id)
-        );
-        
-        const deleteResults = await Promise.all(deletePromises);
-        deleteResults.forEach((result, index) => {
-          console.log(`Deleted event ${matchingEvents[index].id}:`, result.error);
-        });
+        if (deleteError) throw deleteError;
+        console.log(`Deleted ${allEvents.length} calendar events`);
       }
 
-      // Also delete from template_tasks table by title and template
+      // Also clean up template_tasks table
       const { error: templateError } = await supabase
         .from('template_tasks')
         .delete()
         .eq('template_id', taskToDelete.template_id)
         .eq('title', taskToDelete.title);
 
-      console.log('Template tasks delete error:', templateError);
-      
-      // Remove the deleted task from local state immediately
-      setTemplateTasks(prev => prev.filter(task => 
-        !(task.title === taskToDelete.title && task.template_id === taskToDelete.template_id)
-      ));
-      
-      // Refresh data after a short delay to ensure DB changes are reflected
-      setTimeout(() => {
-        fetchAllTemplateData();
-      }, 200);
+      if (templateError) {
+        console.log('Template tasks delete error:', templateError);
+      }
       
       toast.success('Task deleted successfully');
+
+      // Wait longer before refreshing to ensure DB consistency
+      setTimeout(() => {
+        fetchAllTemplateData();
+      }, 500);
+
     } catch (error) {
       console.error('Delete task error:', error);
       toast.error('Failed to delete task');
+      // Restore the task in local state if deletion failed
+      fetchAllTemplateData();
     }
   };
 
