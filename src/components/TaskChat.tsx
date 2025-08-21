@@ -134,27 +134,21 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
           }
         }
       } else {
-        // User: find chat room with any admin for this task
+        // User: find existing chat room where user is the user_id and admin is admin_id
         const { data: userChat, error: userChatError } = await supabase
           .from('task_chats')
           .select('id, admin_id')
           .eq('task_id', taskId)
           .eq('user_id', user.id)
+          .neq('admin_id', user.id) // Make sure admin_id is NOT the same as user_id
           .maybeSingle();
 
         if (userChatError) {
           console.error('Error fetching user chat:', userChatError);
         }
 
-        if (!userChat) {
-          // Create new chat - need to find an admin to create chat with
-          // For now, we'll need an admin to initiate the chat
-          console.log('No existing chat found for user. Admin needs to initiate chat.');
-          existingChatId = null;
-        } else {
-          existingChatId = userChat.id;
-          console.log('User chat found:', userChat, 'for task:', taskId, 'user:', user.id);
-        }
+        existingChatId = userChat?.id || null;
+        console.log('User chat search result:', userChat, 'for task:', taskId, 'user:', user.id);
       }
 
       if (existingChatId) {
