@@ -457,16 +457,25 @@ export default function LearningTemplates() {
 
   const deleteTask = async (taskId: string) => {
     try {
+      // Delete all calendar events with the same title and template_id
+      const taskToDelete = templateTasks.find(t => t.id === taskId);
+      if (!taskToDelete) {
+        throw new Error('Task not found');
+      }
+
       const { error } = await supabase
         .from('calendar_events')
         .delete()
-        .eq('id', taskId);
+        .eq('template_id', taskToDelete.template_id)
+        .eq('title', taskToDelete.title)
+        .eq('description', taskToDelete.description || '');
 
       if (error) throw error;
       
       toast.success('Task deleted successfully');
       fetchAllTemplateData();
     } catch (error) {
+      console.error('Delete task error:', error);
       toast.error('Failed to delete task');
     }
   };
@@ -648,6 +657,9 @@ export default function LearningTemplates() {
     
     // Group tasks by title + description to avoid duplicates and count assigned users
     const groupedTasks = tasks.reduce((acc, task) => {
+      // Skip tasks without user_id
+      if (!task.user_id) return acc;
+      
       const taskKey = `${task.title}_${task.description || ''}_${task.template_id}`;
       const existingTask = acc.find(t => `${t.title}_${t.description || ''}_${t.template_id}` === taskKey);
       
@@ -663,7 +675,7 @@ export default function LearningTemplates() {
         // New task, add it with initial assigned user
         acc.push({
           ...task,
-          assignedUserIds: task.user_id ? [task.user_id] : []
+          assignedUserIds: [task.user_id]
         });
       }
       return acc;
@@ -971,35 +983,35 @@ export default function LearningTemplates() {
                            {assignedUsers.map((user) => (
                              <Card key={user.user_id}>
                                <CardContent className="p-3">
-                                 <div className="flex justify-between items-center">
-                                   <div>
-                                     <p className="font-medium text-sm">{user.full_name}</p>
-                                     <p className="text-xs text-muted-foreground">{user.email}</p>
-                                   </div>
-                                   <div className="flex items-center gap-2">
-                                     <Badge variant="outline" className="text-xs">
-                                       {templateTasksList.filter(t => t.user_id === user.user_id).length} tasks
-                                     </Badge>
-                                     {isAdmin && (
-                                       <DropdownMenu>
-                                         <DropdownMenuTrigger asChild>
-                                           <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                             <MoreVertical className="h-3 w-3" />
-                                           </Button>
-                                         </DropdownMenuTrigger>
-                                         <DropdownMenuContent>
-                                           <DropdownMenuItem 
-                                             onClick={() => removeUserFromTemplate(template.id, user.user_id)}
-                                             className="text-destructive"
-                                           >
-                                             <Trash2 className="mr-2 h-4 w-4" />
-                                             Remove User from Template
-                                           </DropdownMenuItem>
-                                         </DropdownMenuContent>
-                                       </DropdownMenu>
-                                     )}
-                                   </div>
-                                 </div>
+                                    <div className="flex justify-between items-center">
+                                      <div>
+                                        <p className="font-medium text-sm">{user.full_name}</p>
+                                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="text-xs">
+                                          {templateTasksList.filter(t => t.assignedUserIds?.includes(user.user_id)).length} tasks
+                                        </Badge>
+                                        {isAdmin && (
+                                          <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                                <MoreVertical className="h-3 w-3" />
+                                              </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                              <DropdownMenuItem 
+                                                onClick={() => removeUserFromTemplate(template.id, user.user_id)}
+                                                className="text-destructive"
+                                              >
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                Remove User from Template
+                                              </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                          </DropdownMenu>
+                                        )}
+                                      </div>
+                                    </div>
                                </CardContent>
                              </Card>
                            ))}
@@ -1436,7 +1448,19 @@ export default function LearningTemplates() {
             <div>
               <Label>Select User(s)</Label>
               <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-2">
-                {getAssignedUsers(taskToAssign?.template_id || '').map((user) => (
+                {getAssignedUsers(taskToAssign?.template_id || '')
+                  .filter(user => {
+                    // Filter out users who already have this task assigned
+                    if (!taskToAssign) return true;
+                    const existingTask = templateTasks.find(t => 
+                      t.template_id === taskToAssign.template_id &&
+                      t.title === taskToAssign.title &&
+                      t.description === taskToAssign.description &&
+                      t.user_id === user.user_id
+                    );
+                    return !existingTask;
+                  })
+                  .map((user) => (
                   <div key={user.user_id} className="flex items-center space-x-2">
                     <input
                       type="checkbox"
@@ -1456,8 +1480,18 @@ export default function LearningTemplates() {
                     </Label>
                   </div>
                 ))}
-                {getAssignedUsers(taskToAssign?.template_id || '').length === 0 && (
-                  <p className="text-sm text-muted-foreground">No users assigned to this template</p>
+                {getAssignedUsers(taskToAssign?.template_id || '')
+                  .filter(user => {
+                    if (!taskToAssign) return true;
+                    const existingTask = templateTasks.find(t => 
+                      t.template_id === taskToAssign.template_id &&
+                      t.title === taskToAssign.title &&
+                      t.description === taskToAssign.description &&
+                      t.user_id === user.user_id
+                    );
+                    return !existingTask;
+                  }).length === 0 && (
+                  <p className="text-sm text-muted-foreground">All users already have this task assigned</p>
                 )}
               </div>
               {selectedUserIds.length > 0 && (
