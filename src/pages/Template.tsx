@@ -591,10 +591,10 @@ const LearningTemplates = () => {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Learning Templates
+              Check List
             </h1>
             <p className="text-gray-600 dark:text-gray-300 mt-2">
-              Create and manage learning templates with tasks and assignments
+              Create and manage Check List with tasks and assignments
             </p>
           </div>
           
@@ -602,14 +602,14 @@ const LearningTemplates = () => {
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg">
                 <Plus className="mr-2 h-5 w-5" />
-                Create Template
+                Create Check-List
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Create New Template</DialogTitle>
+                <DialogTitle>Create New Check-List</DialogTitle>
                 <DialogDescription>
-                  Create a new learning template to organize tasks and assignments.
+                  Create a new Check-List template to organize tasks and assignments.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
@@ -701,7 +701,7 @@ const LearningTemplates = () => {
                 No templates created yet
               </h3>
               <p className="text-gray-600 dark:text-gray-300 mb-4">
-                Get started by creating your first learning template
+                Get started by creating your first Check-List
               </p>
               <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
                 <Plus className="mr-2 h-4 w-4" />
