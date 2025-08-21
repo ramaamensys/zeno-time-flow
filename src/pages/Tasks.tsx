@@ -234,11 +234,13 @@ const Tasks = () => {
     // First get the events based on user role
     let eventsQuery = supabase.from("calendar_events").select("*");
     
-    // Admin/super_admin see all tasks, regular users see only their own
+    // Admin/super_admin see all tasks except template tasks, regular users see only their own
     if (userRole !== 'admin' && userRole !== 'super_admin') {
       eventsQuery = eventsQuery.eq('user_id', user.id);
+    } else {
+      // For admins, exclude template tasks (they can see those on template page)
+      eventsQuery = eventsQuery.is('template_id', null);
     }
-    // For admins, don't filter - show all events
     
     const { data: eventsData, error: eventsError } = await eventsQuery
       .order("start_time", { ascending: true });
