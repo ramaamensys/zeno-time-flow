@@ -60,6 +60,7 @@ const LearningTemplates = () => {
 
   // Dialog states
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<LearningTemplate | null>(null);
 
@@ -237,13 +238,70 @@ const LearningTemplates = () => {
     }
   };
 
+  const updateTemplate = async () => {
+    if (!user || !isAdmin || !selectedTemplate) return;
+
+    try {
+      const { error } = await supabase
+        .from('learning_templates')
+        .update({
+          name: templateForm.name,
+          description: templateForm.description,
+          technology: templateForm.technology,
+        })
+        .eq('id', selectedTemplate.id);
+
+      if (error) throw error;
+
+      toast.success('Template updated successfully');
+      setIsEditDialogOpen(false);
+      setTemplateForm({ name: "", description: "", technology: "" });
+      setSelectedTemplate(null);
+      fetchTemplates();
+    } catch (error) {
+      toast.error('Failed to update template');
+    }
+  };
+
+  const deleteTemplate = async (templateId: string) => {
+    if (!isAdmin) return;
+
+    try {
+      // Delete all associated tasks first
+      await supabase
+        .from('calendar_events')
+        .delete()
+        .eq('template_id', templateId);
+
+      // Delete all assignments
+      await supabase
+        .from('template_assignments')
+        .delete()
+        .eq('template_id', templateId);
+
+      // Delete the template
+      const { error } = await supabase
+        .from('learning_templates')
+        .delete()
+        .eq('id', templateId);
+
+      if (error) throw error;
+
+      toast.success('Template deleted successfully');
+      fetchTemplates();
+      fetchAllTemplateData();
+    } catch (error) {
+      toast.error('Failed to delete template');
+    }
+  };
+
   const createTask = async () => {
     if (!user || !selectedTemplate) return;
 
     try {
-      // Create tasks for selected users
-      const taskPromises = selectedUserIds.map(userId =>
-        supabase.from('calendar_events').insert([{
+      // If no users selected, create a template-level task without user assignment
+      if (selectedUserIds.length === 0) {
+        const { error } = await supabase.from('calendar_events').insert([{
           title: taskForm.title,
           description: taskForm.description,
           priority: taskForm.priority,
@@ -251,14 +309,31 @@ const LearningTemplates = () => {
           end_time: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
           all_day: true,
           event_type: 'task',
-          user_id: userId,
+          user_id: user.id, // Assign to current admin for RLS compliance
           template_id: selectedTemplate.id,
-        }])
-      );
+        }]);
+        
+        if (error) throw error;
+      } else {
+        // Create tasks for selected users
+        const taskPromises = selectedUserIds.map(userId =>
+          supabase.from('calendar_events').insert([{
+            title: taskForm.title,
+            description: taskForm.description,
+            priority: taskForm.priority,
+            start_time: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
+            end_time: taskForm.due_date ? new Date(taskForm.due_date).toISOString() : null,
+            all_day: true,
+            event_type: 'task',
+            user_id: userId,
+            template_id: selectedTemplate.id,
+          }])
+        );
 
-      await Promise.all(taskPromises);
+        await Promise.all(taskPromises);
+      }
 
-      toast.success('Task created and assigned successfully');
+      toast.success('Task created successfully');
       setIsTaskDialogOpen(false);
       setTaskForm({ title: "", description: "", priority: "medium", due_date: "" });
       setSelectedUserIds([]);
@@ -558,9 +633,15 @@ const LearningTemplates = () => {
                   setIsTaskDialogOpen(true);
                 }}
                 onEditTemplate={() => {
-                  // TODO: Implement edit functionality
-                  toast.info('Edit functionality coming soon');
+                  setSelectedTemplate(template);
+                  setTemplateForm({
+                    name: template.name,
+                    description: template.description,
+                    technology: template.technology,
+                  });
+                  setIsEditDialogOpen(true);
                 }}
+                onDeleteTemplate={() => deleteTemplate(template.id)}
               />
             ))}
           </div>
@@ -623,7 +704,10 @@ const LearningTemplates = () => {
               </div>
               
               <div>
-                <Label>Assign to Users</Label>
+                <Label>Assign to Users (Optional)</Label>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Leave unchecked to create a general template task, or select users to assign specifically.
+                </p>
                 <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded p-2 mt-2">
                   {getAssignedUsers(selectedTemplate?.id || '').map((user) => (
                     <div key={user.user_id} className="flex items-center space-x-2">
@@ -653,9 +737,58 @@ const LearningTemplates = () => {
                 </Button>
                 <Button 
                   onClick={createTask} 
-                  disabled={!taskForm.title.trim() || selectedUserIds.length === 0}
+                  disabled={!taskForm.title.trim()}
                 >
                   Create Task
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Template Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Template</DialogTitle>
+              <DialogDescription>
+                Update the learning template details.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-name">Template Name</Label>
+                <Input
+                  id="edit-name"
+                  placeholder="e.g., React Development"
+                  value={templateForm.name}
+                  onChange={(e) => setTemplateForm(prev => ({ ...prev, name: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  placeholder="Brief description of the learning template"
+                  value={templateForm.description}
+                  onChange={(e) => setTemplateForm(prev => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-technology">Technology/Category</Label>
+                <Input
+                  id="edit-technology"
+                  placeholder="e.g., React, Python, Java"
+                  value={templateForm.technology}
+                  onChange={(e) => setTemplateForm(prev => ({ ...prev, technology: e.target.value }))}
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={updateTemplate} disabled={!templateForm.name.trim()}>
+                  Update Template
                 </Button>
               </div>
             </div>

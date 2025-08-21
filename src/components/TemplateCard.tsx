@@ -45,6 +45,7 @@ interface TemplateCardProps {
   onRemoveUser: (userId: string) => void;
   onAddTask: () => void;
   onEditTemplate: () => void;
+  onDeleteTemplate?: () => void;
 }
 
 const getInitials = (name: string) => {
@@ -90,6 +91,7 @@ export const TemplateCard = ({
   onRemoveUser,
   onAddTask,
   onEditTemplate,
+  onDeleteTemplate,
 }: TemplateCardProps) => {
   const progress = getProgress(tasks);
   const completedTasks = tasks.filter(task => task.completed || task.status === 'completed').length;
@@ -174,9 +176,11 @@ export const TemplateCard = ({
                     <DropdownMenuItem onClick={onEditTemplate} className="cursor-pointer">
                       Edit Template
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="cursor-pointer text-red-600">
-                      Delete Template
-                    </DropdownMenuItem>
+                    {onDeleteTemplate && (
+                      <DropdownMenuItem onClick={onDeleteTemplate} className="cursor-pointer text-red-600">
+                        Delete Template
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </>
