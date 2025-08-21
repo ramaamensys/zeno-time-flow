@@ -366,7 +366,7 @@ const Tasks = () => {
       all_day: newEvent.all_day,
       event_type: newEvent.event_type,
       // If admin is assigning task, use assigned_user_id, otherwise use current user
-      user_id: (isAdminUser && newEvent.assigned_user_id) ? newEvent.assigned_user_id : user?.id,
+      user_id: (isAdminUser && newEvent.assigned_user_id && newEvent.assigned_user_id !== "self") ? newEvent.assigned_user_id : user?.id,
     };
 
     const { error } = await supabase.from("calendar_events").insert([eventData]);
@@ -441,8 +441,8 @@ const Tasks = () => {
       end_time: newSubTask.end_time ? new Date(newSubTask.end_time).toISOString() : (newSubTask.start_time ? new Date(newSubTask.start_time).toISOString() : null),
       all_day: newSubTask.all_day,
       event_type: newSubTask.event_type,
-      // Always use current user's ID for RLS compliance
-      user_id: currentUserId,
+      // Use assigned user ID if specified and not "task-owner", otherwise use current user
+      user_id: (isAdminUser && newSubTask.assigned_user_id && newSubTask.assigned_user_id !== "task-owner") ? newSubTask.assigned_user_id : currentUserId,
       parent_task_id: parentTaskForSubTask.id,
     };
 
@@ -771,7 +771,7 @@ const Tasks = () => {
                         <SelectValue placeholder="Assign to myself" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Assign to myself</SelectItem>
+                        <SelectItem value="self">Assign to myself</SelectItem>
                         {teamMembers.map((member) => (
                           <SelectItem key={member.user_id} value={member.user_id}>
                             {member.full_name} ({member.email})
@@ -882,7 +882,7 @@ const Tasks = () => {
                     <SelectValue placeholder="Assign to task owner" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Assign to task owner</SelectItem>
+                    <SelectItem value="task-owner">Assign to task owner</SelectItem>
                     {teamMembers.map((member) => (
                       <SelectItem key={member.user_id} value={member.user_id}>
                         {member.full_name} ({member.email})
