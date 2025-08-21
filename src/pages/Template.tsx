@@ -468,7 +468,33 @@ export default function LearningTemplates() {
       console.log('Task description:', taskToDelete.description);
       console.log('Task template_id:', taskToDelete.template_id);
 
-      // First delete from template_tasks table
+      // First, let's see what records actually exist
+      const { data: existingCalendarEvents, error: fetchError } = await supabase
+        .from('calendar_events')
+        .select('*')
+        .eq('template_id', taskToDelete.template_id);
+
+      console.log('Existing calendar events for this template:', existingCalendarEvents);
+      console.log('Fetch error:', fetchError);
+
+      // Find matching records by title
+      const matchingEvents = existingCalendarEvents?.filter(event => 
+        event.title === taskToDelete.title
+      ) || [];
+
+      console.log('Matching events by title:', matchingEvents);
+
+      // Delete each matching record by ID to be absolutely sure
+      for (const event of matchingEvents) {
+        const { error: deleteError } = await supabase
+          .from('calendar_events')
+          .delete()
+          .eq('id', event.id);
+        
+        console.log(`Deleted event ${event.id}:`, deleteError);
+      }
+
+      // Also delete from template_tasks table
       const { error: templateError } = await supabase
         .from('template_tasks')
         .delete()
@@ -476,18 +502,6 @@ export default function LearningTemplates() {
         .eq('title', taskToDelete.title);
 
       console.log('Template tasks delete error:', templateError);
-
-      // Delete all matching calendar events regardless of user_id
-      // This will remove all user assignments for this task
-      const { error: calendarError } = await supabase
-        .from('calendar_events')
-        .delete()
-        .eq('template_id', taskToDelete.template_id)
-        .eq('title', taskToDelete.title);
-
-      console.log('Calendar events delete error:', calendarError);
-      
-      if (calendarError) throw calendarError;
       
       toast.success('Task deleted successfully');
       fetchAllTemplateData();
