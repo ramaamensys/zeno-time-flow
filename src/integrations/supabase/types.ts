@@ -946,6 +946,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_available_admins_for_user: {
+        Args: { _user_id: string }
+        Returns: {
+          email: string
+          full_name: string
+          role: string
+          user_id: string
+        }[]
+      }
       get_user_app_type: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_type"]
