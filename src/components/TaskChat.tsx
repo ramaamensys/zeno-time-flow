@@ -45,6 +45,13 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [selectedAdmin, setSelectedAdmin] = useState<string | null>(null);
+  const [availableAdmins, setAvailableAdmins] = useState<Array<{
+    user_id: string;
+    full_name: string | null;
+    email: string;
+    role: string;
+  }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const channelRef = useRef<any>(null);
@@ -69,8 +76,81 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
     }
   }, [isAdmin, assignedUsers, selectedUser]);
 
+  // Fetch available admins for users
   useEffect(() => {
-    if (user && isChatOpen && (selectedUser || !isAdmin)) {
+    const fetchAvailableAdmins = async () => {
+      if (!isAdmin && user && isChatOpen) {
+        try {
+          // Get user's manager and super admin
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('manager_id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          // Get super admins - separate query to avoid relation issues
+          const { data: superAdminRoles } = await supabase
+            .from('user_roles')
+            .select('user_id')
+            .eq('role', 'super_admin');
+
+          const admins = [];
+
+          // Get profiles for super admins
+          if (superAdminRoles && superAdminRoles.length > 0) {
+            const superAdminIds = superAdminRoles.map(sa => sa.user_id);
+            const { data: superAdminProfiles } = await supabase
+              .from('profiles')
+              .select('user_id, full_name, email')
+              .in('user_id', superAdminIds);
+
+            if (superAdminProfiles) {
+              superAdminProfiles.forEach(profile => {
+                admins.push({
+                  user_id: profile.user_id,
+                  full_name: profile.full_name,
+                  email: profile.email,
+                  role: 'super_admin'
+                });
+              });
+            }
+          }
+
+          // Get manager if exists
+          if (userProfile?.manager_id) {
+            const { data: manager } = await supabase
+              .from('profiles')
+              .select('user_id, full_name, email')
+              .eq('user_id', userProfile.manager_id)
+              .maybeSingle();
+            
+            if (manager) {
+              admins.push({
+                user_id: manager.user_id,
+                full_name: manager.full_name,
+                email: manager.email,
+                role: 'admin'
+              });
+            }
+          }
+
+          setAvailableAdmins(admins);
+          
+          // Auto-select the first available admin if none selected
+          if (admins.length > 0 && !selectedAdmin) {
+            setSelectedAdmin(admins[0].user_id);
+          }
+        } catch (error) {
+          console.error('Error fetching available admins:', error);
+        }
+      }
+    };
+
+    fetchAvailableAdmins();
+  }, [isAdmin, user, isChatOpen, selectedAdmin]);
+
+  useEffect(() => {
+    if (user && isChatOpen && (selectedUser || (!isAdmin && selectedAdmin))) {
       initializeChatRoom();
     }
     
@@ -81,7 +161,7 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
         channelRef.current = null;
       }
     };
-  }, [user, taskId, isChatOpen, selectedUser]);
+  }, [user, taskId, isChatOpen, selectedUser, selectedAdmin]);
 
   useEffect(() => {
     scrollToBottom();
@@ -134,42 +214,32 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
           }
         }
       } else {
-        // User: find existing chat room where user is the user_id and there's an admin as admin_id
-        console.log('User looking for chats for task:', taskId, 'user:', user.id);
+        // User: find existing chat room with the selected admin
+        console.log('User looking for chat with admin:', selectedAdmin, 'for task:', taskId, 'user:', user.id);
         
-        const { data: userChats, error: userChatError } = await supabase
-          .from('task_chats')
-          .select(`
-            id, 
-            admin_id, 
-            user_id,
-            profiles!task_chats_admin_id_fkey (
-              full_name,
-              user_id
-            )
-          `)
-          .eq('task_id', taskId)
-          .eq('user_id', user.id);
+        if (selectedAdmin) {
+          let { data: existingChat, error: chatError } = await supabase
+            .from('task_chats')
+            .select('id')
+            .eq('task_id', taskId)
+            .eq('user_id', user.id)
+            .eq('admin_id', selectedAdmin)
+            .maybeSingle();
 
-        if (userChatError) {
-          console.error('Error fetching user chats:', userChatError);
-          throw userChatError;
-        }
+          if (chatError) {
+            console.error('Error fetching user chat:', chatError);
+            throw chatError;
+          }
 
-        console.log('Found user chats:', userChats);
-        
-        // Find chats where admin_id is different from user_id and admin has admin or super_admin role
-        const validChats = userChats?.filter(chat => chat.admin_id !== chat.user_id) || [];
-        
-        if (validChats.length > 0) {
-          // For now, use the most recent chat (last in array)
-          // In the future, could show a dropdown to select which admin to chat with
-          const validChat = validChats[validChats.length - 1];
-          existingChatId = validChat.id;
-          console.log('User found valid chat:', validChat);
-          console.log('All available admin chats:', validChats);
+          if (existingChat) {
+            existingChatId = existingChat.id;
+            console.log('Found existing chat with admin:', existingChat);
+          } else {
+            console.log('No chat found with selected admin:', selectedAdmin);
+            existingChatId = null;
+          }
         } else {
-          console.log('No valid chat found for user. Available chats:', userChats);
+          console.log('No admin selected');
           existingChatId = null;
         }
       }
@@ -406,13 +476,34 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
               </Select>
             </div>
           )}
+
+          {/* Admin Selection for Users */}
+          {!isAdmin && availableAdmins.length > 0 && (
+            <div className="mb-3">
+              <label className="text-sm font-medium mb-2 block">Select Admin to Chat With:</label>
+              <Select value={selectedAdmin || ""} onValueChange={setSelectedAdmin}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select an admin..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableAdmins.map((admin) => (
+                    <SelectItem key={admin.user_id} value={admin.user_id}>
+                      {admin.full_name || admin.email} {admin.role === 'super_admin' ? '(Super Admin)' : '(Manager)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           
           <div className="text-sm text-muted-foreground">
             {isAdmin 
               ? selectedUser 
                 ? `Chatting with: ${assignedUsers.find(u => u.user_id === selectedUser)?.full_name || assignedUsers.find(u => u.user_id === selectedUser)?.email}`
                 : 'Select a user to chat with'
-              : 'Chatting with Admin'
+              : selectedAdmin
+                ? `Chatting with: ${availableAdmins.find(a => a.user_id === selectedAdmin)?.full_name || availableAdmins.find(a => a.user_id === selectedAdmin)?.email} ${availableAdmins.find(a => a.user_id === selectedAdmin)?.role === 'super_admin' ? '(Super Admin)' : '(Manager)'}`
+                : 'Select an admin to chat with'
             }
           </div>
         </DialogHeader>
@@ -432,7 +523,7 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
             ) : (
               <div>
                 <div className="font-medium">Chat not available yet</div>
-                <div className="text-sm">An admin needs to start the conversation with you for this task</div>
+                <div className="text-sm">Select an admin from the dropdown above to start a conversation</div>
               </div>
             )}
           </div>
