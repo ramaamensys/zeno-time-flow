@@ -314,7 +314,7 @@ const Habits = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Habits</h1>
+            <h1 className="text-3xl font-bold text-foreground">Daily Tasks/Habits</h1>
             <p className="text-muted-foreground">Build lasting habits, one day at a time</p>
             {selectedUserId && userRole && (userRole === 'admin' || userRole === 'super_admin') && (
               <p className="text-sm text-muted-foreground mt-1">
