@@ -732,6 +732,39 @@ export type Database = {
           },
         ]
       }
+      task_notes: {
+        Row: {
+          author_id: string
+          created_at: string
+          files: Json | null
+          id: string
+          note_text: string
+          task_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          author_id: string
+          created_at?: string
+          files?: Json | null
+          id?: string
+          note_text: string
+          task_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          author_id?: string
+          created_at?: string
+          files?: Json | null
+          id?: string
+          note_text?: string
+          task_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       template_assignments: {
         Row: {
           assigned_at: string

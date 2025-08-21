@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Users, Plus, Settings, BookOpen, TrendingUp, Calendar, ChevronRight, MessageCircle } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { TaskChat } from "@/components/TaskChat";
+import { TaskNotes } from "@/components/TaskNotes";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { FileUpload } from "@/components/ui/file-upload";
@@ -110,78 +111,8 @@ export const TemplateCard = ({
   onDeleteTask,
   onUpdateTaskNotes,
 }: TemplateCardProps) => {
-  const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
-  const [selectedTaskForNotes, setSelectedTaskForNotes] = useState<TemplateTask | null>(null);
-  const [notes, setNotes] = useState("");
-  const [files, setFiles] = useState<string[]>([]);
-  const [isSavingNotes, setIsSavingNotes] = useState(false);
-  
   const progress = getProgress(tasks);
   const completedTasks = tasks.filter(task => task.completed || task.status === 'completed').length;
-
-  const handleNotesDialog = (task: TemplateTask) => {
-    setSelectedTaskForNotes(task);
-    setNotes(task.notes || "");
-    setFiles(Array.isArray(task.files) ? (task.files as string[]) : []);
-    setIsNotesDialogOpen(true);
-  };
-
-  const handleSaveNotes = async () => {
-    if (onUpdateTaskNotes && selectedTaskForNotes) {
-      setIsSavingNotes(true);
-      await onUpdateTaskNotes(selectedTaskForNotes.id, notes, files);
-      setIsSavingNotes(false);
-      setIsNotesDialogOpen(false);
-    }
-  };
-
-  const handleFileUpload = async (file: File): Promise<string> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
-
-    // Create a unique file path
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-    
-    // Upload file to Supabase storage
-    const { data, error } = await supabase.storage
-      .from('task-attachments')
-      .upload(fileName, file);
-
-    if (error) {
-      throw new Error(`Upload failed: ${error.message}`);
-    }
-
-    // Get public URL for the file
-    const { data: { publicUrl } } = supabase.storage
-      .from('task-attachments')
-      .getPublicUrl(fileName);
-
-    setFiles(prev => [...prev, publicUrl]);
-    return publicUrl;
-  };
-
-  const handleFileRemove = async (fileUrl: string) => {
-    // Extract file path from URL to delete from storage
-    try {
-      const urlParts = fileUrl.split('/');
-      const fileName = urlParts[urlParts.length - 1];
-      const userFolder = urlParts[urlParts.length - 2];
-      const filePath = `${userFolder}/${fileName}`;
-      
-      const { error } = await supabase.storage
-        .from('task-attachments')
-        .remove([filePath]);
-
-      if (error) {
-        console.error('Error deleting file:', error);
-      }
-    } catch (error) {
-      console.error('Error parsing file URL for deletion:', error);
-    }
-    
-    setFiles(prev => prev.filter(f => f !== fileUrl));
-  };
   
   return (
     <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
@@ -427,65 +358,59 @@ export const TemplateCard = ({
                              {task.completed || task.status === 'completed' ? 'Completed' : 'Pending'}
                            </Badge>
                            
-                           {isAdmin && (
-                             <>
-                               {/* Notes Button */}
-                               <Button
-                                 variant="outline"
-                                 size="sm"
-                                 onClick={() => handleNotesDialog(task)}
-                                 className="h-6 px-2"
-                               >
-                                 <MessageCircle className="h-3 w-3" />
-                               </Button>
-                               
-                               {/* Chat Button */}
-                               <TaskChat
-                                 taskId={task.id}
-                                 taskTitle={task.title}
-                                 assignedUsers={assignedUser ? [{
-                                   user_id: assignedUser.user_id,
-                                   full_name: assignedUser.full_name,
-                                   email: assignedUser.email
-                                 }] : []}
-                                 isAdmin={isAdmin}
-                               />
-                               
-                               <DropdownMenu>
-                                 <DropdownMenuTrigger asChild>
-                                   <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                     <Settings className="h-3 w-3" />
-                                   </Button>
-                                 </DropdownMenuTrigger>
-                                 <DropdownMenuContent align="end" className="w-48">
-                                   <DropdownMenuItem 
-                                     onClick={() => onEditTask?.(task)}
-                                     className="cursor-pointer"
-                                   >
-                                     Edit Task
-                                   </DropdownMenuItem>
-                                   <DropdownMenuItem 
-                                     onClick={() => onToggleTaskComplete?.(task.id, task.completed)}
-                                     className="cursor-pointer"
-                                   >
-                                     Mark as {task.completed || task.status === 'completed' ? 'Pending' : 'Completed'}
-                                   </DropdownMenuItem>
-                                   <DropdownMenuItem 
-                                     onClick={() => onReassignTask?.(task)}
-                                     className="cursor-pointer"
-                                   >
-                                     Reassign Task
-                                   </DropdownMenuItem>
-                                   <DropdownMenuItem 
-                                     onClick={() => onDeleteTask?.(task.id)}
-                                     className="cursor-pointer text-red-600"
-                                   >
-                                     Delete Task
-                                   </DropdownMenuItem>
-                                 </DropdownMenuContent>
-                               </DropdownMenu>
-                             </>
-                           )}
+                            {isAdmin && (
+                              <>
+                                 {/* Notes Button */}
+                                 <TaskNotes
+                                   taskId={task.id}
+                                   taskTitle={task.title}
+                                   assignedUsers={assignedUsers}
+                                   isAdmin={isAdmin}
+                                 />
+                                 
+                                 {/* Chat Button */}
+                                 <TaskChat
+                                   taskId={task.id}
+                                   taskTitle={task.title}
+                                   assignedUsers={assignedUsers}
+                                   isAdmin={isAdmin}
+                                 />
+                                
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                      <Settings className="h-3 w-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem 
+                                      onClick={() => onEditTask?.(task)}
+                                      className="cursor-pointer"
+                                    >
+                                      Edit Task
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => onToggleTaskComplete?.(task.id, task.completed)}
+                                      className="cursor-pointer"
+                                    >
+                                      Mark as {task.completed || task.status === 'completed' ? 'Pending' : 'Completed'}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => onReassignTask?.(task)}
+                                      className="cursor-pointer"
+                                    >
+                                      Reassign Task
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => onDeleteTask?.(task.id)}
+                                      className="cursor-pointer text-red-600"
+                                    >
+                                      Delete Task
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </>
+                            )}
                          </div>
                       </div>
                     );
@@ -501,57 +426,6 @@ export const TemplateCard = ({
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
-
-      {/* Notes Dialog */}
-      <Dialog open={isNotesDialogOpen} onOpenChange={setIsNotesDialogOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <MessageCircle className="h-5 w-5" />
-              <span>Task Notes & Files</span>
-            </DialogTitle>
-          </DialogHeader>
-          {selectedTaskForNotes && (
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium mb-2">{selectedTaskForNotes.title}</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-300">{selectedTaskForNotes.description}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Progress Notes</label>
-                <Textarea
-                  placeholder="Add admin comments and view user progress notes..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="min-h-24"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Attachments</label>
-                <FileUpload
-                  onFileUpload={handleFileUpload}
-                  onFileRemove={handleFileRemove}
-                  files={files}
-                  maxFiles={5}
-                />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsNotesDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveNotes} disabled={isSavingNotes}>
-                  {isSavingNotes ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1" />
-                  ) : (
-                    <MessageCircle className="h-4 w-4 mr-1" />
-                  )}
-                  Save Notes
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 };
