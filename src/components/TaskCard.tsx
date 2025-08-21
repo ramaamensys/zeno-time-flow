@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CheckSquare, Clock, Flag, MessageCircle, User, Edit, Trash2, Calendar, Save } from "lucide-react";
+import { FileUpload } from "@/components/ui/file-upload";
+import { CheckSquare, Clock, Flag, MessageCircle, User, Edit, Trash2, Calendar, Save, BookOpen } from "lucide-react";
 import { format } from "date-fns";
 
 interface TaskCardProps {
@@ -19,6 +20,8 @@ interface TaskCardProps {
     created_at: string;
     user_id: string;
     notes?: string;
+    template_id?: string | null;
+    files?: string[];
   };
   user?: {
     full_name: string | null;
@@ -27,7 +30,7 @@ interface TaskCardProps {
   isAdmin: boolean;
   isUserTask?: boolean;
   onToggleComplete?: (taskId: string, completed: boolean) => void;
-  onUpdateNotes?: (taskId: string, notes: string) => void;
+  onUpdateNotes?: (taskId: string, notes: string, files?: string[]) => void;
   onEditTask?: (taskId: string) => void;
   onDeleteTask?: (taskId: string) => void;
   onAssignTask?: (taskId: string) => void;
@@ -70,7 +73,13 @@ export const TaskCard = ({
 }: TaskCardProps) => {
   const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
   const [notes, setNotes] = useState(task.notes || "");
+  const [files, setFiles] = useState<string[]>(task.files || []);
   const [isSavingNotes, setIsSavingNotes] = useState(false);
+
+  // Check if this is a template task that shouldn't be edited by users
+  const isTemplateTask = task.template_id !== null;
+  const canEditTask = isAdmin || (!isTemplateTask && isUserTask);
+  const canToggleComplete = isUserTask || (isAdmin && !isTemplateTask);
 
   const StatusIcon = getStatusIcon(task.status, task.completed);
   const isCompleted = task.completed || task.status === 'completed';
@@ -78,10 +87,21 @@ export const TaskCard = ({
   const handleSaveNotes = async () => {
     if (onUpdateNotes) {
       setIsSavingNotes(true);
-      await onUpdateNotes(task.id, notes);
+      await onUpdateNotes(task.id, notes, files);
       setIsSavingNotes(false);
       setIsNotesDialogOpen(false);
     }
+  };
+
+  const handleFileUpload = async (file: File): Promise<string> => {
+    // Mock file upload - in real app, upload to storage and return URL
+    const mockUrl = `uploads/${file.name}`;
+    setFiles(prev => [...prev, mockUrl]);
+    return mockUrl;
+  };
+
+  const handleFileRemove = (fileUrl: string) => {
+    setFiles(prev => prev.filter(f => f !== fileUrl));
   };
 
   return (
@@ -91,7 +111,7 @@ export const TaskCard = ({
           <div className="flex items-start space-x-3 flex-1">
             {/* Task Status Indicator */}
             <div className="mt-1">
-              {isUserTask && onToggleComplete ? (
+              {canToggleComplete && onToggleComplete ? (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -126,6 +146,12 @@ export const TaskCard = ({
                   <Badge variant={getPriorityColor(task.priority)} className="text-xs">
                     {task.priority}
                   </Badge>
+                  {isTemplateTask && (
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                      <BookOpen className="mr-1 h-3 w-3" />
+                      Template
+                    </Badge>
+                  )}
                 </div>
               </div>
 
@@ -161,14 +187,14 @@ export const TaskCard = ({
                     <Dialog open={isNotesDialogOpen} onOpenChange={setIsNotesDialogOpen}>
                       <DialogTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <MessageCircle className={`h-3 w-3 ${task.notes ? 'text-blue-500' : 'text-gray-400'}`} />
+                          <MessageCircle className={`h-3 w-3 ${task.notes || files.length > 0 ? 'text-blue-500' : 'text-gray-400'}`} />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
+                      <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
                         <DialogHeader>
                           <DialogTitle className="flex items-center space-x-2">
                             <MessageCircle className="h-5 w-5" />
-                            <span>Task Notes</span>
+                            <span>Task Notes & Files</span>
                           </DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4">
@@ -179,14 +205,24 @@ export const TaskCard = ({
                           <div>
                             <label className="text-sm font-medium mb-2 block">Progress Notes</label>
                             <Textarea
-                              placeholder={isUserTask ? "Add your progress notes, challenges, or thoughts about this task..." : "View user's progress notes..."}
+                              placeholder={canEditTask ? "Add your progress notes, challenges, or thoughts about this task..." : "View progress notes..."}
                               value={notes}
                               onChange={(e) => setNotes(e.target.value)}
                               className="min-h-24"
-                              disabled={!isUserTask && !isAdmin}
+                              disabled={!canEditTask}
                             />
                           </div>
-                          {(isUserTask || isAdmin) && (
+                          <div>
+                            <label className="text-sm font-medium mb-2 block">Attachments</label>
+                            <FileUpload
+                              onFileUpload={handleFileUpload}
+                              onFileRemove={handleFileRemove}
+                              files={files}
+                              disabled={!canEditTask}
+                              maxFiles={5}
+                            />
+                          </div>
+                          {canEditTask && (
                             <div className="flex justify-end space-x-2">
                               <Button variant="outline" onClick={() => setIsNotesDialogOpen(false)}>
                                 Cancel
@@ -206,10 +242,10 @@ export const TaskCard = ({
                     </Dialog>
                   )}
 
-                  {/* Admin Actions */}
+                  {/* Admin Actions - Only show for non-template tasks or admins */}
                   {isAdmin && (
                     <>
-                      {onEditTask && (
+                      {onEditTask && !isTemplateTask && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -220,7 +256,7 @@ export const TaskCard = ({
                         </Button>
                       )}
                       
-                      {onAssignTask && (
+                      {onAssignTask && !isTemplateTask && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -231,7 +267,7 @@ export const TaskCard = ({
                         </Button>
                       )}
                       
-                      {onDeleteTask && (
+                      {onDeleteTask && !isTemplateTask && (
                         <Button
                           variant="ghost"
                           size="sm"

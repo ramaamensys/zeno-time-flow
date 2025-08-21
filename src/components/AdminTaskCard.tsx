@@ -2,9 +2,11 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CheckSquare, Clock, Flag, User, Edit, Plus, Calendar, ChevronDown, ChevronRight, X, Check, BookOpen, MessageCircle } from "lucide-react";
+import { FileUpload } from "@/components/ui/file-upload";
+import { CheckSquare, Clock, Flag, User, Edit, Plus, Calendar, ChevronDown, ChevronRight, X, Check, BookOpen, MessageCircle, Save } from "lucide-react";
 import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -24,6 +26,7 @@ interface CalendarEvent {
   completed_at?: string | null;
   template_id?: string | null;
   notes?: string | null;
+  files?: string[];
   profiles?: {
     full_name: string | null;
     email: string;
@@ -37,6 +40,7 @@ interface AdminTaskCardProps {
   onAddSubTask: (parentTask: CalendarEvent) => void;
   onEditTask: (task: CalendarEvent) => void;
   onViewDetails: (task: CalendarEvent) => void;
+  onUpdateNotes?: (taskId: string, notes: string, files?: string[]) => void;
   isAdmin: boolean;
 }
 
@@ -68,13 +72,39 @@ export const AdminTaskCard = ({
   onAddSubTask,
   onEditTask,
   onViewDetails,
+  onUpdateNotes,
   isAdmin,
 }: AdminTaskCardProps) => {
   const [isSubTasksExpanded, setIsSubTasksExpanded] = useState(true);
+  const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
+  const [notes, setNotes] = useState(task.notes || "");
+  const [files, setFiles] = useState<string[]>(task.files || []);
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
   
   const StatusIcon = getStatusIcon(task.completed || false);
   const isCompleted = task.completed || false;
   const hasSubTasks = task.sub_tasks && task.sub_tasks.length > 0;
+  const isTemplateTask = task.template_id !== null;
+
+  const handleSaveNotes = async () => {
+    if (onUpdateNotes) {
+      setIsSavingNotes(true);
+      await onUpdateNotes(task.id, notes, files);
+      setIsSavingNotes(false);
+      setIsNotesDialogOpen(false);
+    }
+  };
+
+  const handleFileUpload = async (file: File): Promise<string> => {
+    // Mock file upload - in real app, upload to storage and return URL
+    const mockUrl = `uploads/${file.name}`;
+    setFiles(prev => [...prev, mockUrl]);
+    return mockUrl;
+  };
+
+  const handleFileRemove = (fileUrl: string) => {
+    setFiles(prev => prev.filter(f => f !== fileUrl));
+  };
 
   return (
     <Card className="group hover:shadow-lg transition-all duration-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600">
@@ -180,25 +210,88 @@ export const AdminTaskCard = ({
                     )}
                   </Button>
                   
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onAddSubTask(task)}
-                    className="h-8"
-                  >
-                    <Plus className="mr-1 h-3 w-3" />
-                    Sub-task
-                  </Button>
+                  {/* Notes Dialog */}
+                  <Dialog open={isNotesDialogOpen} onOpenChange={setIsNotesDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                      >
+                        <MessageCircle className="mr-1 h-3 w-3" />
+                        Notes
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center space-x-2">
+                          <MessageCircle className="h-5 w-5" />
+                          <span>Task Notes & Files</span>
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <h4 className="font-medium mb-2">{task.title}</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-300">{task.description}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Progress Notes</label>
+                          <Textarea
+                            placeholder="View user's progress notes and add admin comments..."
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            className="min-h-24"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-2 block">Attachments</label>
+                          <FileUpload
+                            onFileUpload={handleFileUpload}
+                            onFileRemove={handleFileRemove}
+                            files={files}
+                            maxFiles={5}
+                          />
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                          <Button variant="outline" onClick={() => setIsNotesDialogOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button onClick={handleSaveNotes} disabled={isSavingNotes}>
+                            {isSavingNotes ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1" />
+                            ) : (
+                              <Save className="h-4 w-4 mr-1" />
+                            )}
+                            Save Notes
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                   
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onEditTask(task)}
-                    className="h-8"
-                  >
-                    <Edit className="mr-1 h-3 w-3" />
-                    Edit
-                  </Button>
+                  {!isTemplateTask && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onAddSubTask(task)}
+                        className="h-8"
+                      >
+                        <Plus className="mr-1 h-3 w-3" />
+                        Sub-task
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onEditTask(task)}
+                        className="h-8"
+                      >
+                        <Edit className="mr-1 h-3 w-3" />
+                        Edit
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
 
