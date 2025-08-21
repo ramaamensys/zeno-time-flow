@@ -45,6 +45,7 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const channelRef = useRef<any>(null);
 
   const getInitials = (name: string) => {
     return name
@@ -63,6 +64,14 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
     if (user && isChatOpen) {
       initializeChatRoom();
     }
+    
+    // Cleanup subscription when component unmounts or chat closes
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
   }, [user, taskId, isChatOpen]);
 
   useEffect(() => {
@@ -80,13 +89,17 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
         // Admin: get chat room with the assigned user
         const assignedUser = assignedUsers[0]; // For now, handle first user
         if (assignedUser) {
-          let { data: existingChat } = await supabase
+          let { data: existingChat, error: fetchError } = await supabase
             .from('task_chats')
             .select('id')
             .eq('task_id', taskId)
             .eq('user_id', assignedUser.user_id)
             .eq('admin_id', user.id)
             .maybeSingle();
+
+          if (fetchError) {
+            console.error('Error fetching existing chat:', fetchError);
+          }
 
           if (!existingChat) {
             // Create new chat room
@@ -100,32 +113,47 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
               .select('id')
               .single();
 
-            if (error) throw error;
+            if (error) {
+              console.error('Error creating chat:', error);
+              throw error;
+            }
             existingChatId = newChat.id;
+            console.log('Created new chat:', existingChatId);
           } else {
             existingChatId = existingChat.id;
+            console.log('Found existing chat:', existingChatId);
           }
         }
       } else {
         // User: find chat room where user is assigned
-        const { data: userChat } = await supabase
+        const { data: userChat, error: userChatError } = await supabase
           .from('task_chats')
           .select('id')
           .eq('task_id', taskId)
           .eq('user_id', user.id)
           .maybeSingle();
 
+        if (userChatError) {
+          console.error('Error fetching user chat:', userChatError);
+        }
+
         existingChatId = userChat?.id || null;
+        console.log('User chat search result:', userChat, 'for task:', taskId, 'user:', user.id);
       }
 
       if (existingChatId) {
+        console.log('Setting chat ID:', existingChatId);
         setChatId(existingChatId);
         await fetchMessages(existingChatId);
         setupRealtimeSubscription(existingChatId);
+      } else {
+        console.log('No chat room found or created');
+        setChatId(null);
       }
     } catch (error) {
       console.error('Error initializing chat room:', error);
       toast.error('Failed to load chat');
+      setChatId(null);
     }
     setIsLoading(false);
   };
@@ -174,6 +202,11 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
   };
 
   const setupRealtimeSubscription = (chatRoomId: string) => {
+    // Clean up existing subscription
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
     const channel = supabase
       .channel(`chat-${chatRoomId}`)
       .on(
@@ -191,9 +224,8 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    channelRef.current = channel;
+    console.log('Real-time subscription setup for chat:', chatRoomId);
   };
 
   const handleNewMessage = async (newMessage: any) => {
