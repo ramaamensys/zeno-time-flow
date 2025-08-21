@@ -80,6 +80,7 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
   useEffect(() => {
     const fetchAvailableAdmins = async () => {
       if (!isAdmin && user && isChatOpen) {
+        console.log('Fetching available admins for user:', user.id);
         try {
           // Get user's manager and super admin
           const { data: userProfile } = await supabase
@@ -88,11 +89,15 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
             .eq('user_id', user.id)
             .maybeSingle();
 
+          console.log('User profile:', userProfile);
+
           // Get super admins - separate query to avoid relation issues
           const { data: superAdminRoles } = await supabase
             .from('user_roles')
             .select('user_id')
             .eq('role', 'super_admin');
+
+          console.log('Super admin roles:', superAdminRoles);
 
           const admins = [];
 
@@ -103,6 +108,8 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
               .from('profiles')
               .select('user_id, full_name, email')
               .in('user_id', superAdminIds);
+
+            console.log('Super admin profiles:', superAdminProfiles);
 
             if (superAdminProfiles) {
               superAdminProfiles.forEach(profile => {
@@ -124,6 +131,8 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
               .eq('user_id', userProfile.manager_id)
               .maybeSingle();
             
+            console.log('Manager profile:', manager);
+            
             if (manager) {
               admins.push({
                 user_id: manager.user_id,
@@ -134,10 +143,12 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
             }
           }
 
+          console.log('Final admins list:', admins);
           setAvailableAdmins(admins);
           
           // Auto-select the first available admin if none selected
           if (admins.length > 0 && !selectedAdmin) {
+            console.log('Auto-selecting first admin:', admins[0]);
             setSelectedAdmin(admins[0].user_id);
           }
         } catch (error) {
@@ -147,7 +158,7 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
     };
 
     fetchAvailableAdmins();
-  }, [isAdmin, user, isChatOpen, selectedAdmin]);
+  }, [isAdmin, user, isChatOpen]); // Removed selectedAdmin from dependency to prevent infinite loop
 
   useEffect(() => {
     if (user && isChatOpen && (selectedUser || (!isAdmin && selectedAdmin))) {
