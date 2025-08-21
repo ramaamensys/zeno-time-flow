@@ -338,11 +338,11 @@ export default function LearningTemplates() {
   };
 
   const createTemplateTask = async (templateId: string) => {
-    if (!user || !taskForm.user_id || !taskForm.title.trim()) return;
+    if (!user || !taskForm.title.trim()) return;
 
     try {
       const taskData = {
-        user_id: taskForm.user_id,
+        user_id: taskForm.user_id || user.id, // Use current admin user if no specific user selected
         title: taskForm.title,
         description: taskForm.description || null,
         priority: taskForm.priority,
@@ -359,7 +359,7 @@ export default function LearningTemplates() {
 
       if (error) throw error;
       
-      toast.success('Template task created and added to user\'s tasks');
+      toast.success(taskForm.user_id ? 'Template task created and assigned to user' : 'Template task created (unassigned)');
       setShowCreateTask(false);
       resetTaskForm();
       fetchAllTemplateData();
@@ -729,9 +729,9 @@ export default function LearningTemplates() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Learning Templates</h1>
+          <h1 className="text-3xl font-bold">Templates</h1>
           <p className="text-muted-foreground">
-            {isAdmin ? 'Manage employee learning templates and assignments' : 'View your assigned learning templates and tasks'}
+            {isAdmin ? 'Manage employee templates and assignments' : 'View your assigned templates and tasks'}
           </p>
         </div>
         {isAdmin && (
@@ -1151,10 +1151,10 @@ export default function LearningTemplates() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="task-user">Assign to User</Label>
+              <Label htmlFor="task-user">Assign to User (Optional)</Label>
               <Select value={taskForm.user_id} onValueChange={(value) => setTaskForm({ ...taskForm, user_id: value })}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a user" />
+                  <SelectValue placeholder="Select a user (or leave unassigned)" />
                 </SelectTrigger>
                 <SelectContent>
                   {getAssignedUsers(selectedTemplate?.id || '').map((user) => (
