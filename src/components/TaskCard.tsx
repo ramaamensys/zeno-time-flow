@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,11 +78,27 @@ export const TaskCard = ({
   const [notes, setNotes] = useState(task.notes || "");
   const [files, setFiles] = useState<string[]>(task.files || []);
   const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Get current user to check if task is self-created
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    };
+    getCurrentUser();
+  }, []);
 
   // Check if this is a template task that shouldn't be edited by users
   const isTemplateTask = task.template_id !== null;
   const canEditTask = isAdmin || (!isTemplateTask && isUserTask);
   const canToggleComplete = isUserTask || (isAdmin && !isTemplateTask);
+  
+  // Determine if chat should be shown
+  // Chat should only show for tasks assigned by admins (template tasks or admin-assigned tasks)
+  // NOT for self-created tasks by regular users
+  const shouldShowChat = isTemplateTask || isAdmin;
+  const isSelfCreatedTask = currentUser && task.user_id === currentUser.id && !isTemplateTask;
 
   const StatusIcon = getStatusIcon(task.status, task.completed);
   const isCompleted = task.completed || task.status === 'completed';
@@ -282,8 +298,8 @@ export const TaskCard = ({
                     </Dialog>
                   )}
 
-                  {/* Chat and Notes for template tasks or admins */}
-                  {(isUserTask || isAdmin) && (
+                  {/* Chat and Notes - Only for template tasks or admin viewing tasks */}
+                  {shouldShowChat && (
                     <>
                       {/* TaskNotes Component */}
                       <TaskNotes
@@ -297,17 +313,19 @@ export const TaskCard = ({
                         isAdmin={isAdmin}
                       />
                       
-                      {/* TaskChat Component */}
-                      <TaskChat
-                        taskId={task.id}
-                        taskTitle={task.title}
-                        assignedUsers={isAdmin && user ? [{
-                          user_id: task.user_id,
-                          full_name: user.full_name,
-                          email: user.email
-                        }] : []}
-                        isAdmin={isAdmin}
-                      />
+                      {/* TaskChat Component - Only for admin-assigned tasks */}
+                      {!isSelfCreatedTask && (
+                        <TaskChat
+                          taskId={task.id}
+                          taskTitle={task.title}
+                          assignedUsers={isAdmin && user ? [{
+                            user_id: task.user_id,
+                            full_name: user.full_name,
+                            email: user.email
+                          }] : []}
+                          isAdmin={isAdmin}
+                        />
+                      )}
                     </>
                   )}
 
