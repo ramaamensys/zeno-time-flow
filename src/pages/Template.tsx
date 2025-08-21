@@ -949,7 +949,7 @@ export default function LearningTemplates() {
                                  setSelectedTemplate(template);
                                  setShowCreateTask(true);
                                }}
-                               disabled={assignedUsers.length === 0}
+                               disabled={false}
                              >
                                <Plus className="mr-2 h-4 w-4" />
                                Add Task
