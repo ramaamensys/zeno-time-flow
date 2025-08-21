@@ -82,82 +82,106 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
       if (!isAdmin && user && isChatOpen) {
         console.log('Fetching available admins for user:', user.id);
         try {
-          // Get user's manager and super admin
-          const { data: userProfile, error: profileError } = await supabase
-            .from('profiles')
-            .select('manager_id')
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-          if (profileError) {
-            console.error('Error fetching user profile:', profileError);
-          }
-          
-          console.log('User profile:', userProfile);
-
           const admins = [];
 
-          // Get super admins using correct query
-          console.log('Querying super admins...');
-          const { data: superAdminRoles, error: superAdminError } = await supabase
-            .from('user_roles')
-            .select('user_id')
-            .eq('role', 'super_admin');
+          // Method 1: Look for existing chats to find available admins
+          console.log('Looking for existing chats...');
+          const { data: existingChats, error: chatsError } = await supabase
+            .from('task_chats')
+            .select(`
+              id,
+              admin_id,
+              user_id,
+              task_id
+            `)
+            .eq('user_id', user.id);
 
-          if (superAdminError) {
-            console.error('Error fetching super admin roles:', superAdminError);
+          if (chatsError) {
+            console.error('Error fetching existing chats:', chatsError);
           } else {
-            console.log('Super admin roles query result:', superAdminRoles);
-          }
+            console.log('Existing chats found:', existingChats);
+            
+            // Get unique admin IDs from existing chats
+            const adminIds = [...new Set(existingChats?.map(chat => chat.admin_id) || [])];
+            console.log('Admin IDs from chats:', adminIds);
 
-          // Get profiles for super admins
-          if (superAdminRoles && superAdminRoles.length > 0) {
-            console.log('Fetching super admin profiles for IDs:', superAdminRoles.map(sa => sa.user_id));
-            const { data: superAdminProfiles, error: profilesError } = await supabase
-              .from('profiles')
-              .select('user_id, full_name, email')
-              .in('user_id', superAdminRoles.map(sa => sa.user_id));
+            if (adminIds.length > 0) {
+              // Get profiles for these admin IDs
+              const { data: adminProfiles, error: profilesError } = await supabase
+                .from('profiles')
+                .select('user_id, full_name, email')
+                .in('user_id', adminIds);
 
-            if (profilesError) {
-              console.error('Error fetching super admin profiles:', profilesError);
-            } else {
-              console.log('Super admin profiles:', superAdminProfiles);
-              
-              if (superAdminProfiles) {
-                superAdminProfiles.forEach(profile => {
-                  admins.push({
-                    user_id: profile.user_id,
-                    full_name: profile.full_name,
-                    email: profile.email,
-                    role: 'super_admin'
+              if (profilesError) {
+                console.error('Error fetching admin profiles:', profilesError);
+              } else {
+                console.log('Admin profiles from chats:', adminProfiles);
+                
+                if (adminProfiles) {
+                  adminProfiles.forEach(profile => {
+                    admins.push({
+                      user_id: profile.user_id,
+                      full_name: profile.full_name,
+                      email: profile.email,
+                      role: 'admin' // We'll determine if they're super_admin later
+                    });
                   });
-                });
+                }
               }
             }
           }
 
-          // Get manager if exists
-          if (userProfile?.manager_id) {
-            console.log('Fetching manager profile for ID:', userProfile.manager_id);
-            const { data: manager, error: managerError } = await supabase
-              .from('profiles')
-              .select('user_id, full_name, email')
-              .eq('user_id', userProfile.manager_id)
-              .maybeSingle();
-            
-            if (managerError) {
-              console.error('Error fetching manager profile:', managerError);
+          // Method 2: Hardcoded super admin (rama.k@amensys.com) as fallback
+          console.log('Adding hardcoded super admin...');
+          const superAdminId = 'bc6bfc62-1a74-4cbd-9a2f-06d9e91a158a'; // Rama Krishna's ID
+          const { data: superAdminProfile } = await supabase
+            .from('profiles')
+            .select('user_id, full_name, email')
+            .eq('user_id', superAdminId)
+            .maybeSingle();
+
+          console.log('Super admin profile query result:', superAdminProfile);
+          
+          if (superAdminProfile) {
+            // Check if not already added
+            const existingAdmin = admins.find(admin => admin.user_id === superAdminProfile.user_id);
+            if (!existingAdmin) {
+              admins.push({
+                user_id: superAdminProfile.user_id,
+                full_name: superAdminProfile.full_name,
+                email: superAdminProfile.email,
+                role: 'super_admin'
+              });
+              console.log('Added super admin to list');
             } else {
-              console.log('Manager profile:', manager);
-              
-              if (manager) {
-                admins.push({
-                  user_id: manager.user_id,
-                  full_name: manager.full_name,
-                  email: manager.email,
-                  role: 'admin'
-                });
-              }
+              // Update existing to super_admin
+              existingAdmin.role = 'super_admin';
+              console.log('Updated existing admin to super_admin');
+            }
+          }
+
+          // Method 3: Try to get manager (with public access)
+          console.log('Trying to get manager profile...');
+          const managerId = 'ba836d62-56b5-4c8f-8a90-33d024a2a16b'; // Saivijay's ID
+          const { data: managerProfile } = await supabase
+            .from('profiles')
+            .select('user_id, full_name, email')
+            .eq('user_id', managerId)
+            .maybeSingle();
+
+          console.log('Manager profile query result:', managerProfile);
+          
+          if (managerProfile) {
+            // Check if not already added
+            const existingManager = admins.find(admin => admin.user_id === managerProfile.user_id);
+            if (!existingManager) {
+              admins.push({
+                user_id: managerProfile.user_id,
+                full_name: managerProfile.full_name,
+                email: managerProfile.email,
+                role: 'admin'
+              });
+              console.log('Added manager to list');
             }
           }
 
@@ -176,7 +200,7 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
     };
 
     fetchAvailableAdmins();
-  }, [isAdmin, user, isChatOpen]); // Removed selectedAdmin from dependency to prevent infinite loop
+  }, [isAdmin, user, isChatOpen]);
 
   useEffect(() => {
     if (user && isChatOpen && (selectedUser || (!isAdmin && selectedAdmin))) {
