@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { FileUpload } from "@/components/ui/file-upload";
 import { CheckSquare, Clock, Flag, MessageCircle, User, Edit, Trash2, Calendar, Save, BookOpen } from "lucide-react";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TaskCardProps {
   task: {
@@ -94,13 +95,50 @@ export const TaskCard = ({
   };
 
   const handleFileUpload = async (file: File): Promise<string> => {
-    // Mock file upload - in real app, upload to storage and return URL
-    const mockUrl = `uploads/${file.name}`;
-    setFiles(prev => [...prev, mockUrl]);
-    return mockUrl;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Create a unique file path
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+    
+    // Upload file to Supabase storage
+    const { data, error } = await supabase.storage
+      .from('task-attachments')
+      .upload(fileName, file);
+
+    if (error) {
+      throw new Error(`Upload failed: ${error.message}`);
+    }
+
+    // Get public URL for the file
+    const { data: { publicUrl } } = supabase.storage
+      .from('task-attachments')
+      .getPublicUrl(fileName);
+
+    setFiles(prev => [...prev, publicUrl]);
+    return publicUrl;
   };
 
-  const handleFileRemove = (fileUrl: string) => {
+  const handleFileRemove = async (fileUrl: string) => {
+    // Extract file path from URL to delete from storage
+    try {
+      const urlParts = fileUrl.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      const userFolder = urlParts[urlParts.length - 2];
+      const filePath = `${userFolder}/${fileName}`;
+      
+      const { error } = await supabase.storage
+        .from('task-attachments')
+        .remove([filePath]);
+
+      if (error) {
+        console.error('Error deleting file:', error);
+      }
+    } catch (error) {
+      console.error('Error parsing file URL for deletion:', error);
+    }
+    
     setFiles(prev => prev.filter(f => f !== fileUrl));
   };
 

@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Upload, X, File, FileText, Image, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface FileUploadProps {
   onFileUpload?: (file: File) => Promise<string>;
@@ -25,6 +27,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 }) => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files || []);
@@ -32,7 +35,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     if (selectedFiles.length === 0) return;
     
     if (files.length + selectedFiles.length > maxFiles) {
-      alert(`Maximum ${maxFiles} files allowed`);
+      toast({
+        title: "Too many files",
+        description: `Maximum ${maxFiles} files allowed`,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -41,11 +48,49 @@ export const FileUpload: React.FC<FileUploadProps> = ({
     try {
       for (const file of selectedFiles) {
         if (onFileUpload) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            toast({
+              title: "Authentication required",
+              description: "You need to be logged in to upload files",
+              variant: "destructive",
+            });
+            continue;
+          }
+
+          // Create a unique file path
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+          
+          // Upload file to Supabase storage
+          const { data, error } = await supabase.storage
+            .from('task-attachments')
+            .upload(fileName, file);
+
+          if (error) {
+            toast({
+              title: "Upload failed",
+              description: error.message,
+              variant: "destructive",
+            });
+            continue;
+          }
+
+          // Get public URL for the file
+          const { data: { publicUrl } } = supabase.storage
+            .from('task-attachments')
+            .getPublicUrl(fileName);
+
           await onFileUpload(file);
         }
       }
     } catch (error) {
       console.error('File upload failed:', error);
+      toast({
+        title: "Upload failed",
+        description: "An error occurred while uploading files",
+        variant: "destructive",
+      });
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
