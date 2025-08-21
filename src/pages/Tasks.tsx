@@ -564,9 +564,8 @@ const Tasks = () => {
     const { error } = await supabase
       .from("calendar_events")
       .update({ 
-        notes: notes
-        // Note: files would need to be stored separately in a files table or storage bucket
-        // For now, we're just saving the notes
+        notes: notes,
+        files: files || []
       })
       .eq("id", taskId);
 
@@ -579,7 +578,7 @@ const Tasks = () => {
     } else {
       toast({
         title: "Notes updated",
-        description: "Task notes have been saved successfully",
+        description: "Task notes and files have been saved successfully",
       });
       fetchEvents();
     }

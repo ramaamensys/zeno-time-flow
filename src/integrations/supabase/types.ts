@@ -89,6 +89,7 @@ export type Database = {
           description: string | null
           end_time: string | null
           event_type: string | null
+          files: Json | null
           id: string
           notes: string | null
           parent_task_id: string | null
@@ -107,6 +108,7 @@ export type Database = {
           description?: string | null
           end_time?: string | null
           event_type?: string | null
+          files?: Json | null
           id?: string
           notes?: string | null
           parent_task_id?: string | null
@@ -125,6 +127,7 @@ export type Database = {
           description?: string | null
           end_time?: string | null
           event_type?: string | null
+          files?: Json | null
           id?: string
           notes?: string | null
           parent_task_id?: string | null
