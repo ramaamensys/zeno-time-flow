@@ -463,10 +463,17 @@ export default function LearningTemplates() {
         throw new Error('Task not found');
       }
 
+      // First delete from template_tasks table
+      const { error: templateError } = await supabase
+        .from('template_tasks')
+        .delete()
+        .eq('template_id', taskToDelete.template_id)
+        .eq('title', taskToDelete.title);
+
+      if (templateError) throw templateError;
+
+      // Then delete all matching calendar events (user assignments)
       // Handle both null and empty descriptions
-      const descriptionConditions = [];
-      
-      // First delete tasks with matching description (null or empty string)
       if (taskToDelete.description === null || taskToDelete.description === '') {
         const { error: error1 } = await supabase
           .from('calendar_events')
