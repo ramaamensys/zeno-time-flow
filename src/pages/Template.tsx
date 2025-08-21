@@ -464,9 +464,6 @@ export default function LearningTemplates() {
       }
 
       console.log('Deleting task:', taskToDelete);
-      console.log('Task title:', taskToDelete.title);
-      console.log('Task description:', taskToDelete.description);
-      console.log('Task template_id:', taskToDelete.template_id);
 
       // First, let's see what records actually exist
       const { data: existingCalendarEvents, error: fetchError } = await supabase
@@ -475,7 +472,6 @@ export default function LearningTemplates() {
         .eq('template_id', taskToDelete.template_id);
 
       console.log('Existing calendar events for this template:', existingCalendarEvents);
-      console.log('Fetch error:', fetchError);
 
       // Find matching records by title
       const matchingEvents = existingCalendarEvents?.filter(event => 
@@ -503,8 +499,18 @@ export default function LearningTemplates() {
 
       console.log('Template tasks delete error:', templateError);
       
+      // Clear local state and force refresh
+      setTemplateTasks([]);
+      setAssignments([]);
+      
+      // Force a complete data refresh
+      await new Promise(resolve => setTimeout(resolve, 500)); // Small delay
+      await fetchAllTemplateData();
+      
+      // Also refresh the template list
+      await fetchTemplates();
+      
       toast.success('Task deleted successfully');
-      fetchAllTemplateData();
     } catch (error) {
       console.error('Delete task error:', error);
       toast.error('Failed to delete task');
