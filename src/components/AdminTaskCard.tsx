@@ -336,12 +336,12 @@ export const AdminTaskCard = ({
                   <TaskChat
                     taskId={task.id}
                     taskTitle={task.title}
-                    assignedUsers={task.profiles ? [{
+                    assignedUsers={isAdmin && task.profiles ? [{
                       user_id: task.user_id,
                       full_name: task.profiles.full_name,
                       email: task.profiles.email
                     }] : []}
-                    isAdmin={true}
+                    isAdmin={isAdmin}
                   />
                 </div>
               </div>
