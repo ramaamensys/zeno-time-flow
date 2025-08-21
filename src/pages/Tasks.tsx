@@ -1191,8 +1191,8 @@ const Tasks = () => {
         )}
       </div>
 
-      {/* Templates Section - Only for Users */}
-      {!isAdminUser && (
+      {/* Templates Section - Only for Regular Users (not admins) */}
+      {userRole === 'user' && (
         <div className="space-y-6">
           <div className="border-t pt-6">
             <h2 className="text-2xl font-bold mb-2">Learning Templates</h2>
