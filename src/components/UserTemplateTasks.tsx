@@ -37,7 +37,7 @@ interface TemplateWithTasks {
   tasks: TemplateTask[];
 }
 
-export default function UserTemplateTasks() {
+function UserTemplateTasks() {
   const { user } = useAuth();
   const [templatesWithTasks, setTemplatesWithTasks] = useState<TemplateWithTasks[]>([]);
   const [loading, setLoading] = useState(true);
@@ -309,3 +309,6 @@ export default function UserTemplateTasks() {
     </div>
   );
 }
+
+export { UserTemplateTasks };
+export default UserTemplateTasks;
