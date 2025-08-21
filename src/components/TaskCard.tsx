@@ -289,7 +289,7 @@ export const TaskCard = ({
                       <TaskNotes
                         taskId={task.id}
                         taskTitle={task.title}
-                        assignedUsers={user ? [{
+                        assignedUsers={isAdmin && user ? [{
                           user_id: task.user_id,
                           full_name: user.full_name,
                           email: user.email
@@ -301,7 +301,7 @@ export const TaskCard = ({
                       <TaskChat
                         taskId={task.id}
                         taskTitle={task.title}
-                        assignedUsers={user ? [{
+                        assignedUsers={isAdmin && user ? [{
                           user_id: task.user_id,
                           full_name: user.full_name,
                           email: user.email

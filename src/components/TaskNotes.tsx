@@ -210,7 +210,7 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskNot
           </DialogTitle>
           
           {/* User Selection for Admins */}
-          {isAdmin && assignedUsers.length > 1 && (
+          {isAdmin && assignedUsers.length > 0 && (
             <div className="mb-3">
               <label className="text-sm font-medium mb-2 block">Select User for Notes:</label>
               <Select value={selectedUser || ""} onValueChange={setSelectedUser}>
