@@ -17,39 +17,63 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
+    // Check for existing session first
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+        }
+        
+        if (isMounted) {
+          console.log('Initial session check:', session?.user?.email || 'No user');
+          setSession(session);
+          setUser(session?.user ?? null);
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state change:', event, session?.user?.email);
+      (event, session) => {
+        if (!isMounted) return;
+        
+        console.log('Auth state change:', event, session?.user?.email || 'No user');
         
         setSession(session);
         setUser(session?.user ?? null);
-        setIsLoading(false);
+        
+        // Only set loading to false if we haven't done the initial check yet
+        if (isLoading) {
+          setIsLoading(false);
+        }
         
         // Handle sign out event
         if (event === 'SIGNED_OUT') {
           console.log('User signed out, cleaning up...');
           setUser(null);
           setSession(null);
-          
-          // Use setTimeout to avoid potential routing conflicts
-          setTimeout(() => {
-            window.location.href = '/auth';
-          }, 100);
         }
       }
     );
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', session?.user?.email);
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoading(false);
-    });
+    // Initialize auth
+    initializeAuth();
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []); // Remove isLoading from dependencies to prevent loops
 
   const cleanupAuthState = () => {
     // Remove all Supabase auth keys from localStorage
