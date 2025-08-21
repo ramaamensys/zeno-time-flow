@@ -58,7 +58,7 @@ export default function UserManagement() {
     password: "",
     role: "user" as "user" | "admin" | "super_admin",
     app_type: "calendar" as "calendar" | "scheduler",
-    manager_id: ""
+    manager_id: "none"
   });
   const [managers, setManagers] = useState<UserProfile[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
@@ -239,7 +239,7 @@ export default function UserManagement() {
           role: newUser.role,
           password: newUser.password,
           app_type: newUser.app_type,
-          manager_id: newUser.manager_id || null
+          manager_id: newUser.manager_id && newUser.manager_id !== "none" ? newUser.manager_id : null
         }
       });
 
@@ -256,7 +256,7 @@ export default function UserManagement() {
       });
 
       // Clear the form and close dialog
-      setNewUser({ email: "", full_name: "", role: "user", password: "", app_type: "calendar", manager_id: "" });
+      setNewUser({ email: "", full_name: "", role: "user", password: "", app_type: "calendar", manager_id: "none" });
       setIsDialogOpen(false);
       
       // Reload users to show the new user
@@ -602,8 +602,8 @@ export default function UserManagement() {
                           <SelectValue placeholder="Select a manager (optional)" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">No Manager</SelectItem>
-                          {managers.map((manager) => (
+                          <SelectItem value="none">No Manager</SelectItem>
+                          {managers.filter(manager => manager.user_id && manager.full_name).map((manager) => (
                             <SelectItem key={manager.user_id} value={manager.user_id}>
                               {manager.full_name} ({manager.email})
                             </SelectItem>
