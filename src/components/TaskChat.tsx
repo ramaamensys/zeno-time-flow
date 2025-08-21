@@ -139,7 +139,15 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
         
         const { data: userChats, error: userChatError } = await supabase
           .from('task_chats')
-          .select('id, admin_id, user_id')
+          .select(`
+            id, 
+            admin_id, 
+            user_id,
+            profiles!task_chats_admin_id_fkey (
+              full_name,
+              user_id
+            )
+          `)
           .eq('task_id', taskId)
           .eq('user_id', user.id);
 
@@ -150,12 +158,16 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
 
         console.log('Found user chats:', userChats);
         
-        // Find the first chat where admin_id is different from user_id
-        const validChat = userChats?.find(chat => chat.admin_id !== chat.user_id);
+        // Find chats where admin_id is different from user_id and admin has admin or super_admin role
+        const validChats = userChats?.filter(chat => chat.admin_id !== chat.user_id) || [];
         
-        if (validChat) {
+        if (validChats.length > 0) {
+          // For now, use the most recent chat (last in array)
+          // In the future, could show a dropdown to select which admin to chat with
+          const validChat = validChats[validChats.length - 1];
           existingChatId = validChat.id;
           console.log('User found valid chat:', validChat);
+          console.log('All available admin chats:', validChats);
         } else {
           console.log('No valid chat found for user. Available chats:', userChats);
           existingChatId = null;
