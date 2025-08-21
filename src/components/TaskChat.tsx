@@ -83,63 +83,81 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
         console.log('Fetching available admins for user:', user.id);
         try {
           // Get user's manager and super admin
-          const { data: userProfile } = await supabase
+          const { data: userProfile, error: profileError } = await supabase
             .from('profiles')
             .select('manager_id')
             .eq('user_id', user.id)
             .maybeSingle();
 
+          if (profileError) {
+            console.error('Error fetching user profile:', profileError);
+          }
+          
           console.log('User profile:', userProfile);
 
-          // Get super admins - separate query to avoid relation issues
-          const { data: superAdminRoles } = await supabase
+          const admins = [];
+
+          // Get super admins using correct query
+          console.log('Querying super admins...');
+          const { data: superAdminRoles, error: superAdminError } = await supabase
             .from('user_roles')
             .select('user_id')
             .eq('role', 'super_admin');
 
-          console.log('Super admin roles:', superAdminRoles);
-
-          const admins = [];
+          if (superAdminError) {
+            console.error('Error fetching super admin roles:', superAdminError);
+          } else {
+            console.log('Super admin roles query result:', superAdminRoles);
+          }
 
           // Get profiles for super admins
           if (superAdminRoles && superAdminRoles.length > 0) {
-            const superAdminIds = superAdminRoles.map(sa => sa.user_id);
-            const { data: superAdminProfiles } = await supabase
+            console.log('Fetching super admin profiles for IDs:', superAdminRoles.map(sa => sa.user_id));
+            const { data: superAdminProfiles, error: profilesError } = await supabase
               .from('profiles')
               .select('user_id, full_name, email')
-              .in('user_id', superAdminIds);
+              .in('user_id', superAdminRoles.map(sa => sa.user_id));
 
-            console.log('Super admin profiles:', superAdminProfiles);
-
-            if (superAdminProfiles) {
-              superAdminProfiles.forEach(profile => {
-                admins.push({
-                  user_id: profile.user_id,
-                  full_name: profile.full_name,
-                  email: profile.email,
-                  role: 'super_admin'
+            if (profilesError) {
+              console.error('Error fetching super admin profiles:', profilesError);
+            } else {
+              console.log('Super admin profiles:', superAdminProfiles);
+              
+              if (superAdminProfiles) {
+                superAdminProfiles.forEach(profile => {
+                  admins.push({
+                    user_id: profile.user_id,
+                    full_name: profile.full_name,
+                    email: profile.email,
+                    role: 'super_admin'
+                  });
                 });
-              });
+              }
             }
           }
 
           // Get manager if exists
           if (userProfile?.manager_id) {
-            const { data: manager } = await supabase
+            console.log('Fetching manager profile for ID:', userProfile.manager_id);
+            const { data: manager, error: managerError } = await supabase
               .from('profiles')
               .select('user_id, full_name, email')
               .eq('user_id', userProfile.manager_id)
               .maybeSingle();
             
-            console.log('Manager profile:', manager);
-            
-            if (manager) {
-              admins.push({
-                user_id: manager.user_id,
-                full_name: manager.full_name,
-                email: manager.email,
-                role: 'admin'
-              });
+            if (managerError) {
+              console.error('Error fetching manager profile:', managerError);
+            } else {
+              console.log('Manager profile:', manager);
+              
+              if (manager) {
+                admins.push({
+                  user_id: manager.user_id,
+                  full_name: manager.full_name,
+                  email: manager.email,
+                  role: 'admin'
+                });
+              }
             }
           }
 
