@@ -646,11 +646,13 @@ export default function LearningTemplates() {
   const getTemplateTasks = (templateId: string) => {
     const tasks = templateTasks.filter(task => task.template_id === templateId);
     
-    // Group tasks by ID to avoid duplicates and count assigned users
+    // Group tasks by title + description to avoid duplicates and count assigned users
     const groupedTasks = tasks.reduce((acc, task) => {
-      const existingTask = acc.find(t => t.id === task.id);
+      const taskKey = `${task.title}_${task.description || ''}_${task.template_id}`;
+      const existingTask = acc.find(t => `${t.title}_${t.description || ''}_${t.template_id}` === taskKey);
+      
       if (existingTask) {
-        // Task already exists, just track that there are multiple assignments
+        // Task already exists, add this user to the assignedUserIds
         if (!existingTask.assignedUserIds) {
           existingTask.assignedUserIds = [existingTask.user_id];
         }
@@ -661,7 +663,7 @@ export default function LearningTemplates() {
         // New task, add it with initial assigned user
         acc.push({
           ...task,
-          assignedUserIds: [task.user_id]
+          assignedUserIds: task.user_id ? [task.user_id] : []
         });
       }
       return acc;
@@ -1048,9 +1050,11 @@ export default function LearningTemplates() {
                                        )}
                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                          <span>
-                                           {taskAssignedUsers.length === 1 
-                                             ? taskAssignedUsers[0]?.full_name || 'Unknown'
-                                             : `${taskAssignedUsers.length} users assigned`}
+                                           {task.assignedUserIds && task.assignedUserIds.length > 0
+                                             ? (task.assignedUserIds.length === 1 
+                                                 ? taskAssignedUsers[0]?.full_name || 'Unknown'
+                                                 : `${task.assignedUserIds.length} users assigned`)
+                                             : 'No users assigned'}
                                          </span>
                                          <span>• Created: {
                                            task.created_at 
