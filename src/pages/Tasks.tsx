@@ -1143,7 +1143,7 @@ const Tasks = () => {
                 task={event}
                 onToggleComplete={toggleTaskCompletion}
                 onAddSubTask={openSubTaskDialog}
-                onEditTask={openEventDetails}
+                onEditTask={openEditDialog}
                 onViewDetails={openEventDetails}
                 onUpdateNotes={appendTaskNote}
                 isAdmin={isAdminUser}
