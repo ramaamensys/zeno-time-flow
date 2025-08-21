@@ -600,21 +600,30 @@ const Tasks = () => {
 
   // New function for cumulative notes (append instead of replace)
   const appendTaskNote = async (taskId: string, newNote: string, files?: string[]) => {
-    // First, get the current notes
+    // First, get the current task to check if it's a template task
     const { data: currentTask } = await supabase
       .from("calendar_events")
-      .select("notes, files")
+      .select("notes, files, template_id")
       .eq("id", taskId)
       .single();
 
     const currentNotes = currentTask?.notes || "";
     const currentFiles = Array.isArray(currentTask?.files) ? currentTask.files : [];
-    const timestamp = new Date().toLocaleString();
+    const isTemplateTask = currentTask?.template_id !== null;
     
-    // Append new note with timestamp
-    const updatedNotes = currentNotes 
-      ? `${currentNotes}\n\n[${timestamp}] ${newNote}`
-      : `[${timestamp}] ${newNote}`;
+    // For template tasks, don't add timestamps - just append the note
+    // For regular tasks, add timestamps
+    let updatedNotes;
+    if (isTemplateTask) {
+      updatedNotes = currentNotes 
+        ? `${currentNotes}\n\n${newNote}`
+        : newNote;
+    } else {
+      const timestamp = new Date().toLocaleString();
+      updatedNotes = currentNotes 
+        ? `${currentNotes}\n\n[${timestamp}] ${newNote}`
+        : `[${timestamp}] ${newNote}`;
+    }
     
     // Merge files (avoid duplicates)
     const mergedFiles = [...currentFiles];
