@@ -1357,8 +1357,8 @@ const Tasks = () => {
       {userRole === 'user' && (
         <div className="space-y-6">
           <div className="border-t pt-6">
-            <h2 className="text-2xl font-bold mb-2">Learning Templates</h2>
-            <p className="text-muted-foreground mb-6">Track your progress on assigned learning templates</p>
+            <h2 className="text-2xl font-bold mb-2">Templates</h2>
+            <p className="text-muted-foreground mb-6">Track your progress on assigned templates</p>
             
             {templatesLoading ? (
               <div className="flex justify-center items-center h-32">
@@ -1368,9 +1368,9 @@ const Tasks = () => {
               <Card>
                 <CardContent className="p-6 text-center">
                   <BookOpen className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No learning templates assigned</h3>
+                  <h3 className="text-lg font-semibold mb-2">No Templates assigned</h3>
                   <p className="text-muted-foreground">
-                    Contact your administrator to get assigned to learning templates
+                    Contact your administrator to get assigned to templates
                   </p>
                 </CardContent>
               </Card>
