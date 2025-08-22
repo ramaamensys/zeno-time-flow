@@ -795,7 +795,14 @@ const Habits = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {habits.filter(h => h.frequency === 'daily').length === 0 ? (
+                {habits.filter(h => {
+                  if (h.frequency !== 'daily') return false;
+                  const today = new Date().toISOString().split('T')[0];
+                  // If no start_date is set, show for all days (legacy habits)
+                  if (!h.start_date) return true;
+                  // Only include habits that start on or before today
+                  return h.start_date <= today;
+                }).length === 0 ? (
                   <div className="text-center py-16">
                     <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-muted/30 to-muted/50 flex items-center justify-center">
                       <Check className="w-12 h-12 text-muted-foreground/50" />
@@ -806,7 +813,14 @@ const Habits = () => {
                  ) : (
                    <div className="space-y-3">
                      {habits
-                       .filter(h => h.frequency === 'daily')
+                       .filter(h => {
+                         if (h.frequency !== 'daily') return false;
+                         const today = new Date().toISOString().split('T')[0];
+                         // If no start_date is set, show for all days (legacy habits)
+                         if (!h.start_date) return true;
+                         // Only include habits that start on or before today
+                         return h.start_date <= today;
+                       })
                        .filter(habit => {
                          // Hide completed habits from today's view unless viewing other user's habits
                          const isCompleted = getHabitCompletion(habit.id, new Date().toISOString().split('T')[0]);
@@ -1156,7 +1170,7 @@ const Habits = () => {
                         <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                       </div>
                       <h4 className="font-semibold text-lg">
-                        Habits for {new Date(selectedWeekDate).toLocaleDateString('en-US', { 
+                        Habits for {new Date(selectedWeekDate + 'T00:00:00').toLocaleDateString('en-US', { 
                           weekday: 'long', 
                           month: 'short', 
                           day: 'numeric' 
