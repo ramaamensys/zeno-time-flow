@@ -456,6 +456,7 @@ export type Database = {
           description: string | null
           frequency: string
           id: string
+          notes: string | null
           target_count: number
           title: string
           updated_at: string
@@ -470,6 +471,7 @@ export type Database = {
           description?: string | null
           frequency?: string
           id?: string
+          notes?: string | null
           target_count?: number
           title: string
           updated_at?: string
@@ -484,6 +486,7 @@ export type Database = {
           description?: string | null
           frequency?: string
           id?: string
+          notes?: string | null
           target_count?: number
           title?: string
           updated_at?: string
