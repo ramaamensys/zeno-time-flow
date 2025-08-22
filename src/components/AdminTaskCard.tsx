@@ -245,15 +245,15 @@ export const AdminTaskCard = ({
                       </Badge>
                     )}
                     {!task.template_id && isAdmin && task.user_id !== currentUser?.id && (
-                      <Badge variant="outline" className="bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200">
+                      <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300 border-green-200">
                         <User className="mr-1 h-3 w-3" />
-                        Admin Assigned
+                        {task.profiles?.full_name || task.profiles?.email || 'User Task'}
                       </Badge>
                     )}
                     {!task.template_id && currentUser && task.user_id === currentUser?.id && (
-                      <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300 border-green-200">
+                      <Badge variant="outline" className="bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200">
                         <User className="mr-1 h-3 w-3" />
-                        {isAdmin ? 'Personal Task' : (task.description && task.description.length > 0 ? 'Admin Assigned' : 'Personal Task')}
+                        Personal Task
                       </Badge>
                     )}
                   </div>
