@@ -26,6 +26,8 @@ interface Habit {
   created_at: string;
   color: string;
   notes?: string;
+  start_date?: string;
+  start_time?: string;
 }
 
 interface HabitCompletion {
@@ -58,7 +60,10 @@ const Habits = () => {
     category: 'health',
     frequency: 'daily' as const,
     target_count: 1,
-    color: '#10b981'
+    color: '#10b981',
+    notes: '',
+    start_date: new Date().toISOString().split('T')[0],
+    start_time: '09:00'
   });
 
   const [editHabitForm, setEditHabitForm] = useState({
@@ -207,6 +212,9 @@ const Habits = () => {
         frequency: newHabit.frequency,
         target_count: newHabit.target_count,
         color: newHabit.color,
+        notes: newHabit.notes,
+        start_date: newHabit.start_date,
+        start_time: newHabit.start_time,
         user_id: user?.id
       }]);
 
@@ -220,7 +228,10 @@ const Habits = () => {
         category: 'health',
         frequency: 'daily',
         target_count: 1,
-        color: '#10b981'
+        color: '#10b981',
+        notes: '',
+        start_date: new Date().toISOString().split('T')[0],
+        start_time: '09:00'
       });
       setIsAddingHabit(false);
       toast.success('Habit created successfully');
