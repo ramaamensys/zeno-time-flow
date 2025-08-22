@@ -28,6 +28,7 @@ interface CalendarEvent {
   event_type: string;
   created_at: string;
   user_id: string;
+  created_by?: string;
   parent_task_id?: string | null;
   completed?: boolean;
   completed_at?: string | null;
@@ -332,37 +333,36 @@ const Tasks = () => {
           filtered = filtered.filter(event => event.template_id !== null);
           break;
         case "admin_assigned":
-          // For regular users: tasks that were likely assigned by admin
-          // Heuristic: tasks where user is not admin and has tasks with specific patterns
+          // Tasks created by admin for another user
           if (userRole === 'user') {
             filtered = filtered.filter(event => 
               event.template_id === null && 
               event.user_id === user?.id &&
-              // Admin assigned tasks typically have formal descriptions or are created recently by admin
-              (event.description !== null && event.description.length > 0)
+              event.created_by !== event.user_id // Admin created for user
             );
           } else {
             // For admins: show tasks they created for others
             filtered = filtered.filter(event => 
               event.template_id === null && 
-              event.user_id !== user?.id
+              event.user_id !== user?.id &&
+              event.created_by === user?.id
             );
           }
           break;
         case "personal":
-          // For regular users: tasks they likely created themselves
+          // Tasks created by the user themselves
           if (userRole === 'user') {
             filtered = filtered.filter(event => 
               event.template_id === null &&
               event.user_id === user?.id &&
-              // Personal tasks often have shorter descriptions or no description
-              (event.description === null || event.description.length === 0)
+              event.created_by === event.user_id // User created for themselves
             );
           } else {
             // For admins: tasks they created for themselves
             filtered = filtered.filter(event => 
               event.template_id === null &&
-              event.user_id === user?.id
+              event.user_id === user?.id &&
+              event.created_by === user?.id
             );
           }
           break;
@@ -480,6 +480,8 @@ const Tasks = () => {
       event_type: newEvent.event_type,
       // If admin is assigning task, use assigned_user_id, otherwise use current user
       user_id: (isAdminUser && newEvent.assigned_user_id && newEvent.assigned_user_id !== "self") ? newEvent.assigned_user_id : user?.id,
+      // Track who created the task
+      created_by: user?.id,
     };
 
     const { data: insertedTask, error } = await supabase.from("calendar_events").insert([eventData]).select().single();
@@ -583,6 +585,8 @@ const Tasks = () => {
       // Use assigned user ID if specified and not "task-owner", otherwise use current user
       user_id: (isAdminUser && newSubTask.assigned_user_id && newSubTask.assigned_user_id !== "task-owner") ? newSubTask.assigned_user_id : currentUserId,
       parent_task_id: parentTaskForSubTask.id,
+      // Track who created the sub-task
+      created_by: user?.id,
     };
 
     const { error } = await supabase.from("calendar_events").insert([subTaskData]);

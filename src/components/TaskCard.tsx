@@ -22,6 +22,7 @@ interface TaskCardProps {
     completed: boolean;
     created_at: string;
     user_id: string;
+    created_by?: string;
     notes?: string;
     template_id?: string | null;
     files?: string[];
@@ -94,11 +95,10 @@ export const TaskCard = ({
   const canEditTask = isAdmin || (!isTemplateTask && isUserTask);
   const canToggleComplete = isUserTask || (isAdmin && !isTemplateTask);
   
-  // Determine if chat should be shown
-  // Chat should NEVER show for personal tasks regardless of user role
-  // Only show for template tasks assigned by admin to other users
+  // Determine if chat should be shown and task type
   const isSelfCreatedTask = currentUser && task.user_id === currentUser.id;
-  const shouldShowChat = false; // Disabled chat for all personal tasks
+  const isAdminAssignedTask = currentUser && task.created_by && task.created_by !== task.user_id;
+  const shouldShowChat = isAdminAssignedTask && !isTemplateTask;
 
   const StatusIcon = getStatusIcon(task.status, task.completed);
   const isCompleted = task.completed || task.status === 'completed';
@@ -206,6 +206,18 @@ export const TaskCard = ({
                     <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
                       <BookOpen className="mr-1 h-3 w-3" />
                       Template
+                    </Badge>
+                  )}
+                  {!isTemplateTask && isAdminAssignedTask && (
+                    <Badge variant="outline" className="bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200">
+                      <User className="mr-1 h-3 w-3" />
+                      Admin Assigned
+                    </Badge>
+                  )}
+                  {!isTemplateTask && isSelfCreatedTask && !isAdminAssignedTask && (
+                    <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300 border-green-200">
+                      <User className="mr-1 h-3 w-3" />
+                      Personal Task
                     </Badge>
                   )}
                 </div>

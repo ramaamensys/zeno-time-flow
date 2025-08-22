@@ -86,6 +86,7 @@ export type Database = {
           completed: boolean | null
           completed_at: string | null
           created_at: string | null
+          created_by: string | null
           description: string | null
           end_time: string | null
           event_type: string | null
@@ -105,6 +106,7 @@ export type Database = {
           completed?: boolean | null
           completed_at?: string | null
           created_at?: string | null
+          created_by?: string | null
           description?: string | null
           end_time?: string | null
           event_type?: string | null
@@ -124,6 +126,7 @@ export type Database = {
           completed?: boolean | null
           completed_at?: string | null
           created_at?: string | null
+          created_by?: string | null
           description?: string | null
           end_time?: string | null
           event_type?: string | null

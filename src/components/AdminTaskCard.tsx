@@ -63,6 +63,7 @@ interface CalendarEvent {
   event_type: string;
   created_at: string;
   user_id: string;
+  created_by?: string;
   parent_task_id?: string | null;
   completed?: boolean;
   completed_at?: string | null;
@@ -244,14 +245,20 @@ export const AdminTaskCard = ({
                         Template Task
                       </Badge>
                     )}
-                    {!task.template_id && isAdmin && task.user_id !== currentUser?.id && (
+                    {!task.template_id && isAdmin && task.user_id !== currentUser?.id && task.created_by !== task.user_id && (
+                      <Badge variant="outline" className="bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200">
+                        <User className="mr-1 h-3 w-3" />
+                        Admin Assigned
+                      </Badge>
+                    )}
+                    {!task.template_id && isAdmin && task.user_id !== currentUser?.id && task.created_by === task.user_id && (
                       <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300 border-green-200">
                         <User className="mr-1 h-3 w-3" />
                         {task.profiles?.full_name || task.profiles?.email || 'User Task'}
                       </Badge>
                     )}
                     {!task.template_id && currentUser && task.user_id === currentUser?.id && (
-                      <Badge variant="outline" className="bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200">
+                      <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300 border-green-200">
                         <User className="mr-1 h-3 w-3" />
                         Personal Task
                       </Badge>
