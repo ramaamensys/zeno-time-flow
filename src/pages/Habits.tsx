@@ -751,7 +751,6 @@ const Habits = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -825,8 +824,6 @@ const Habits = () => {
         </Dialog>
 
         {/* Admin User Filter */}
-          </DialogContent>
-        </Dialog>
 
         {/* Modern Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
