@@ -348,10 +348,16 @@ const Tasks = () => {
               event.template_id === null &&
               event.user_id === user?.id
             );
+          }
+          break;
+      }
     }
 
     // Apply status filter
     if (filters.status && filters.status !== "all") {
+      console.log("Applying status filter:", filters.status);
+      console.log("Tasks before status filter:", filtered.map(e => ({ id: e.id, title: e.title, completed: e.completed })));
+      
       switch (filters.status) {
         case "completed":
           filtered = filtered.filter(event => event.completed === true);
@@ -360,9 +366,8 @@ const Tasks = () => {
           filtered = filtered.filter(event => event.completed !== true);
           break;
       }
-    }
-          break;
-      }
+      
+      console.log("Tasks after status filter:", filtered.map(e => ({ id: e.id, title: e.title, completed: e.completed })));
     }
 
     // Apply additional filters for admins
