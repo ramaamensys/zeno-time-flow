@@ -465,14 +465,22 @@ const LearningTemplates = () => {
         .eq('template_id', templateId)
         .eq('user_id', userId);
 
-      // Remove associated tasks
+      // Keep tasks but mark them as unassigned by removing user_id reference
+      // This preserves the task history and content
       await supabase
         .from('calendar_events')
-        .delete()
+        .update({ user_id: null })
         .eq('template_id', templateId)
         .eq('user_id', userId);
 
-      toast.success('User removed from template successfully');
+      // Also update template_tasks if they exist
+      await supabase
+        .from('template_tasks')
+        .update({ user_id: null })
+        .eq('template_id', templateId)
+        .eq('user_id', userId);
+
+      toast.success('User removed from template successfully. Tasks preserved as unassigned.');
       fetchAllTemplateData();
     } catch (error) {
       toast.error('Failed to remove user from template');
