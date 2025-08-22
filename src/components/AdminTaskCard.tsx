@@ -12,6 +12,46 @@ import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 
+// Sub-task Notes Dialog Component
+const SubTaskNotesDialog = ({ subTask, onUpdateNotes }: { subTask: CalendarEvent, onUpdateNotes?: (taskId: string, notes: string, files?: string[]) => void }) => {
+  const [subTaskNotes, setSubTaskNotes] = useState(subTask.notes || "");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveSubTaskNotes = async () => {
+    if (onUpdateNotes) {
+      setIsSaving(true);
+      await onUpdateNotes(subTask.id, subTaskNotes);
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h4 className="font-medium mb-2">{subTask.title}</h4>
+        <p className="text-sm text-gray-600 dark:text-gray-300">{subTask.description}</p>
+      </div>
+      <Textarea
+        placeholder="Add notes for this sub-task..."
+        value={subTaskNotes}
+        onChange={(e) => setSubTaskNotes(e.target.value)}
+        className="min-h-24"
+      />
+      <div className="flex justify-end space-x-2">
+        <Button variant="outline">Cancel</Button>
+        <Button onClick={handleSaveSubTaskNotes} disabled={isSaving}>
+          {isSaving ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1" />
+          ) : (
+            <Save className="h-4 w-4 mr-1" />
+          )}
+          Save Notes
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 interface CalendarEvent {
   id: string;
   title: string;
@@ -432,25 +472,15 @@ export const AdminTaskCard = ({
                                       <MessageCircle className="h-3 w-3 text-gray-400 hover:text-blue-500" />
                                     </Button>
                                   </DialogTrigger>
-                                  <DialogContent className="sm:max-w-lg">
-                                    <DialogHeader>
-                                      <DialogTitle>Sub-task Notes</DialogTitle>
-                                    </DialogHeader>
-                                    <div className="space-y-4">
-                                      <div>
-                                        <h4 className="font-medium mb-2">{subTask.title}</h4>
-                                        <p className="text-sm text-gray-600 dark:text-gray-300">{subTask.description}</p>
-                                      </div>
-                                      <Textarea
-                                        placeholder="Add notes for this sub-task..."
-                                        className="min-h-24"
-                                      />
-                                      <div className="flex justify-end space-x-2">
-                                        <Button variant="outline">Cancel</Button>
-                                        <Button>Save Notes</Button>
-                                      </div>
-                                    </div>
-                                  </DialogContent>
+                                   <DialogContent className="sm:max-w-lg">
+                                     <DialogHeader>
+                                       <DialogTitle>Sub-task Notes</DialogTitle>
+                                     </DialogHeader>
+                                     <SubTaskNotesDialog 
+                                       subTask={subTask} 
+                                       onUpdateNotes={onUpdateNotes} 
+                                     />
+                                   </DialogContent>
                                 </Dialog>
                                 
                                 <Button

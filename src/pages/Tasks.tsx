@@ -89,6 +89,7 @@ const Tasks = () => {
     teamMember: "all",
     priority: "all",
     dateRange: "all",
+    taskType: "all", // New filter for task types
   });
 
   // Helper variable for admin permissions
@@ -307,9 +308,34 @@ const Tasks = () => {
   const applyFilters = () => {
     let filtered = [...events];
 
-    // Only apply filters for admins
-    if (userRole === 'admin' || userRole === 'super_admin') {
+    // Apply task type filter for all users
+    if (filters.taskType && filters.taskType !== "all") {
+      switch (filters.taskType) {
+        case "template":
+          filtered = filtered.filter(event => event.template_id !== null);
+          break;
+        case "admin_assigned":
+          // Tasks assigned by admin/super_admin (not created by current user and not template tasks)
+          filtered = filtered.filter(event => 
+            event.template_id === null && 
+            event.user_id === user?.id && 
+            // Check if task was created by someone else (admin assigned) - we'll need to track creator_id for this
+            // For now, we'll use a heuristic: if user is not admin but has tasks, some might be admin assigned
+            (userRole === 'user')
+          );
+          break;
+        case "personal":
+          // Tasks created by the user themselves (not template tasks)
+          filtered = filtered.filter(event => 
+            event.template_id === null &&
+            event.user_id === user?.id
+          );
+          break;
+      }
+    }
 
+    // Apply additional filters for admins
+    if (userRole === 'admin' || userRole === 'super_admin') {
       if (filters.teamMember && filters.teamMember !== "all") {
         filtered = filtered.filter(event => event.user_id === filters.teamMember);
       }
@@ -318,6 +344,36 @@ const Tasks = () => {
         filtered = filtered.filter(event => event.priority === filters.priority);
       }
 
+      if (filters.dateRange && filters.dateRange !== "all") {
+        const today = new Date();
+        const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        
+        switch (filters.dateRange) {
+          case "today":
+            filtered = filtered.filter(event => {
+              const eventDate = new Date(event.start_time);
+              const startOfEventDay = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+              return startOfEventDay.getTime() === startOfToday.getTime();
+            });
+            break;
+          case "week":
+            const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+            filtered = filtered.filter(event => {
+              const eventDate = new Date(event.start_time);
+              return eventDate >= today && eventDate <= weekFromNow;
+            });
+            break;
+          case "month":
+            const monthFromNow = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+            filtered = filtered.filter(event => {
+              const eventDate = new Date(event.start_time);
+              return eventDate >= today && eventDate <= monthFromNow;
+            });
+            break;
+        }
+      }
+    } else {
+      // For regular users, also apply date filter
       if (filters.dateRange && filters.dateRange !== "all") {
         const today = new Date();
         const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -374,7 +430,7 @@ const Tasks = () => {
       user_id: (isAdminUser && newEvent.assigned_user_id && newEvent.assigned_user_id !== "self") ? newEvent.assigned_user_id : user?.id,
     };
 
-    const { error } = await supabase.from("calendar_events").insert([eventData]);
+    const { data: insertedTask, error } = await supabase.from("calendar_events").insert([eventData]).select().single();
 
     if (error) {
       toast({
@@ -383,6 +439,21 @@ const Tasks = () => {
         variant: "destructive",
       });
     } else {
+      // If admin is assigning task to someone else, auto-initiate chat
+      if (isAdminUser && newEvent.assigned_user_id && newEvent.assigned_user_id !== "self" && insertedTask) {
+        try {
+          await supabase.from("task_chats").insert([{
+            task_id: insertedTask.id,
+            user_id: newEvent.assigned_user_id,
+            admin_id: user?.id,
+            message: "Please look into the given Task",
+            sender_type: 'admin'
+          }]);
+        } catch (chatError) {
+          console.error("Error creating initial chat message:", chatError);
+        }
+      }
+
       toast({
         title: "Event created",
         description: "Your event has been created successfully",
@@ -1059,19 +1130,40 @@ const Tasks = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Admin Filters - Only show for admins */}
-      {isAdminUser && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center">
-                <Filter className="mr-2 h-4 w-4" />
-                Filters
-              </CardTitle>
+      {/* Filters - Show for all users */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center">
+              <Filter className="mr-2 h-4 w-4" />
+              Filters
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Task Type Filter - Available for all users */}
+            <div className="grid gap-2">
+              <Label>Task Type</Label>
+              <Select value={filters.taskType} onValueChange={(value) => setFilters({ ...filters, taskType: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Tasks</SelectItem>
+                  {userRole === 'user' && (
+                    <>
+                      <SelectItem value="template">Template Tasks</SelectItem>
+                      <SelectItem value="admin_assigned">Admin Assigned</SelectItem>
+                      <SelectItem value="personal">Personal Tasks</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+            {/* Team Member Filter - Only for admins */}
+            {isAdminUser && (
               <div className="grid gap-2">
                 <Label>Team Member</Label>
                 <Select value={filters.teamMember} onValueChange={(value) => setFilters({ ...filters, teamMember: value })}>
@@ -1088,40 +1180,40 @@ const Tasks = () => {
                   </SelectContent>
                 </Select>
               </div>
+            )}
 
-              <div className="grid gap-2">
-                <Label>Priority</Label>
-                <Select value={filters.priority} onValueChange={(value) => setFilters({ ...filters, priority: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Priorities</SelectItem>
-                    <SelectItem value="high">High Priority</SelectItem>
-                    <SelectItem value="medium">Medium Priority</SelectItem>
-                    <SelectItem value="low">Low Priority</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Date Range</Label>
-                <Select value={filters.dateRange} onValueChange={(value) => setFilters({ ...filters, dateRange: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Dates</SelectItem>
-                    <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="week">Next 7 Days</SelectItem>
-                    <SelectItem value="month">Next 30 Days</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="grid gap-2">
+              <Label>Priority</Label>
+              <Select value={filters.priority} onValueChange={(value) => setFilters({ ...filters, priority: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priorities</SelectItem>
+                  <SelectItem value="high">High Priority</SelectItem>
+                  <SelectItem value="medium">Medium Priority</SelectItem>
+                  <SelectItem value="low">Low Priority</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </CardContent>
-        </Card>
-      )}
+
+            <div className="grid gap-2">
+              <Label>Date Range</Label>
+              <Select value={filters.dateRange} onValueChange={(value) => setFilters({ ...filters, dateRange: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Dates</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">Next 7 Days</SelectItem>
+                  <SelectItem value="month">Next 30 Days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Tasks List */}
       <div className="space-y-4">
