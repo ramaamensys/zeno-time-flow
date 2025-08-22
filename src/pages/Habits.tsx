@@ -393,8 +393,10 @@ const Habits = () => {
       if (h.frequency !== 'daily') return false;
       // If no start_date is set, show for all days (legacy habits)
       if (!h.start_date) return true;
-      // Only include habits that start on or before today
-      return h.start_date <= today;
+      // Only include habits that start on or before today and haven't ended
+      const isAfterStart = h.start_date <= today;
+      const isBeforeEnd = !h.end_date || h.end_date >= today;
+      return isAfterStart && isBeforeEnd;
     });
     const completedToday = activeTodayHabits.filter(h => getHabitCompletion(h.id, today)).length;
     const totalStreaks = habits.reduce((sum, h) => sum + h.current_streak, 0);
@@ -911,8 +913,10 @@ const Habits = () => {
                          const today = new Date().toISOString().split('T')[0];
                          // If no start_date is set, show for all days (legacy habits)
                          if (!h.start_date) return true;
-                         // Only include habits that start on or before today
-                         return h.start_date <= today;
+                         // Only include habits that start on or before today and haven't ended
+                         const isAfterStart = h.start_date <= today;
+                         const isBeforeEnd = !h.end_date || h.end_date >= today;
+                         return isAfterStart && isBeforeEnd;
                        })
                        .filter(habit => {
                          // Hide completed habits from today's view unless viewing other user's habits
