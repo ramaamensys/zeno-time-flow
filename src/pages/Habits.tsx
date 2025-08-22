@@ -361,7 +361,8 @@ const Habits = () => {
     const dailyHabits = habits.filter(h => h.frequency === 'daily');
     const completedToday = dailyHabits.filter(h => getHabitCompletion(h.id, today)).length;
     const totalStreaks = habits.reduce((sum, h) => sum + h.current_streak, 0);
-    const perfectDays = 5; // Mock data
+    // Calculate perfect days (days where all daily habits were completed)
+    const perfectDays = 0; // TODO: Calculate based on historical data
 
     return { completedToday, totalHabits: dailyHabits.length, totalStreaks, perfectDays };
   };
