@@ -484,8 +484,22 @@ const Habits = () => {
         // If no start_date is set, show for all days (legacy habits)
         if (!h.start_date) return h.frequency === 'daily';
         
-        // Only show habits that start on or before the selected date
-        return h.frequency === 'daily' && h.start_date <= dateStr;
+        // Only show habits on their exact start_date, not on subsequent days
+        // unless they have an explicit completion record for that day
+        if (h.frequency === 'daily') {
+          // Show on start date
+          if (h.start_date === dateStr) return true;
+          
+          // For days after start date, only show if there's a completion record
+          if (h.start_date < dateStr) {
+            return getHabitCompletion(h.id, dateStr) !== null;
+          }
+          
+          // Don't show for days before start date
+          return false;
+        }
+        
+        return false;
       })
       .map(habit => ({
         ...habit,
