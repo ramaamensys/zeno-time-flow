@@ -1244,10 +1244,9 @@ const Habits = () => {
                     </div>
                   </div>
                 )}
-                </div>
               </CardContent>
-          </Card>
-        </div>
+            </Card>
+          </div>
         </div>
 
         {/* Admin User Filter */}
