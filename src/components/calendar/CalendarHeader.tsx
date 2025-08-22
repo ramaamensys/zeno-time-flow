@@ -61,43 +61,59 @@ export const CalendarHeader = ({
   };
 
   return (
-    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6">
+    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-8">
+      {/* Left side - Create button and navigation */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <Button 
           onClick={onNewEvent} 
-          className="bg-gray-800 hover:bg-gray-700 text-white"
+          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 border-0 h-12 px-6 rounded-xl font-semibold"
           size="lg"
         >
-          <Plus className="mr-2 h-4 w-4" />
+          <Plus className="mr-2 h-5 w-5" />
           Create
         </Button>
         
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handlePrevious}>
-            <ChevronLeft className="h-4 w-4" />
+        <div className="flex items-center gap-2 bg-white rounded-xl p-1 shadow-sm border border-gray-100">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handlePrevious}
+            className="h-10 w-10 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <ChevronLeft className="h-5 w-5" />
           </Button>
-          <Button variant="outline" size="sm" onClick={handleNext}>
-            <ChevronRight className="h-4 w-4" />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleNext}
+            className="h-10 w-10 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <ChevronRight className="h-5 w-5" />
           </Button>
-          <Button variant="outline" onClick={() => onDateChange(new Date())}>
+          <Button 
+            variant="ghost" 
+            onClick={() => onDateChange(new Date())}
+            className="px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors font-medium text-gray-700"
+          >
             Today
           </Button>
         </div>
       </div>
       
+      {/* Right side - Date display and view selector */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <h1 className="text-2xl lg:text-3xl font-semibold text-gray-800">
+        <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
           {format(currentDate, getDateFormat())}
         </h1>
         
         <Select value={view} onValueChange={onViewChange}>
-          <SelectTrigger className="w-28">
+          <SelectTrigger className="w-32 h-12 rounded-xl border-gray-200 shadow-sm hover:shadow-md transition-shadow bg-white">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="day">Day</SelectItem>
-            <SelectItem value="week">Week</SelectItem>
-            <SelectItem value="month">Month</SelectItem>
+          <SelectContent className="rounded-xl border-gray-200 shadow-lg bg-white z-50">
+            <SelectItem value="day" className="rounded-lg">Day</SelectItem>
+            <SelectItem value="week" className="rounded-lg">Week</SelectItem>
+            <SelectItem value="month" className="rounded-lg">Month</SelectItem>
           </SelectContent>
         </Select>
       </div>

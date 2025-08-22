@@ -449,8 +449,14 @@ const Calendar = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <DailyQuote />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 relative">
+      {/* Background decoration */}
+      <div className="absolute inset-0 bg-grid-pattern opacity-[0.02] pointer-events-none" />
+      <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-400/10 to-purple-400/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-purple-400/10 to-pink-400/10 rounded-full blur-3xl pointer-events-none" />
+      
+      <div className="relative z-10 space-y-8 p-6">
+        <DailyQuote />
       
       <CalendarHeader
         currentDate={currentDate}
@@ -499,6 +505,7 @@ const Calendar = () => {
         />
       )}
 
+      {/* Dialogs */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="w-[95vw] max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -651,7 +658,6 @@ const Calendar = () => {
               </Button>
               <Button onClick={createEvent} className="w-full sm:w-auto">{editingEvent ? "Update Event" : "Create Event"}</Button>
             </div>
-            
           </div>
         </DialogContent>
       </Dialog>
@@ -761,6 +767,7 @@ const Calendar = () => {
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 };
