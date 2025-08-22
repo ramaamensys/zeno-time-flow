@@ -90,6 +90,7 @@ const Tasks = () => {
     priority: "all",
     dateRange: "all",
     taskType: "all", // New filter for task types
+    status: "all", // New filter for task status
   });
 
   // Helper variable for admin permissions
@@ -347,7 +348,19 @@ const Tasks = () => {
               event.template_id === null &&
               event.user_id === user?.id
             );
-          }
+    }
+
+    // Apply status filter
+    if (filters.status && filters.status !== "all") {
+      switch (filters.status) {
+        case "completed":
+          filtered = filtered.filter(event => event.completed === true);
+          break;
+        case "pending":
+          filtered = filtered.filter(event => event.completed !== true);
+          break;
+      }
+    }
           break;
       }
     }
@@ -1226,6 +1239,20 @@ const Tasks = () => {
                   <SelectItem value="today">Today</SelectItem>
                   <SelectItem value="week">Next 7 Days</SelectItem>
                   <SelectItem value="month">Next 30 Days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label>Status</Label>
+              <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Tasks</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
