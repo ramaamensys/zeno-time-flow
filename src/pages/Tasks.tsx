@@ -239,12 +239,28 @@ const Tasks = () => {
     // First get the events based on user role
     let eventsQuery = supabase.from("calendar_events").select("*");
     
-    // Admin/super_admin see all tasks except template tasks, regular users see only their own
     if (userRole !== 'admin' && userRole !== 'super_admin') {
+      // Regular users see only their own tasks
       eventsQuery = eventsQuery.eq('user_id', user.id);
     } else {
-      // For admins, exclude template tasks (they can see those on template page)
-      eventsQuery = eventsQuery.is('template_id', null);
+      // For admins: show their own tasks + tasks of users they manage
+      if (userRole === 'super_admin') {
+        // Super admins see all tasks except template tasks
+        eventsQuery = eventsQuery.is('template_id', null);
+      } else {
+        // Regular admins see their own tasks + tasks of users they manage
+        const { data: managedUsers } = await supabase
+          .from('profiles')
+          .select('user_id')
+          .eq('manager_id', user.id);
+        
+        const managedUserIds = managedUsers?.map(u => u.user_id) || [];
+        const allowedUserIds = [...managedUserIds, user.id]; // Include admin's own tasks
+        
+        eventsQuery = eventsQuery
+          .in('user_id', allowedUserIds)
+          .is('template_id', null);
+      }
     }
     
     const { data: eventsData, error: eventsError } = await eventsQuery
@@ -654,6 +670,31 @@ const Tasks = () => {
       setIsEditDialogOpen(false);
       setSelectedEvent(null);
       fetchEvents();
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm("Are you sure you want to delete this task? This action cannot be undone.")) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from("calendar_events")
+      .delete()
+      .eq("id", taskId);
+
+    if (error) {
+      toast({
+        title: "Error deleting task",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      await fetchEvents();
+      toast({
+        title: "Task deleted",
+        description: "Task has been deleted successfully",
+      });
     }
   };
 
@@ -1297,6 +1338,7 @@ const Tasks = () => {
                 onEditTask={openEditDialog}
                 onViewDetails={openEventDetails}
                 onUpdateNotes={appendTaskNote}
+                onDeleteTask={handleDeleteTask}
                 isAdmin={isAdminUser}
               />
             ))}

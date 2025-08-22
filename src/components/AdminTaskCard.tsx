@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { FileUpload } from "@/components/ui/file-upload";
 import { TaskChat } from "@/components/TaskChat";
-import { CheckSquare, Clock, Flag, User, Edit, Plus, Calendar, ChevronDown, ChevronRight, X, Check, BookOpen, MessageCircle, Save } from "lucide-react";
+import { CheckSquare, Clock, Flag, User, Edit, Plus, Calendar, ChevronDown, ChevronRight, X, Check, BookOpen, MessageCircle, Save, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
@@ -83,6 +83,7 @@ interface AdminTaskCardProps {
   onEditTask: (task: CalendarEvent) => void;
   onViewDetails: (task: CalendarEvent) => void;
   onUpdateNotes?: (taskId: string, notes: string, files?: string[]) => void;
+  onDeleteTask?: (taskId: string) => void;
   isAdmin: boolean;
 }
 
@@ -115,6 +116,7 @@ export const AdminTaskCard = ({
   onEditTask,
   onViewDetails,
   onUpdateNotes,
+  onDeleteTask,
   isAdmin,
 }: AdminTaskCardProps) => {
   const [isSubTasksExpanded, setIsSubTasksExpanded] = useState(true);
@@ -393,6 +395,19 @@ export const AdminTaskCard = ({
                         <Edit className="mr-1 h-3 w-3" />
                         Edit
                       </Button>
+                      
+                      {/* Delete Button - Only for admins */}
+                      {isAdmin && onDeleteTask && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onDeleteTask(task.id)}
+                          className="h-8 text-red-600 hover:text-red-700 hover:border-red-300"
+                        >
+                          <Trash2 className="mr-1 h-3 w-3" />
+                          Delete
+                        </Button>
+                      )}
                     </>
                   )}
                   
