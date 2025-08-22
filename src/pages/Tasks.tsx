@@ -94,6 +94,7 @@ const Tasks = () => {
     status: "all",
   });
 
+  // Helper variable for admin permissions
   const isAdminUser = userRole === 'admin' || userRole === 'super_admin';
   const [newEvent, setNewEvent] = useState({
     title: "",
@@ -459,7 +460,7 @@ const Tasks = () => {
 
   const fetchUserTemplateTasks = async () => {
     if (!user || userRole !== 'user') return;
-
+    
     try {
       const { data: assignments, error: assignmentsError } = await supabase
         .from('template_assignments')
@@ -517,8 +518,13 @@ const Tasks = () => {
   if (isLoading) {
     console.log("Tasks page loading...", { user, userRole });
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center h-96 bg-gradient-to-br from-background via-background/95 to-primary/5">
+        <div className="relative">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Target className="w-8 h-8 text-primary animate-pulse" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -577,116 +583,115 @@ const Tasks = () => {
                   <Button className="bg-gradient-to-r from-primary via-primary/90 to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 border-0">
                     <Plus className="mr-2 h-4 w-4" />
                     <Sparkles className="mr-1 h-3 w-3" />
-                  New Task
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Create New Task</DialogTitle>
-                  <DialogDescription>
-                    Add a new task to your calendar. Fill in the details below.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
+                    New Task
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Create New Task</DialogTitle>
+                    <DialogDescription>
+                      Add a new task to your calendar. Fill in the details below.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    {isAdminUser && (
+                      <div className="grid gap-2">
+                        <Label>Assign to User</Label>
+                        <Select
+                          value={newEvent.assigned_user_id}
+                          onValueChange={(value) => setNewEvent({ ...newEvent, assigned_user_id: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Assign to myself" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="self">Assign to myself</SelectItem>
+                            {teamMembers.map((member) => (
+                              <SelectItem key={member.user_id} value={member.user_id}>
+                                {member.full_name} ({member.email})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
 
-                  {/* User Assignment - Only for Admins */}
-                  {isAdminUser && (
                     <div className="grid gap-2">
-                      <Label>Assign to User</Label>
-                      <Select
-                        value={newEvent.assigned_user_id}
-                        onValueChange={(value) => setNewEvent({ ...newEvent, assigned_user_id: value })}
-                      >
+                      <Label htmlFor="title">Title *</Label>
+                      <Input
+                        id="title"
+                        placeholder="Enter task title"
+                        value={newEvent.title}
+                        onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        placeholder="Enter task description"
+                        value={newEvent.description}
+                        onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="priority">Priority</Label>
+                      <Select value={newEvent.priority} onValueChange={(value) => setNewEvent({ ...newEvent, priority: value })}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Assign to myself" />
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="self">Assign to myself</SelectItem>
-                          {teamMembers.map((member) => (
-                            <SelectItem key={member.user_id} value={member.user_id}>
-                              {member.full_name} ({member.email})
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                  )}
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="title">Title *</Label>
-                    <Input
-                      id="title"
-                      placeholder="Enter task title"
-                      value={newEvent.title}
-                      onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                    />
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="all-day"
+                        checked={newEvent.all_day}
+                        onCheckedChange={(checked) => setNewEvent({ ...newEvent, all_day: checked })}
+                      />
+                      <Label htmlFor="all-day">All day</Label>
+                    </div>
+
+                    {!newEvent.all_day && (
+                      <>
+                        <div className="grid gap-2">
+                          <Label htmlFor="start-time">Start Time</Label>
+                          <Input
+                            id="start-time"
+                            type="datetime-local"
+                            value={newEvent.start_time}
+                            onChange={(e) => setNewEvent({ ...newEvent, start_time: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label htmlFor="end-time">End Time</Label>
+                          <Input
+                            id="end-time"
+                            type="datetime-local"
+                            value={newEvent.end_time}
+                            onChange={(e) => setNewEvent({ ...newEvent, end_time: e.target.value })}
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Enter task description"
-                      value={newEvent.description}
-                      onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                    />
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={createEvent}>Create Task</Button>
                   </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="priority">Priority</Label>
-                    <Select value={newEvent.priority} onValueChange={(value) => setNewEvent({ ...newEvent, priority: value })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="all-day"
-                      checked={newEvent.all_day}
-                      onCheckedChange={(checked) => setNewEvent({ ...newEvent, all_day: checked })}
-                    />
-                    <Label htmlFor="all-day">All Day</Label>
-                  </div>
-
-                  {!newEvent.all_day && (
-                    <>
-                      <div className="grid gap-2">
-                        <Label htmlFor="start-time">Start Time</Label>
-                        <Input
-                          id="start-time"
-                          type="datetime-local"
-                          value={newEvent.start_time}
-                          onChange={(e) => setNewEvent({ ...newEvent, start_time: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="grid gap-2">
-                        <Label htmlFor="end-time">End Time</Label>
-                        <Input
-                          id="end-time"
-                          type="datetime-local"
-                          value={newEvent.end_time}
-                          onChange={(e) => setNewEvent({ ...newEvent, end_time: e.target.value })}
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={createEvent}>Create Task</Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </div>
       </div>
@@ -811,19 +816,78 @@ const Tasks = () => {
         {filteredEvents.length > 0 ? (
           <div className="space-y-4 animate-fade-in">
             {filteredEvents.map((event) => (
-              <AdminTaskCard
-                key={event.id}
-                event={event}
-                isAdminView={isAdminUser}
-                onRefresh={fetchEvents}
-              />
+              <div key={event.id} className="group relative">
+                <Card className="border-0 shadow-lg hover:shadow-xl bg-gradient-to-r from-card/80 via-card to-card/90 backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className={`p-2 rounded-lg ${
+                            event.completed 
+                              ? 'bg-green-500/20 text-green-600' 
+                              : event.priority === 'high' 
+                                ? 'bg-red-500/20 text-red-600'
+                                : event.priority === 'medium'
+                                  ? 'bg-yellow-500/20 text-yellow-600'
+                                  : 'bg-blue-500/20 text-blue-600'
+                          }`}>
+                            {event.completed ? <Check className="w-4 h-4" /> : <Flag className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <h3 className={`text-lg font-semibold ${event.completed ? 'line-through text-muted-foreground' : ''}`}>
+                              {event.title}
+                            </h3>
+                            {event.description && (
+                              <p className="text-sm text-muted-foreground">{event.description}</p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            {format(new Date(event.start_time), "MMM dd, yyyy")}
+                          </div>
+                          {!event.all_day && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              {format(new Date(event.start_time), "h:mm a")}
+                            </div>
+                          )}
+                          {isAdminUser && event.profiles && (
+                            <div className="flex items-center gap-1">
+                              <User className="w-4 h-4" />
+                              {event.profiles.full_name || event.profiles.email}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Badge variant={event.priority === 'high' ? 'destructive' : event.priority === 'medium' ? 'default' : 'secondary'}>
+                          {event.priority}
+                        </Badge>
+                        {event.completed ? (
+                          <Badge variant="default" className="bg-green-500 text-white">
+                            Completed
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">
+                            Pending
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             ))}
           </div>
         ) : (
           <Card className="border-0 shadow-2xl bg-gradient-to-br from-card/50 via-card/30 to-card/50 backdrop-blur-sm animate-scale-in">
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <div className="p-6 rounded-full bg-gradient-to-br from-muted/50 to-muted/30 mb-6">
-                <List className="w-12 h-12 text-muted-foreground/50" />
+                <List className="w-12 h-12 text-muted-foreground/60" />
               </div>
               <h3 className="text-xl font-semibold mb-2 text-muted-foreground">No tasks found</h3>
               <p className="text-muted-foreground/80 mb-6 max-w-md">
