@@ -238,7 +238,10 @@ const Tasks = () => {
     if (!user || userRole === null) return;
     
     // First get the events based on user role
-    let eventsQuery = supabase.from("calendar_events").select("*");
+    let eventsQuery = supabase.from("calendar_events").select(`
+      *,
+      created_by
+    `);
     
     if (userRole !== 'admin' && userRole !== 'super_admin') {
       // Regular users see only their own tasks

@@ -245,6 +245,12 @@ export const AdminTaskCard = ({
                         Template Task
                       </Badge>
                     )}
+                    {!task.template_id && currentUser && task.user_id === currentUser?.id && task.created_by !== task.user_id && (
+                      <Badge variant="outline" className="bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200">
+                        <User className="mr-1 h-3 w-3" />
+                        Admin Assigned
+                      </Badge>
+                    )}
                     {!task.template_id && isAdmin && task.user_id !== currentUser?.id && task.created_by !== task.user_id && (
                       <Badge variant="outline" className="bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200">
                         <User className="mr-1 h-3 w-3" />
@@ -257,7 +263,7 @@ export const AdminTaskCard = ({
                         {task.profiles?.full_name || task.profiles?.email || 'User Task'}
                       </Badge>
                     )}
-                    {!task.template_id && currentUser && task.user_id === currentUser?.id && (
+                    {!task.template_id && currentUser && task.user_id === currentUser?.id && (!task.created_by || task.created_by === task.user_id) && (
                       <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300 border-green-200">
                         <User className="mr-1 h-3 w-3" />
                         Personal Task
@@ -418,8 +424,8 @@ export const AdminTaskCard = ({
                     </>
                   )}
                   
-                   {/* Chat - Show for template tasks and admin-assigned regular tasks */}
-                   {(task.template_id || (!task.template_id && isAdmin && task.user_id !== currentUser?.id)) && (
+                   {/* Chat - Show for admin-assigned tasks (using created_by field) */}
+                   {currentUser && task.created_by && task.created_by !== task.user_id && (
                      <TaskChat
                        taskId={task.id}
                        taskTitle={task.title}
@@ -432,12 +438,16 @@ export const AdminTaskCard = ({
                      />
                    )}
                    
-                   {/* Chat for users on admin-assigned tasks */}
-                   {!task.template_id && !isAdmin && task.description && task.description.length > 0 && (
+                   {/* Chat for template tasks */}
+                   {task.template_id && (
                      <TaskChat
                        taskId={task.id}
                        taskTitle={task.title}
-                       assignedUsers={[]}
+                       assignedUsers={isAdmin && task.profiles ? [{
+                         user_id: task.user_id,
+                         full_name: task.profiles.full_name,
+                         email: task.profiles.email
+                       }] : []}
                        isAdmin={isAdmin}
                      />
                    )}
