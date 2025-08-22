@@ -375,13 +375,18 @@ const Habits = () => {
 
   const getTodayStats = () => {
     const today = new Date().toISOString().split('T')[0];
-    const dailyHabits = habits.filter(h => h.frequency === 'daily');
-    const completedToday = dailyHabits.filter(h => getHabitCompletion(h.id, today)).length;
+    // Filter habits that should be active today
+    const activeTodayHabits = habits.filter(h => {
+      if (h.frequency !== 'daily') return false;
+      // If no start_date is set, show for all days (legacy habits)
+      if (!h.start_date) return true;
+      // Only include habits that start on or before today
+      return h.start_date <= today;
+    });
+    const completedToday = activeTodayHabits.filter(h => getHabitCompletion(h.id, today)).length;
     const totalStreaks = habits.reduce((sum, h) => sum + h.current_streak, 0);
-    // Calculate perfect days (days where all daily habits were completed)
-    const perfectDays = 0; // TODO: Calculate based on historical data
 
-    return { completedToday, totalHabits: dailyHabits.length, totalStreaks, perfectDays };
+    return { completedToday, totalHabits: activeTodayHabits.length, totalStreaks };
   };
 
   const getWeeklyCalendar = () => {
@@ -473,11 +478,19 @@ const Habits = () => {
   };
 
   const getDayHabits = (dateStr: string) => {
-    const dailyHabits = habits.filter(h => h.frequency === 'daily');
-    return dailyHabits.map(habit => ({
-      ...habit,
-      completed: getHabitCompletion(habit.id, dateStr)
-    }));
+    // Filter habits that should be active on the given date
+    return habits
+      .filter(h => {
+        // If no start_date is set, show for all days (legacy habits)
+        if (!h.start_date) return h.frequency === 'daily';
+        
+        // Only show habits that start on or before the selected date
+        return h.frequency === 'daily' && h.start_date <= dateStr;
+      })
+      .map(habit => ({
+        ...habit,
+        completed: getHabitCompletion(habit.id, dateStr)
+      }));
   };
 
   const stats = getTodayStats();
@@ -560,6 +573,34 @@ const Habits = () => {
                       <SelectItem value="weekly">Weekly</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div>
+                  <Label htmlFor="start-date">Start Date</Label>
+                  <Input
+                    id="start-date"
+                    type="date"
+                    value={newHabit.start_date}
+                    onChange={(e) => setNewHabit({ ...newHabit, start_date: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="start-time">Start Time</Label>
+                  <Input
+                    id="start-time"
+                    type="time"
+                    value={newHabit.start_time}
+                    onChange={(e) => setNewHabit({ ...newHabit, start_time: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="notes">Notes (optional)</Label>
+                  <Textarea
+                    id="notes"
+                    value={newHabit.notes}
+                    onChange={(e) => setNewHabit({ ...newHabit, notes: e.target.value })}
+                    placeholder="Any additional notes about this habit..."
+                    rows={3}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="color">Color</Label>
