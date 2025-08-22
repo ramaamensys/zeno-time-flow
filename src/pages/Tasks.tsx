@@ -518,13 +518,15 @@ const Tasks = () => {
   };
 
   // AdminTaskCard callback functions
-  const toggleTaskComplete = async (taskId: string, completed: boolean) => {
+  const toggleTaskComplete = async (taskId: string, currentCompleted: boolean) => {
     try {
+      const newCompleted = !currentCompleted;
+      
       const { error } = await supabase
         .from('calendar_events')
         .update({ 
-          completed,
-          completed_at: completed ? new Date().toISOString() : null 
+          completed: newCompleted,
+          completed_at: newCompleted ? new Date().toISOString() : null 
         })
         .eq('id', taskId);
 
@@ -535,9 +537,17 @@ const Tasks = () => {
           variant: "destructive",
         });
       } else {
-        await fetchEvents();
+        // Update local state immediately for better UX
+        setEvents(prevEvents => 
+          prevEvents.map(event => 
+            event.id === taskId 
+              ? { ...event, completed: newCompleted, completed_at: newCompleted ? new Date().toISOString() : null }
+              : event
+          )
+        );
+        
         toast({
-          title: completed ? "Task completed!" : "Task reopened",
+          title: newCompleted ? "Task completed!" : "Task reopened",
           description: "Task status updated successfully",
         });
       }
