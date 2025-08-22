@@ -457,14 +457,14 @@ const Calendar = () => {
       
       <div className="relative z-10 space-y-8 p-6">
         <DailyQuote />
-      
-      <CalendarHeader
-        currentDate={currentDate}
-        onDateChange={setCurrentDate}
-        view={view}
-        onViewChange={setView}
-        onNewEvent={() => openEventDialog()}
-      />
+        
+        <CalendarHeader
+          currentDate={currentDate}
+          onDateChange={setCurrentDate}
+          view={view}
+          onViewChange={setView}
+          onNewEvent={() => openEventDialog()}
+        />
 
       {view === "month" && (
         <MonthView
