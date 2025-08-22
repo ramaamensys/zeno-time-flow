@@ -22,21 +22,23 @@ interface CalendarEvent {
   title: string;
   description: string | null;
   priority: string;
-  start_time: string;
-  end_time: string;
+  start_time: string | null;
+  end_time: string | null;
   all_day: boolean;
   event_type: string;
   created_at: string;
   user_id: string;
   created_by?: string;
   parent_task_id?: string | null;
-  completed?: boolean;
+  completed?: boolean | null;
   completed_at?: string | null;
   template_id?: string | null;
+  notes?: string | null;
+  files?: any;
   profiles?: {
     full_name: string | null;
     email: string;
-  };
+  } | null;
   sub_tasks?: CalendarEvent[];
 }
 
@@ -515,6 +517,192 @@ const Tasks = () => {
     }
   };
 
+  // AdminTaskCard callback functions
+  const toggleTaskComplete = async (taskId: string, completed: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .update({ 
+          completed,
+          completed_at: completed ? new Date().toISOString() : null 
+        })
+        .eq('id', taskId);
+
+      if (error) {
+        toast({
+          title: "Error updating task",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        await fetchEvents();
+        toast({
+          title: completed ? "Task completed!" : "Task reopened",
+          description: "Task status updated successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling task completion:', error);
+    }
+  };
+
+  const openSubTaskDialog = (parentTask: CalendarEvent) => {
+    setParentTaskForSubTask(parentTask);
+    setIsSubTaskDialogOpen(true);
+  };
+
+  const openEditDialog = (task: CalendarEvent) => {
+    setSelectedEvent(task);
+    setIsEditDialogOpen(true);
+  };
+
+  const openDetailDialog = (task: CalendarEvent) => {
+    setSelectedEvent(task);
+    setIsDetailDialogOpen(true);
+  };
+
+  const updateTaskNotes = async (taskId: string, notes: string, files?: string[]) => {
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .update({ 
+          notes,
+          files: files || []
+        })
+        .eq('id', taskId);
+
+      if (error) {
+        toast({
+          title: "Error updating notes",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        await fetchEvents();
+        toast({
+          title: "Notes updated",
+          description: "Task notes saved successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error updating task notes:', error);
+    }
+  };
+
+  const deleteTask = async (taskId: string) => {
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .delete()
+        .eq('id', taskId);
+
+      if (error) {
+        toast({
+          title: "Error deleting task",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        await fetchEvents();
+        toast({
+          title: "Task deleted",
+          description: "Task removed successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error);
+    }
+  };
+
+  const createSubTask = async () => {
+    if (!newSubTask.title.trim() || !parentTaskForSubTask) {
+      toast({
+        title: "Title required",
+        description: "Please enter a sub-task title",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const subTaskData = {
+      title: newSubTask.title,
+      description: newSubTask.description || null,
+      priority: newSubTask.priority,
+      start_time: newSubTask.start_time ? new Date(newSubTask.start_time).toISOString() : new Date().toISOString(),
+      end_time: newSubTask.end_time ? new Date(newSubTask.end_time).toISOString() : (newSubTask.start_time ? new Date(newSubTask.start_time).toISOString() : new Date().toISOString()),
+      all_day: newSubTask.all_day,
+      event_type: newSubTask.event_type,
+      parent_task_id: parentTaskForSubTask.id,
+      user_id: (isAdminUser && newSubTask.assigned_user_id && newSubTask.assigned_user_id !== "self") ? newSubTask.assigned_user_id : parentTaskForSubTask.user_id,
+      created_by: user?.id,
+    };
+
+    const { error } = await supabase.from("calendar_events").insert([subTaskData]);
+
+    if (error) {
+      toast({
+        title: "Error creating sub-task",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Sub-task created successfully!",
+        description: newSubTask.title,
+      });
+      
+      setNewSubTask({
+        title: "",
+        description: "",
+        priority: "medium",
+        start_time: "",
+        end_time: "",
+        all_day: false,
+        event_type: "task",
+        assigned_user_id: "",
+      });
+      setIsSubTaskDialogOpen(false);
+      setParentTaskForSubTask(null);
+      fetchEvents();
+    }
+  };
+
+  const updateEvent = async (event: CalendarEvent | null) => {
+    if (!event) return;
+
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .update({
+          title: event.title,
+          description: event.description,
+          priority: event.priority,
+          start_time: event.start_time,
+          end_time: event.end_time,
+          all_day: event.all_day,
+        })
+        .eq('id', event.id);
+
+      if (error) {
+        toast({
+          title: "Error updating task",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        await fetchEvents();
+        setIsEditDialogOpen(false);
+        setSelectedEvent(null);
+        toast({
+          title: "Task updated",
+          description: "Task updated successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error updating task:', error);
+    }
+  };
+
   if (isLoading) {
     console.log("Tasks page loading...", { user, userRole });
     return (
@@ -816,71 +1004,17 @@ const Tasks = () => {
         {filteredEvents.length > 0 ? (
           <div className="space-y-4 animate-fade-in">
             {filteredEvents.map((event) => (
-              <div key={event.id} className="group relative">
-                <Card className="border-0 shadow-lg hover:shadow-xl bg-gradient-to-r from-card/80 via-card to-card/90 backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className={`p-2 rounded-lg ${
-                            event.completed 
-                              ? 'bg-green-500/20 text-green-600' 
-                              : event.priority === 'high' 
-                                ? 'bg-red-500/20 text-red-600'
-                                : event.priority === 'medium'
-                                  ? 'bg-yellow-500/20 text-yellow-600'
-                                  : 'bg-blue-500/20 text-blue-600'
-                          }`}>
-                            {event.completed ? <Check className="w-4 h-4" /> : <Flag className="w-4 h-4" />}
-                          </div>
-                          <div>
-                            <h3 className={`text-lg font-semibold ${event.completed ? 'line-through text-muted-foreground' : ''}`}>
-                              {event.title}
-                            </h3>
-                            {event.description && (
-                              <p className="text-sm text-muted-foreground">{event.description}</p>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
-                            {format(new Date(event.start_time), "MMM dd, yyyy")}
-                          </div>
-                          {!event.all_day && (
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              {format(new Date(event.start_time), "h:mm a")}
-                            </div>
-                          )}
-                          {isAdminUser && event.profiles && (
-                            <div className="flex items-center gap-1">
-                              <User className="w-4 h-4" />
-                              {event.profiles.full_name || event.profiles.email}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Badge variant={event.priority === 'high' ? 'destructive' : event.priority === 'medium' ? 'default' : 'secondary'}>
-                          {event.priority}
-                        </Badge>
-                        {event.completed ? (
-                          <Badge variant="default" className="bg-green-500 text-white">
-                            Completed
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline">
-                            Pending
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <AdminTaskCard 
+                key={event.id} 
+                task={event}
+                isAdmin={isAdminUser}
+                onToggleComplete={toggleTaskComplete}
+                onAddSubTask={openSubTaskDialog}
+                onEditTask={openEditDialog}
+                onViewDetails={openDetailDialog}
+                onUpdateNotes={updateTaskNotes}
+                onDeleteTask={deleteTask}
+              />
             ))}
           </div>
         ) : (
@@ -962,6 +1096,307 @@ const Tasks = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Sub Task Dialog */}
+        <Dialog open={isSubTaskDialogOpen} onOpenChange={setIsSubTaskDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Create Sub Task</DialogTitle>
+              <DialogDescription>
+                Add a sub-task to {parentTaskForSubTask?.title}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              {isAdminUser && (
+                <div className="grid gap-2">
+                  <Label>Assign to User</Label>
+                  <Select
+                    value={newSubTask.assigned_user_id}
+                    onValueChange={(value) => setNewSubTask({ ...newSubTask, assigned_user_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Same as parent task" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="self">Same as parent task</SelectItem>
+                      {teamMembers.map((member) => (
+                        <SelectItem key={member.user_id} value={member.user_id}>
+                          {member.full_name} ({member.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="grid gap-2">
+                <Label htmlFor="sub-title">Title *</Label>
+                <Input
+                  id="sub-title"
+                  placeholder="Enter sub-task title"
+                  value={newSubTask.title}
+                  onChange={(e) => setNewSubTask({ ...newSubTask, title: e.target.value })}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="sub-description">Description</Label>
+                <Textarea
+                  id="sub-description"
+                  placeholder="Enter sub-task description"
+                  value={newSubTask.description}
+                  onChange={(e) => setNewSubTask({ ...newSubTask, description: e.target.value })}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="sub-priority">Priority</Label>
+                <Select value={newSubTask.priority} onValueChange={(value) => setNewSubTask({ ...newSubTask, priority: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="sub-all-day"
+                  checked={newSubTask.all_day}
+                  onCheckedChange={(checked) => setNewSubTask({ ...newSubTask, all_day: checked })}
+                />
+                <Label htmlFor="sub-all-day">All day</Label>
+              </div>
+
+              {!newSubTask.all_day && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="sub-start-time">Start Time</Label>
+                    <Input
+                      id="sub-start-time"
+                      type="datetime-local"
+                      value={newSubTask.start_time}
+                      onChange={(e) => setNewSubTask({ ...newSubTask, start_time: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="sub-end-time">End Time</Label>
+                    <Input
+                      id="sub-end-time"
+                      type="datetime-local"
+                      value={newSubTask.end_time}
+                      onChange={(e) => setNewSubTask({ ...newSubTask, end_time: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setIsSubTaskDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={createSubTask}>Create Sub Task</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Task Details Dialog */}
+        <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle className="text-xl">{selectedEvent?.title}</DialogTitle>
+            </DialogHeader>
+            {selectedEvent && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium">Priority</Label>
+                    <Badge variant={selectedEvent.priority === 'high' ? 'destructive' : selectedEvent.priority === 'medium' ? 'default' : 'secondary'} className="mt-1">
+                      {selectedEvent.priority}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Status</Label>
+                    <Badge variant={selectedEvent.completed ? 'default' : 'outline'} className="mt-1">
+                      {selectedEvent.completed ? 'Completed' : 'Pending'}
+                    </Badge>
+                  </div>
+                </div>
+
+                {selectedEvent.description && (
+                  <div>
+                    <Label className="text-sm font-medium">Description</Label>
+                    <p className="text-sm text-muted-foreground mt-1">{selectedEvent.description}</p>
+                  </div>
+                )}
+
+                {selectedEvent.start_time && (
+                  <div>
+                    <Label className="text-sm font-medium">
+                      {selectedEvent.all_day ? "Date" : "Start Time"}
+                    </Label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {selectedEvent.all_day 
+                        ? format(new Date(selectedEvent.start_time), "MMMM dd, yyyy")
+                        : format(new Date(selectedEvent.start_time), "MMMM dd, yyyy 'at' h:mm a")
+                      }
+                    </p>
+                  </div>
+                )}
+
+                {!selectedEvent.all_day && selectedEvent.end_time && (
+                  <div>
+                    <Label className="text-sm font-medium">End Time</Label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {format(new Date(selectedEvent.end_time), "MMMM dd, yyyy 'at' h:mm a")}
+                    </p>
+                  </div>
+                )}
+
+                {isAdminUser && selectedEvent.profiles && (
+                  <div>
+                    <Label className="text-sm font-medium">Assigned to</Label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {selectedEvent.profiles.full_name || selectedEvent.profiles.email}
+                    </p>
+                  </div>
+                )}
+
+                {selectedEvent.completed_at && (
+                  <div>
+                    <Label className="text-sm font-medium">Completed on</Label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {format(new Date(selectedEvent.completed_at), "MMMM dd, yyyy 'at' h:mm a")}
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <Label className="text-sm font-medium">Created on</Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {format(new Date(selectedEvent.created_at), "MMMM dd, yyyy 'at' h:mm a")}
+                  </p>
+                </div>
+
+                {selectedEvent.notes && (
+                  <div>
+                    <Label className="text-sm font-medium">Notes</Label>
+                    <p className="text-sm text-muted-foreground mt-1">{selectedEvent.notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Task Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Edit Task</DialogTitle>
+              <DialogDescription>
+                Update the task details below.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedEvent && (
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-title">Title</Label>
+                  <Input
+                    id="edit-title"
+                    value={selectedEvent.title}
+                    onChange={(e) => setSelectedEvent({ ...selectedEvent, title: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-description">Description</Label>
+                  <Textarea
+                    id="edit-description"
+                    value={selectedEvent.description || ""}
+                    onChange={(e) => setSelectedEvent({ ...selectedEvent, description: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-priority">Priority</Label>
+                  <Select value={selectedEvent.priority} onValueChange={(value) => setSelectedEvent({ ...selectedEvent, priority: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="edit-all-day"
+                    checked={selectedEvent.all_day}
+                    onCheckedChange={(checked) => setSelectedEvent({ ...selectedEvent, all_day: checked })}
+                  />
+                  <Label htmlFor="edit-all-day">All day</Label>
+                </div>
+
+                {!selectedEvent.all_day && (
+                  <>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-start-time">Start Time</Label>
+                      <Input
+                        id="edit-start-time"
+                        type="datetime-local"
+                        value={selectedEvent.start_time ? (() => {
+                          const date = new Date(selectedEvent.start_time);
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const day = String(date.getDate()).padStart(2, '0');
+                          const hours = String(date.getHours()).padStart(2, '0');
+                          const minutes = String(date.getMinutes()).padStart(2, '0');
+                          return `${year}-${month}-${day}T${hours}:${minutes}`;
+                        })() : ""}
+                        onChange={(e) => setSelectedEvent({ ...selectedEvent, start_time: e.target.value ? new Date(e.target.value).toISOString() : "" })}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-end-time">End Time</Label>
+                      <Input
+                        id="edit-end-time"
+                        type="datetime-local"
+                        value={selectedEvent.end_time ? (() => {
+                          const date = new Date(selectedEvent.end_time);
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const day = String(date.getDate()).padStart(2, '0');
+                          const hours = String(date.getHours()).padStart(2, '0');
+                          const minutes = String(date.getMinutes()).padStart(2, '0');
+                          return `${year}-${month}-${day}T${hours}:${minutes}`;
+                        })() : ""}
+                        onChange={(e) => setSelectedEvent({ ...selectedEvent, end_time: e.target.value ? new Date(e.target.value).toISOString() : "" })}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => updateEvent(selectedEvent)}>
+                Update Task
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
