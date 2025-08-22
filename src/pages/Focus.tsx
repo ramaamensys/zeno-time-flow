@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Play, Pause, Square, Timer, Target, Brain, Users } from "lucide-react";
+import { Play, Pause, Square, Timer, Target, Brain, Users, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -37,6 +38,7 @@ const Focus = () => {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [users, setUsers] = useState<Array<{ id: string; full_name: string; email: string }>>([]);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user) {
@@ -248,6 +250,18 @@ const Focus = () => {
     return `${mins}m`;
   };
 
+  const toggleNotesExpansion = (sessionId: string) => {
+    setExpandedNotes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(sessionId)) {
+        newSet.delete(sessionId);
+      } else {
+        newSet.add(sessionId);
+      }
+      return newSet;
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -424,7 +438,7 @@ const Focus = () => {
                     className="group hover:shadow-lg transition-all duration-300 p-6 border border-gray-100 rounded-2xl bg-gradient-to-r from-white to-gray-50/50 hover:from-indigo-50/50 hover:to-purple-50/50"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="space-y-2">
+                      <div className="space-y-2 flex-1">
                         <div className="flex items-center gap-3">
                           <span className="font-semibold text-lg text-gray-800">
                             {new Date(session.start_time).toLocaleDateString()}
@@ -433,27 +447,40 @@ const Focus = () => {
                             {new Date(session.start_time).toLocaleTimeString()}
                           </span>
                         </div>
+                        
+                        {/* Expandable Notes Section */}
                         {session.notes && (
-                          <p className="text-gray-600 mt-2 p-3 bg-blue-50/50 rounded-lg border-l-4 border-blue-200">
-                            {session.notes}
-                          </p>
+                          <Collapsible>
+                            <CollapsibleTrigger 
+                              onClick={() => toggleNotesExpansion(session.id)}
+                              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors mt-3"
+                            >
+                              <FileText className="h-4 w-4" />
+                              <span className="text-sm font-medium">View Notes</span>
+                              {expandedNotes.has(session.id) ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="mt-3">
+                              <div className="bg-blue-50/80 p-4 rounded-lg border-l-4 border-blue-300">
+                                <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+                                  {session.notes}
+                                </p>
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
                         )}
                       </div>
-                      <div className="flex items-center gap-6 text-sm">
+                      
+                      <div className="flex items-center gap-6 text-sm ml-6">
                         <div className="text-center">
                           <div className="font-bold text-xl text-indigo-600 mb-1">
                             {formatDuration(session.duration)}
                           </div>
                           <div className="text-gray-500 font-medium">Duration</div>
                         </div>
-                        {session.productivity_score && (
-                          <div className="text-center">
-                            <div className="font-bold text-xl text-purple-600 mb-1">
-                              {session.productivity_score}/10
-                            </div>
-                            <div className="text-gray-500 font-medium">Score</div>
-                          </div>
-                        )}
                         <div className="text-center">
                           <div className="font-bold text-xl text-orange-600 mb-1">
                             {session.interruptions}
