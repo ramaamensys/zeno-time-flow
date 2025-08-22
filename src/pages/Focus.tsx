@@ -257,189 +257,256 @@ const Focus = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Focus Sessions</h1>
-        <p className="text-muted-foreground">
-          Track your focused work time and productivity
-        </p>
-        {selectedUserId && userRole && (userRole === 'admin' || userRole === 'super_admin') && (
-          <p className="text-sm text-muted-foreground mt-1">
-            Viewing focus sessions for: {users.find(u => u.id === selectedUserId)?.full_name}
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50/30 to-purple-50/30 relative">
+      {/* Background decoration */}
+      <div className="absolute inset-0 bg-grid-pattern opacity-[0.02] pointer-events-none" />
+      <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-indigo-400/10 to-purple-400/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-blue-400/10 to-cyan-400/10 rounded-full blur-3xl pointer-events-none" />
+      
+      <div className="relative z-10 space-y-8 p-6">
+        {/* Header Section */}
+        <div className="text-center">
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 bg-clip-text text-transparent mb-4">
+            Focus Sessions
+          </h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Track your focused work time and productivity
           </p>
-        )}
-      </div>
+          {selectedUserId && userRole && (userRole === 'admin' || userRole === 'super_admin') && (
+            <p className="text-sm text-purple-600 mt-2 font-medium">
+              Viewing focus sessions for: {users.find(u => u.id === selectedUserId)?.full_name}
+            </p>
+          )}
+        </div>
 
-      <Card className="border-2">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Timer className="h-5 w-5" />
-            Focus Timer
-          </CardTitle>
-          <CardDescription>
-            Start a focus session to track your productive time
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="text-center">
-            <div className="text-6xl font-mono font-bold mb-4">
-              {formatTime(seconds)}
-            </div>
-            
-            {currentSession && (
-              <div className="flex items-center justify-center gap-4 mb-4">
-                <Badge variant="outline" className="text-sm">
-                  Interruptions: {interruptions}
-                </Badge>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={addInterruption}
-                >
-                  +1 Interruption
-                </Button>
+        {/* Focus Timer Card */}
+        <Card className="border-0 shadow-2xl bg-white/90 backdrop-blur-sm overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white pb-8">
+            <CardTitle className="flex items-center justify-center gap-3 text-2xl font-bold">
+              <Timer className="h-7 w-7" />
+              Focus Timer
+            </CardTitle>
+            <CardDescription className="text-indigo-100 text-center text-lg">
+              Start a focus session to track your productive time
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-8 py-8">
+            <div className="text-center">
+              {/* Timer Display */}
+              <div className="relative mb-8">
+                <div className="text-7xl md:text-8xl font-mono font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-6 tracking-tight">
+                  {formatTime(seconds)}
+                </div>
+                {currentSession && (
+                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  </div>
+                )}
               </div>
-            )}
-
-            <div className="flex items-center justify-center gap-4">
-              {!currentSession && (!selectedUserId || selectedUserId === user?.id) ? (
-                <Button onClick={startSession} size="lg">
-                  <Play className="mr-2 h-4 w-4" />
-                  Start Focus Session
-                </Button>
-              ) : currentSession ? (
-                <>
-                  {isActive ? (
-                    <Button onClick={pauseSession} variant="outline" size="lg">
-                      <Pause className="mr-2 h-4 w-4" />
-                      Pause
-                    </Button>
-                  ) : (
-                    <Button onClick={resumeSession} size="lg">
-                      <Play className="mr-2 h-4 w-4" />
-                      Resume
-                    </Button>
-                  )}
-                  <Button onClick={stopSession} variant="destructive" size="lg">
-                    <Square className="mr-2 h-4 w-4" />
-                    Stop Session
+              
+              {/* Interruptions Counter */}
+              {currentSession && (
+                <div className="flex items-center justify-center gap-6 mb-8">
+                  <div className="bg-gradient-to-r from-orange-100 to-red-100 px-6 py-3 rounded-2xl border border-orange-200">
+                    <span className="text-orange-700 font-semibold">
+                      Interruptions: {interruptions}
+                    </span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={addInterruption}
+                    className="border-orange-300 text-orange-600 hover:bg-orange-50 rounded-xl h-12 px-6"
+                  >
+                    +1 Interruption
                   </Button>
-                </>
-              ) : selectedUserId && selectedUserId !== user?.id && (
-                <p className="text-muted-foreground">Viewing another user's sessions (read-only)</p>
+                </div>
               )}
-            </div>
-          </div>
 
-          {currentSession && (
-            <div className="space-y-4 pt-4 border-t">
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="session-notes">Session Notes</Label>
+              {/* Control Buttons */}
+              <div className="flex items-center justify-center gap-4">
+                {!currentSession && (!selectedUserId || selectedUserId === user?.id) ? (
+                  <Button 
+                    onClick={startSession} 
+                    size="lg"
+                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 h-14 px-8 text-lg font-semibold rounded-2xl"
+                  >
+                    <Play className="mr-3 h-5 w-5" />
+                    Start Focus Session
+                  </Button>
+                ) : currentSession ? (
+                  <>
+                    {isActive ? (
+                      <Button 
+                        onClick={pauseSession} 
+                        variant="outline" 
+                        size="lg"
+                        className="border-2 border-orange-300 text-orange-600 hover:bg-orange-50 h-14 px-8 text-lg font-semibold rounded-2xl"
+                      >
+                        <Pause className="mr-3 h-5 w-5" />
+                        Pause
+                      </Button>
+                    ) : (
+                      <Button 
+                        onClick={resumeSession} 
+                        size="lg"
+                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 h-14 px-8 text-lg font-semibold rounded-2xl"
+                      >
+                        <Play className="mr-3 h-5 w-5" />
+                        Resume
+                      </Button>
+                    )}
+                    <Button 
+                      onClick={stopSession} 
+                      variant="destructive" 
+                      size="lg"
+                      className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 shadow-lg hover:shadow-xl transition-all duration-300 h-14 px-8 text-lg font-semibold rounded-2xl"
+                    >
+                      <Square className="mr-3 h-5 w-5" />
+                      Stop Session
+                    </Button>
+                  </>
+                ) : selectedUserId && selectedUserId !== user?.id && (
+                  <div className="bg-gray-100 px-6 py-4 rounded-2xl">
+                    <p className="text-gray-600 font-medium">Viewing another user's sessions (read-only)</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Session Notes */}
+            {currentSession && (
+              <div className="pt-8 border-t border-gray-200">
+                <div className="max-w-2xl mx-auto space-y-4">
+                  <Label htmlFor="session-notes" className="text-lg font-semibold text-gray-700">
+                    Session Notes
+                  </Label>
                   <Textarea
                     id="session-notes"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="What did you work on? Any insights or challenges?"
-                    rows={3}
+                    rows={4}
+                    className="rounded-xl border-gray-200 focus:border-indigo-300 focus:ring-indigo-200"
                   />
                 </div>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Brain className="h-5 w-5" />
-            Recent Sessions
-          </CardTitle>
-          <CardDescription>
-            Your focus session history
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {sessions.length === 0 ? (
-            <div className="text-center py-8">
-              <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">
-                No focus sessions yet. Start your first session to track your productivity!
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {sessions.map((session) => (
-                <div key={session.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">
-                        {new Date(session.start_time).toLocaleDateString()}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {new Date(session.start_time).toLocaleTimeString()}
-                      </span>
-                    </div>
-                    {session.notes && (
-                      <p className="text-sm text-muted-foreground">{session.notes}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="text-center">
-                      <div className="font-medium">{formatDuration(session.duration)}</div>
-                      <div className="text-muted-foreground">Duration</div>
-                    </div>
-                    {session.productivity_score && (
-                      <div className="text-center">
-                        <div className="font-medium">{session.productivity_score}/10</div>
-                        <div className="text-muted-foreground">Score</div>
-                      </div>
-                    )}
-                    <div className="text-center">
-                      <div className="font-medium">{session.interruptions}</div>
-                      <div className="text-muted-foreground">Interruptions</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Admin User Filter */}
-      {userRole && (userRole === 'admin' || userRole === 'super_admin') && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              View User Focus Sessions
-              <Badge variant="outline" className="ml-2">Admin: {userRole}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <Label htmlFor="user-select">Select User:</Label>
-              <Select value={selectedUserId || 'my_sessions'} onValueChange={(value) => setSelectedUserId(value === 'my_sessions' ? null : value)}>
-                <SelectTrigger className="w-64">
-                  <SelectValue placeholder="Select a user to view their focus sessions" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="my_sessions">My Sessions</SelectItem>
-                  {users.map(user => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.full_name} ({user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-                </Select>
-                <Badge variant="secondary">{users.length} users loaded</Badge>
-            </div>
+            )}
           </CardContent>
         </Card>
-      )}
-      
+
+        {/* Recent Sessions Card */}
+        <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white">
+            <CardTitle className="flex items-center justify-center gap-3 text-2xl font-bold">
+              <Brain className="h-7 w-7" />
+              Recent Sessions
+            </CardTitle>
+            <CardDescription className="text-purple-100 text-center text-lg">
+              Your focus session history
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6">
+            {sessions.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-24 h-24 bg-gradient-to-r from-purple-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Target className="h-12 w-12 text-purple-500" />
+                </div>
+                <p className="text-gray-600 text-lg max-w-md mx-auto">
+                  No focus sessions yet. Start your first session to track your productivity!
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {sessions.map((session) => (
+                  <div 
+                    key={session.id} 
+                    className="group hover:shadow-lg transition-all duration-300 p-6 border border-gray-100 rounded-2xl bg-gradient-to-r from-white to-gray-50/50 hover:from-indigo-50/50 hover:to-purple-50/50"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold text-lg text-gray-800">
+                            {new Date(session.start_time).toLocaleDateString()}
+                          </span>
+                          <span className="text-gray-500 bg-gray-100 px-3 py-1 rounded-full text-sm">
+                            {new Date(session.start_time).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        {session.notes && (
+                          <p className="text-gray-600 mt-2 p-3 bg-blue-50/50 rounded-lg border-l-4 border-blue-200">
+                            {session.notes}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-6 text-sm">
+                        <div className="text-center">
+                          <div className="font-bold text-xl text-indigo-600 mb-1">
+                            {formatDuration(session.duration)}
+                          </div>
+                          <div className="text-gray-500 font-medium">Duration</div>
+                        </div>
+                        {session.productivity_score && (
+                          <div className="text-center">
+                            <div className="font-bold text-xl text-purple-600 mb-1">
+                              {session.productivity_score}/10
+                            </div>
+                            <div className="text-gray-500 font-medium">Score</div>
+                          </div>
+                        )}
+                        <div className="text-center">
+                          <div className="font-bold text-xl text-orange-600 mb-1">
+                            {session.interruptions}
+                          </div>
+                          <div className="text-gray-500 font-medium">Interruptions</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Admin User Filter */}
+        {userRole && (userRole === 'admin' || userRole === 'super_admin') && (
+          <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white">
+              <CardTitle className="flex items-center justify-center gap-3 text-xl font-bold">
+                <Users className="h-6 w-6" />
+                View User Focus Sessions
+                <Badge variant="secondary" className="ml-3 bg-white/20 text-white border-white/30">
+                  Admin: {userRole}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-6 justify-center">
+                <Label htmlFor="user-select" className="text-lg font-semibold text-gray-700">
+                  Select User:
+                </Label>
+                <Select value={selectedUserId || 'my_sessions'} onValueChange={(value) => setSelectedUserId(value === 'my_sessions' ? null : value)}>
+                  <SelectTrigger className="w-80 h-12 rounded-xl border-gray-200 bg-white">
+                    <SelectValue placeholder="Select a user to view their focus sessions" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-gray-200 shadow-lg bg-white z-50">
+                    <SelectItem value="my_sessions" className="rounded-lg">My Sessions</SelectItem>
+                    {users.map(user => (
+                      <SelectItem key={user.id} value={user.id} className="rounded-lg">
+                        {user.full_name} ({user.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-4 py-2">
+                  {users.length} users loaded
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 };
