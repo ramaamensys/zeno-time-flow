@@ -781,18 +781,19 @@ const Habits = () => {
                                  </div>
                                </div>
                              </div>
-                             <div className="flex items-center space-x-2">
-                               {/* Notes button for admins */}
-                               {(userRole === 'admin' || userRole === 'super_admin') && (
-                                 <Button
-                                   variant="ghost"
-                                   size="sm"
-                                   onClick={() => openNotesDialog(habit)}
-                                 >
-                                   <StickyNote className="w-4 h-4" />
-                                 </Button>
-                               )}
-                               {(!selectedUserId || selectedUserId === user?.id) && (
+                              <div className="flex items-center space-x-2">
+                                {/* Notes button - show for habit owner or admins */}
+                                {((!selectedUserId || selectedUserId === user?.id) || (userRole === 'admin' || userRole === 'super_admin')) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openNotesDialog(habit)}
+                                    title="View/Edit Notes"
+                                  >
+                                    <StickyNote className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {(!selectedUserId || selectedUserId === user?.id) && (
                                  <>
                                    <Button
                                      variant="ghost"
