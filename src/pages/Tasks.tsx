@@ -315,21 +315,39 @@ const Tasks = () => {
           filtered = filtered.filter(event => event.template_id !== null);
           break;
         case "admin_assigned":
-          // Tasks assigned by admin/super_admin (not created by current user and not template tasks)
-          filtered = filtered.filter(event => 
-            event.template_id === null && 
-            event.user_id === user?.id && 
-            // Check if task was created by someone else (admin assigned) - we'll need to track creator_id for this
-            // For now, we'll use a heuristic: if user is not admin but has tasks, some might be admin assigned
-            (userRole === 'user')
-          );
+          // For regular users: tasks that were likely assigned by admin
+          // Heuristic: tasks where user is not admin and has tasks with specific patterns
+          if (userRole === 'user') {
+            filtered = filtered.filter(event => 
+              event.template_id === null && 
+              event.user_id === user?.id &&
+              // Admin assigned tasks typically have formal descriptions or are created recently by admin
+              (event.description !== null && event.description.length > 0)
+            );
+          } else {
+            // For admins: show tasks they created for others
+            filtered = filtered.filter(event => 
+              event.template_id === null && 
+              event.user_id !== user?.id
+            );
+          }
           break;
         case "personal":
-          // Tasks created by the user themselves (not template tasks)
-          filtered = filtered.filter(event => 
-            event.template_id === null &&
-            event.user_id === user?.id
-          );
+          // For regular users: tasks they likely created themselves
+          if (userRole === 'user') {
+            filtered = filtered.filter(event => 
+              event.template_id === null &&
+              event.user_id === user?.id &&
+              // Personal tasks often have shorter descriptions or no description
+              (event.description === null || event.description.length === 0)
+            );
+          } else {
+            // For admins: tasks they created for themselves
+            filtered = filtered.filter(event => 
+              event.template_id === null &&
+              event.user_id === user?.id
+            );
+          }
           break;
       }
     }
