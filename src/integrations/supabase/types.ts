@@ -454,6 +454,7 @@ export type Database = {
           created_at: string
           current_streak: number
           description: string | null
+          end_date: string | null
           frequency: string
           id: string
           notes: string | null
@@ -471,6 +472,7 @@ export type Database = {
           created_at?: string
           current_streak?: number
           description?: string | null
+          end_date?: string | null
           frequency?: string
           id?: string
           notes?: string | null
@@ -488,6 +490,7 @@ export type Database = {
           created_at?: string
           current_streak?: number
           description?: string | null
+          end_date?: string | null
           frequency?: string
           id?: string
           notes?: string | null

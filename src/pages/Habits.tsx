@@ -28,6 +28,7 @@ interface Habit {
   notes?: string;
   start_date?: string;
   start_time?: string;
+  end_date?: string;
 }
 
 interface HabitCompletion {
@@ -63,7 +64,8 @@ const Habits = () => {
     color: '#10b981',
     notes: '',
     start_date: new Date().toISOString().split('T')[0],
-    start_time: '09:00'
+    start_time: '09:00',
+    end_date: ''
   });
 
   const [editHabitForm, setEditHabitForm] = useState({
@@ -72,7 +74,10 @@ const Habits = () => {
     category: 'health',
     frequency: 'daily' as 'daily' | 'weekly',
     target_count: 1,
-    color: '#10b981'
+    color: '#10b981',
+    start_date: '',
+    start_time: '',
+    end_date: ''
   });
 
   const categories = [
@@ -215,6 +220,7 @@ const Habits = () => {
         notes: newHabit.notes,
         start_date: newHabit.start_date,
         start_time: newHabit.start_time,
+        end_date: newHabit.end_date || null,
         user_id: user?.id
       }]);
 
@@ -231,7 +237,8 @@ const Habits = () => {
         color: '#10b981',
         notes: '',
         start_date: new Date().toISOString().split('T')[0],
-        start_time: '09:00'
+        start_time: '09:00',
+        end_date: ''
       });
       setIsAddingHabit(false);
       toast.success('Habit created successfully');
@@ -247,7 +254,10 @@ const Habits = () => {
       category: habit.category,
       frequency: habit.frequency,
       target_count: habit.target_count,
-      color: habit.color
+      color: habit.color,
+      start_date: habit.start_date || '',
+      start_time: habit.start_time || '',
+      end_date: habit.end_date || ''
     });
     setIsEditingHabit(true);
   };
@@ -266,7 +276,10 @@ const Habits = () => {
         category: editHabitForm.category,
         frequency: editHabitForm.frequency,
         target_count: editHabitForm.target_count,
-        color: editHabitForm.color
+        color: editHabitForm.color,
+        start_date: editHabitForm.start_date || null,
+        start_time: editHabitForm.start_time || null,
+        end_date: editHabitForm.end_date || null
       })
       .eq('id', editingHabit.id);
 
@@ -484,19 +497,15 @@ const Habits = () => {
         // If no start_date is set, show for all days (legacy habits)
         if (!h.start_date) return h.frequency === 'daily';
         
-        // Only show habits on their exact start_date, not on subsequent days
-        // unless they have an explicit completion record for that day
         if (h.frequency === 'daily') {
-          // Show on start date
-          if (h.start_date === dateStr) return true;
+          // Check if date is before start_date
+          if (dateStr < h.start_date) return false;
           
-          // For days after start date, only show if there's a completion record
-          if (h.start_date < dateStr) {
-            return getHabitCompletion(h.id, dateStr) !== null;
-          }
+          // Check if date is after end_date (if specified)
+          if (h.end_date && dateStr > h.end_date) return false;
           
-          // Don't show for days before start date
-          return false;
+          // Show habit only within start_date and end_date range
+          return true;
         }
         
         return false;
@@ -624,6 +633,28 @@ const Habits = () => {
                       />
                     </div>
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="end-date" className="text-sm font-medium">End Date (optional)</Label>
+                      <Input
+                        id="end-date"
+                        type="date"
+                        value={newHabit.end_date}
+                        onChange={(e) => setNewHabit({ ...newHabit, end_date: e.target.value })}
+                        className="h-12 border-2 focus:border-primary/50 transition-colors"
+                        min={newHabit.start_date}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Duration</Label>
+                      <div className="flex items-center h-12 px-3 text-sm text-muted-foreground bg-muted/50 rounded-md border-2 border-border/50">
+                        {newHabit.end_date && newHabit.start_date ? 
+                          `${Math.ceil((new Date(newHabit.end_date).getTime() - new Date(newHabit.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1} days` : 
+                          'No end date set'
+                        }
+                      </div>
+                    </div>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="notes" className="text-sm font-medium">Notes (optional)</Label>
                     <Textarea
@@ -720,6 +751,51 @@ const Habits = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-start-date" className="text-sm font-medium">Start Date</Label>
+                  <Input
+                    id="edit-start-date"
+                    type="date"
+                    value={editHabitForm.start_date}
+                    onChange={(e) => setEditHabitForm({ ...editHabitForm, start_date: e.target.value })}
+                    className="h-12 border-2 focus:border-primary/50 transition-colors"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-start-time" className="text-sm font-medium">Start Time</Label>
+                  <Input
+                    id="edit-start-time"
+                    type="time"
+                    value={editHabitForm.start_time}
+                    onChange={(e) => setEditHabitForm({ ...editHabitForm, start_time: e.target.value })}
+                    className="h-12 border-2 focus:border-primary/50 transition-colors"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-end-date" className="text-sm font-medium">End Date (optional)</Label>
+                  <Input
+                    id="edit-end-date"
+                    type="date"
+                    value={editHabitForm.end_date}
+                    onChange={(e) => setEditHabitForm({ ...editHabitForm, end_date: e.target.value })}
+                    className="h-12 border-2 focus:border-primary/50 transition-colors"
+                    min={editHabitForm.start_date}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Duration</Label>
+                  <div className="flex items-center h-12 px-3 text-sm text-muted-foreground bg-muted/50 rounded-md border-2 border-border/50">
+                    {editHabitForm.end_date && editHabitForm.start_date ? 
+                      `${Math.ceil((new Date(editHabitForm.end_date).getTime() - new Date(editHabitForm.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1} days` : 
+                      'No end date set'
+                    }
+                  </div>
+                </div>
               </div>
               <div className="space-y-3">
                 <Label className="text-sm font-medium">Color</Label>
@@ -745,6 +821,10 @@ const Habits = () => {
                 Update Habit
               </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Admin User Filter */}
           </DialogContent>
         </Dialog>
 
@@ -814,8 +894,10 @@ const Habits = () => {
                   const today = new Date().toISOString().split('T')[0];
                   // If no start_date is set, show for all days (legacy habits)
                   if (!h.start_date) return true;
-                  // Only include habits that start on or before today
-                  return h.start_date <= today;
+                  // Check if today is within start_date and end_date range
+                  if (today < h.start_date) return false;
+                  if (h.end_date && today > h.end_date) return false;
+                  return true;
                 }).length === 0 ? (
                   <div className="text-center py-16">
                     <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-muted/30 to-muted/50 flex items-center justify-center">
