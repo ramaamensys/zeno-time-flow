@@ -399,15 +399,18 @@ export const AdminTaskCard = ({
                         </Button>
                       )}
                       
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onEditTask(task)}
-                        className="h-8"
-                      >
-                        <Edit className="mr-1 h-3 w-3" />
-                        Edit
-                      </Button>
+                      {/* Edit Button - Only for personal tasks (not admin-assigned) or admins */}
+                      {(isAdmin || (!task.created_by || task.created_by === task.user_id)) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onEditTask(task)}
+                          className="h-8"
+                        >
+                          <Edit className="mr-1 h-3 w-3" />
+                          Edit
+                        </Button>
+                      )}
                       
                       {/* Delete Button - Only for admins */}
                       {isAdmin && onDeleteTask && (
