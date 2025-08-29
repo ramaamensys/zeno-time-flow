@@ -519,7 +519,7 @@ const Habits = () => {
           <div className="relative flex items-center justify-between">
             <div className="space-y-2">
               <h1 className="text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                Daily Drive
+                Daily Routine
               </h1>
               <p className="text-lg text-muted-foreground">Fuel your daily motivation and build powerful routines</p>
               {selectedUserId && userRole && (userRole === 'admin' || userRole === 'super_admin') && (
