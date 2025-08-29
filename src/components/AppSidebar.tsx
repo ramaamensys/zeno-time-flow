@@ -66,8 +66,8 @@ export function AppSidebar() {
   const items = [
     { title: "Calendar", url: "/", icon: Calendar },
     { title: "Tasks", url: "/tasks", icon: CheckSquare },
-    { title: "Focus Time", url: "/focus", icon: Timer },
-    { title: "Daily Routine/Habits", url: "/habits", icon: Target },
+    { title: "Productive Hours", url: "/focus", icon: Timer },
+    { title: "Daily Drive", url: "/habits", icon: Target },
     { title: "Account", url: "/account", icon: Settings },
     ...(userRole === 'super_admin' || userRole === 'admin' ? [
       { title: "Template", url: "/template", icon: GraduationCap }

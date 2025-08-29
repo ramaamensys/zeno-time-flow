@@ -45,8 +45,8 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
     });
   };
 
-  // Generate consistent colors for meetings based on title
-  const getMeetingColor = (title: string) => {
+  // Generate consistent colors for meetings based on event id for truly unique colors
+  const getMeetingColor = (eventId: string) => {
     const colors = [
       'from-red-500 to-red-600', 
       'from-blue-500 to-blue-600', 
@@ -55,11 +55,15 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
       'from-orange-500 to-orange-600', 
       'from-pink-500 to-pink-600', 
       'from-indigo-500 to-indigo-600', 
-      'from-teal-500 to-teal-600'
+      'from-teal-500 to-teal-600',
+      'from-cyan-500 to-cyan-600',
+      'from-emerald-500 to-emerald-600',
+      'from-yellow-500 to-yellow-600',
+      'from-rose-500 to-rose-600'
     ];
     
-    // Create hash from title for consistent color
-    const hash = title.split('').reduce((a, b) => {
+    // Create hash from event ID for consistent but unique color
+    const hash = eventId.split('').reduce((a, b) => {
       a = ((a << 5) - a) + b.charCodeAt(0);
       return a & a;
     }, 0);
@@ -74,7 +78,7 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
     const completedClasses = event.completed ? "line-through opacity-70" : "";
     
     if (event.event_type === 'meeting') {
-      return `${baseClasses} bg-gradient-to-r ${getMeetingColor(event.title)} ${completedClasses}`;
+      return `${baseClasses} bg-gradient-to-r ${getMeetingColor(event.id)} ${completedClasses}`;
     }
     
     if (isOverdue) {

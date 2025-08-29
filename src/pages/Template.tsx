@@ -610,7 +610,7 @@ const LearningTemplates = () => {
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg">
                 <Plus className="mr-2 h-5 w-5" />
-                Create New Checklist
+                New Checklist
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
@@ -661,44 +661,6 @@ const LearningTemplates = () => {
           </Dialog>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100 text-sm">Total Templates</p>
-                  <p className="text-3xl font-bold">{templates.length}</p>
-                </div>
-                <BookOpen className="h-12 w-12 text-blue-200" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-100 text-sm">Active Assignments</p>
-                  <p className="text-3xl font-bold">{assignments.length}</p>
-                </div>
-                <Users className="h-12 w-12 text-green-200" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-100 text-sm">Total Tasks</p>
-                  <p className="text-3xl font-bold">{templateTasks.length}</p>
-                </div>
-                <TrendingUp className="h-12 w-12 text-purple-200" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Templates Grid */}
         {templates.length === 0 ? (

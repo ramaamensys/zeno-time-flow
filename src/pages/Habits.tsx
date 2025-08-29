@@ -54,6 +54,12 @@ const Habits = () => {
   const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
   const [currentHabitForNotes, setCurrentHabitForNotes] = useState<Habit | null>(null);
   const [habitNotes, setHabitNotes] = useState('');
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => {
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay());
+    return weekStart;
+  });
 
   const [newHabit, setNewHabit] = useState({
     title: '',
@@ -405,17 +411,19 @@ const Habits = () => {
   };
 
   const getWeeklyCalendar = () => {
-    const today = new Date();
-    const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - today.getDay());
-    
     const days = [];
     for (let i = 0; i < 7; i++) {
-      const date = new Date(weekStart);
-      date.setDate(weekStart.getDate() + i);
+      const date = new Date(currentWeekStart);
+      date.setDate(currentWeekStart.getDate() + i);
       days.push(date);
     }
     return days;
+  };
+
+  const navigateWeek = (direction: 'prev' | 'next') => {
+    const newWeekStart = new Date(currentWeekStart);
+    newWeekStart.setDate(currentWeekStart.getDate() + (direction === 'next' ? 7 : -7));
+    setCurrentWeekStart(newWeekStart);
   };
 
   const getWeeklyHabitProgress = (habitId: string) => {
