@@ -281,14 +281,14 @@ const Focus = () => {
         {/* Header Section */}
         <div className="text-center">
           <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 bg-clip-text text-transparent mb-4">
-            Productive Hours
+            Focus Hours
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Track your productive work time and efficiency
+            Track your focus work time and efficiency
           </p>
           {selectedUserId && userRole && (userRole === 'admin' || userRole === 'super_admin') && (
             <p className="text-sm text-purple-600 mt-2 font-medium">
-              Viewing productive hours for: {users.find(u => u.id === selectedUserId)?.full_name}
+              Viewing focus hours for: {users.find(u => u.id === selectedUserId)?.full_name}
             </p>
           )}
         </div>
@@ -298,10 +298,10 @@ const Focus = () => {
           <CardHeader className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white pb-8">
             <CardTitle className="flex items-center justify-center gap-3 text-2xl font-bold">
               <Timer className="h-7 w-7" />
-              Productivity Timer
+              Focus Timer
             </CardTitle>
             <CardDescription className="text-indigo-100 text-center text-lg">
-              Begin a productive session to track your efficiency
+              Begin a focus session to track your efficiency
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-8 py-8">
@@ -417,7 +417,7 @@ const Focus = () => {
               Recent Sessions
             </CardTitle>
             <CardDescription className="text-purple-100 text-center text-lg">
-              Your productive session history
+              Your focus session history
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6">
@@ -427,7 +427,7 @@ const Focus = () => {
                   <Target className="h-12 w-12 text-purple-500" />
                 </div>
                 <p className="text-gray-600 text-lg max-w-md mx-auto">
-                  No productive sessions yet. Begin your first session to track your productivity!
+                  No focus sessions yet. Begin your first session to track your productivity!
                 </p>
               </div>
             ) : (
