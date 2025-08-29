@@ -599,7 +599,7 @@ const LearningTemplates = () => {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Check List
+              Check Lists
             </h1>
             <p className="text-gray-600 dark:text-gray-300 mt-2">
               Create and manage Check List with tasks and assignments

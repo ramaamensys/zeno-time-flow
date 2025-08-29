@@ -66,11 +66,11 @@ export function AppSidebar() {
   const items = [
     { title: "Calendar", url: "/", icon: Calendar },
     { title: "Tasks", url: "/tasks", icon: CheckSquare },
-    { title: "Productive Hours", url: "/focus", icon: Timer },
-    { title: "Daily Drive", url: "/habits", icon: Target },
+    { title: "Focus Hours", url: "/focus", icon: Timer },
+    { title: "Daily Routine", url: "/habits", icon: Target },
     { title: "Account", url: "/account", icon: Settings },
     ...(userRole === 'super_admin' || userRole === 'admin' ? [
-      { title: "Template", url: "/template", icon: GraduationCap }
+      { title: "Check Lists", url: "/template", icon: GraduationCap }
     ] : []),
     ...(userRole === 'super_admin' ? [
       { title: "User Management", url: "/user-management", icon: Users }
