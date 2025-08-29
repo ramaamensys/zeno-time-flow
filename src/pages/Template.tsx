@@ -610,7 +610,7 @@ const LearningTemplates = () => {
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg">
                 <Plus className="mr-2 h-5 w-5" />
-                Create Check-List
+                Create New Checklist
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">

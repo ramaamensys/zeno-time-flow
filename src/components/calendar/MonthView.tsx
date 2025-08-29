@@ -14,6 +14,7 @@ interface CalendarEvent {
   priority: string;
   created_at: string;
   user_id: string;
+  completed?: boolean;
 }
 
 interface MonthViewProps {
@@ -44,24 +45,53 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
     });
   };
 
+  // Generate consistent colors for meetings based on title
+  const getMeetingColor = (title: string) => {
+    const colors = [
+      'from-red-500 to-red-600', 
+      'from-blue-500 to-blue-600', 
+      'from-green-500 to-green-600', 
+      'from-purple-500 to-purple-600',
+      'from-orange-500 to-orange-600', 
+      'from-pink-500 to-pink-600', 
+      'from-indigo-500 to-indigo-600', 
+      'from-teal-500 to-teal-600'
+    ];
+    
+    // Create hash from title for consistent color
+    const hash = title.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    
+    return colors[Math.abs(hash) % colors.length];
+  };
+
   const getEventStyling = (event: CalendarEvent, isOverdue: boolean) => {
-    const baseClasses = "rounded-md px-3 py-1 text-xs font-medium text-white";
+    const baseClasses = "rounded-lg px-3 py-2 text-xs font-medium text-white shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 cursor-pointer backdrop-blur-sm";
+    
+    // Handle completed events with strike-through
+    const completedClasses = event.completed ? "line-through opacity-70" : "";
+    
+    if (event.event_type === 'meeting') {
+      return `${baseClasses} bg-gradient-to-r ${getMeetingColor(event.title)} ${completedClasses}`;
+    }
     
     if (isOverdue) {
-      return `${baseClasses} bg-red-500`;
+      return `${baseClasses} bg-gradient-to-r from-red-500 to-red-600 ring-2 ring-red-200 ${completedClasses}`;
     }
     
     switch (event.priority) {
       case "urgent":
-        return `${baseClasses} bg-red-500`;
+        return `${baseClasses} bg-gradient-to-r from-red-500 to-pink-500 ${completedClasses}`;
       case "high":
-        return `${baseClasses} bg-orange-500`;
+        return `${baseClasses} bg-gradient-to-r from-orange-500 to-red-500 ${completedClasses}`;
       case "medium":
-        return `${baseClasses} bg-blue-500`;
+        return `${baseClasses} bg-gradient-to-r from-blue-500 to-purple-500 ${completedClasses}`;
       case "low":
-        return `${baseClasses} bg-green-500`;
+        return `${baseClasses} bg-gradient-to-r from-green-500 to-blue-500 ${completedClasses}`;
       default:
-        return `${baseClasses} bg-gray-500`;
+        return `${baseClasses} bg-gradient-to-r from-gray-500 to-gray-600 ${completedClasses}`;
     }
   };
 
@@ -113,21 +143,10 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
                     <div
                       key={event.id}
                       className={cn(
-                        "rounded-lg px-3 py-2 text-xs font-medium text-white shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 cursor-pointer backdrop-blur-sm",
-                        isOverdue 
-                          ? "bg-gradient-to-r from-red-500 to-red-600 ring-2 ring-red-200" 
-                          : event.priority === "urgent"
-                          ? "bg-gradient-to-r from-red-500 to-pink-500"
-                          : event.priority === "high"
-                          ? "bg-gradient-to-r from-orange-500 to-red-500"
-                          : event.priority === "medium"
-                          ? "bg-gradient-to-r from-blue-500 to-purple-500"
-                          : event.priority === "low"
-                          ? "bg-gradient-to-r from-green-500 to-blue-500"
-                          : "bg-gradient-to-r from-gray-500 to-gray-600",
+                        getEventStyling(event, isOverdue),
                         "truncate"
                       )}
-                      title={`${event.title} (${event.priority} priority)${isOverdue ? ' - OVERDUE' : ''}${getUserName && onUserEventClick ? ` - ${getUserName(event.user_id)}` : ''}`}
+                      title={`${event.title} (${event.priority} priority)${isOverdue ? ' - OVERDUE' : ''}${event.completed ? ' - COMPLETED' : ''}${getUserName && onUserEventClick ? ` - ${getUserName(event.user_id)}` : ''}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (onUserEventClick && e.ctrlKey) {
@@ -142,7 +161,7 @@ export const MonthView = ({ currentDate, events, onDateClick, onEditEvent, onDel
                       }}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="truncate flex-1 font-medium">
+                        <span className={cn("truncate flex-1 font-medium", event.completed && "line-through")}>
                           {event.title}
                         </span>
                         {getUserName && (

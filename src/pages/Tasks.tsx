@@ -749,21 +749,7 @@ const Tasks = () => {
                 </div>
               </div>
               
-              {/* Quick Stats */}
-              <div className="flex gap-6">
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
-                  <CheckSquare className="w-4 h-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                    {filteredEvents.filter(e => e.completed).length} Completed
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20">
-                  <TrendingUp className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
-                    {filteredEvents.filter(e => !e.completed).length} Active
-                  </span>
-                </div>
-              </div>
+              {/* Quick Stats - removed per user request */}
             </div>
             
             <div className="flex gap-3 animate-scale-in">
@@ -780,7 +766,6 @@ const Tasks = () => {
                 <DialogTrigger asChild>
                   <Button className="bg-gradient-to-r from-primary via-primary/90 to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 border-0">
                     <Plus className="mr-2 h-4 w-4" />
-                    <Sparkles className="mr-1 h-3 w-3" />
                     New Task
                   </Button>
                 </DialogTrigger>

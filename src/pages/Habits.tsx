@@ -538,9 +538,9 @@ const Habits = () => {
           <div className="relative flex items-center justify-between">
             <div className="space-y-2">
               <h1 className="text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                Daily Routine/Habits
+                Daily Drive
               </h1>
-              <p className="text-lg text-muted-foreground">Build lasting habits, one day at a time</p>
+              <p className="text-lg text-muted-foreground">Fuel your daily motivation and build powerful routines</p>
               {selectedUserId && userRole && (userRole === 'admin' || userRole === 'super_admin') && (
                 <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
                   <Users className="w-4 h-4 mr-2 text-primary" />
