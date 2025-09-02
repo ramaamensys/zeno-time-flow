@@ -67,7 +67,7 @@ export function AppSidebar() {
     { title: "Calendar", url: "/", icon: Calendar },
     { title: "Tasks", url: "/tasks", icon: CheckSquare },
     { title: "Focus Hours", url: "/focus", icon: Timer },
-    { title: "Daily Routine", url: "/habits", icon: Target },
+    { title: "Daily Routines", url: "/habits", icon: Target },
     { title: "Account", url: "/account", icon: Settings },
     ...(userRole === 'super_admin' || userRole === 'admin' ? [
       { title: "Check Lists", url: "/template", icon: GraduationCap }
