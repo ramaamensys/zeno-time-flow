@@ -782,15 +782,15 @@ const Habits = () => {
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                         <span>Created {format(new Date(habit.created_at), 'MMM dd, yyyy')}</span>
                         {habit.start_date && (
-                          <span>Start: {format(new Date(habit.start_date), 'MMM dd, yyyy')}</span>
+                          <span>Start: {habit.start_date}</span>
                         )}
                         {habit.end_date && (
-                          <span>End: {format(new Date(habit.end_date), 'MMM dd, yyyy')}</span>
+                          <span>End: {habit.end_date}</span>
                         )}
                       </div>
-                      {habit.start_date && new Date(habit.start_date) > new Date() && (
+                      {habit.start_date && habit.start_date > format(new Date(), 'yyyy-MM-dd') && (
                         <div className="mt-2 text-sm text-blue-600 dark:text-blue-400">
-                          Next: {format(new Date(habit.start_date), 'EEE, MMM d')}
+                          Next: {format(new Date(habit.start_date + 'T00:00:00'), 'EEE, MMM d')}
                         </div>
                       )}
                     </div>
