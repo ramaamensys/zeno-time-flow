@@ -12,6 +12,9 @@ import {
   BarChart3,
   Settings,
   GraduationCap,
+  Building,
+  Clock,
+  UserCheck,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,7 +67,8 @@ export function AppSidebar() {
   }, [user]);
 
   const items = [
-    { title: "Calendar", url: "/", icon: Calendar },
+    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+    { title: "Calendar", url: "/calendar", icon: Calendar },
     { title: "Tasks", url: "/tasks", icon: CheckSquare },
     { title: "Focus Hours", url: "/focus", icon: Timer },
     { title: "Daily Routines", url: "/habits", icon: Target },
@@ -77,6 +81,14 @@ export function AppSidebar() {
     ] : [])
   ];
 
+  const schedulerItems = [
+    { title: "Scheduler Dashboard", url: "/scheduler", icon: BarChart3 },
+    { title: "Schedule", url: "/scheduler/schedule", icon: Calendar },
+    { title: "Employees", url: "/scheduler/employees", icon: UserCheck },
+    { title: "Time Clock", url: "/scheduler/time-clock", icon: Clock },
+    { title: "Settings", url: "/scheduler/settings", icon: Settings },
+  ];
+
   const isActive = (path: string) => currentPath === path;
   const isExpanded = items.some((i) => isActive(i.url));
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
@@ -86,10 +98,28 @@ export function AppSidebar() {
     <Sidebar className={collapsed ? "w-14" : "w-60"} collapsible="icon">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>Main Features</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url} end className={getNavCls}>
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Scheduler</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {schedulerItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end className={getNavCls}>

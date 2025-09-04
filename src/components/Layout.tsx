@@ -2,17 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { LogOut, ArrowLeftRight } from "lucide-react";
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
+import { LogOut } from "lucide-react";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -20,29 +10,6 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const { user, signOut } = useAuth();
-  const navigate = useNavigate();
-  const [hasMultipleApps, setHasMultipleApps] = useState(false);
-
-  useEffect(() => {
-    const checkMultiAppAccess = async () => {
-      if (!user) return;
-
-      try {
-        const { data: roles } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id);
-
-        // Only super admins can see the app switcher
-        const isSuperAdmin = roles?.some(r => r.role === 'super_admin') || false;
-        setHasMultipleApps(isSuperAdmin);
-      } catch (error) {
-        console.error('Error checking multi-app access:', error);
-      }
-    };
-
-    checkMultiAppAccess();
-  }, [user]);
 
   return (
     <SidebarProvider>
@@ -61,24 +28,6 @@ const Layout = ({ children }: LayoutProps) => {
               </div>
               
               <div className="flex items-center gap-4">
-                {hasMultipleApps && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="gap-2">
-                        <ArrowLeftRight className="h-4 w-4" />
-                        Switch App
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => navigate('/scheduler')}>
-                        📅 Roster Joy (Scheduler)
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate('/app-selector')}>
-                        🏠 App Selector
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
                 <span className="text-sm text-muted-foreground">
                   {user?.email}
                 </span>
