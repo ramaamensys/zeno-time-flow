@@ -11,17 +11,18 @@ import CreateCompanyModal from "@/components/scheduler/CreateCompanyModal";
 import CreateShiftModal from "@/components/scheduler/CreateShiftModal";
 import EditShiftModal from "@/components/scheduler/EditShiftModal";
 import CreateEmployeeModal from "@/components/scheduler/CreateEmployeeModal";
+import SlotEditModal from "@/components/scheduler/SlotEditModal";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-// Predefined shift slots
-const SHIFT_SLOTS = [
-  { id: "morning", name: "Morning Shift", time: "6:00 AM - 2:00 PM", startHour: 6, endHour: 14 },
-  { id: "afternoon", name: "Afternoon Shift", time: "2:00 PM - 10:00 PM", startHour: 14, endHour: 22 },
-  { id: "night", name: "Night Shift", time: "10:00 PM - 6:00 AM", startHour: 22, endHour: 6 }
-];
-
 export default function SchedulerSchedule() {
+  // Predefined shift slots (mutable for editing)
+  const [shiftSlots, setShiftSlots] = useState([
+    { id: "morning", name: "Morning Shift", time: "6:00 AM - 2:00 PM", startHour: 6, endHour: 14 },
+    { id: "afternoon", name: "Afternoon Shift", time: "2:00 PM - 10:00 PM", startHour: 14, endHour: 22 },
+    { id: "night", name: "Night Shift", time: "10:00 PM - 6:00 AM", startHour: 22, endHour: 6 }
+  ]);
+  
   const [selectedWeek, setSelectedWeek] = useState(new Date());
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   const [selectedCompany, setSelectedCompany] = useState<string>("");
@@ -35,6 +36,8 @@ export default function SchedulerSchedule() {
   const [draggedEmployee, setDraggedEmployee] = useState<string | null>(null);
   const [draggedShift, setDraggedShift] = useState<Shift | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showSlotEditModal, setShowSlotEditModal] = useState(false);
+  const [editingSlot, setEditingSlot] = useState<{ id: string; name: string; time: string; startHour: number; endHour: number } | null>(null);
   
   // Database hooks
   const { companies, loading: companiesLoading } = useCompanies();
@@ -79,7 +82,7 @@ export default function SchedulerSchedule() {
 
   const getShiftsForDayAndSlot = (dayIndex: number, slotId: string) => {
     const targetDate = weekDates[dayIndex];
-    const slot = SHIFT_SLOTS.find(s => s.id === slotId);
+    const slot = shiftSlots.find(s => s.id === slotId);
     
     if (!slot) return [];
     
@@ -103,7 +106,7 @@ export default function SchedulerSchedule() {
 
   const handleAddShift = (dayIndex: number, slotId: string) => {
     const date = weekDates[dayIndex];
-    const slot = SHIFT_SLOTS.find(s => s.id === slotId);
+    const slot = shiftSlots.find(s => s.id === slotId);
     setPreSelectedDate(date);
     setPreSelectedSlot(slot);
     setShowCreateShift(true);
@@ -135,7 +138,7 @@ export default function SchedulerSchedule() {
     
     if (employeeId && selectedCompany) {
       const date = weekDates[dayIndex];
-      const slot = SHIFT_SLOTS.find(s => s.id === slotId);
+      const slot = shiftSlots.find(s => s.id === slotId);
       
       if (slot) {
         const startDateTime = new Date(date);
@@ -195,7 +198,7 @@ export default function SchedulerSchedule() {
     let csvContent = `${companyName} - Weekly Schedule (${weekRange})\n\n`;
     csvContent += 'Day,Shift,Employee,Start Time,End Time,Break (min),Status\n';
     
-    SHIFT_SLOTS.forEach(slot => {
+    shiftSlots.forEach(slot => {
       days.forEach((day, dayIndex) => {
         const dayShifts = getShiftsForDayAndSlot(dayIndex, slot.id);
         dayShifts.forEach(shift => {
@@ -217,6 +220,20 @@ export default function SchedulerSchedule() {
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+  };
+
+  const handleSlotSave = (slotId: string, updates: { name: string; startHour: number; endHour: number }) => {
+    setShiftSlots(prev => prev.map(slot => 
+      slot.id === slotId 
+        ? { 
+            ...slot, 
+            name: updates.name, 
+            startHour: updates.startHour, 
+            endHour: updates.endHour,
+            time: `${updates.startHour}:00 - ${updates.endHour}:00`
+          }
+        : slot
+    ));
   };
 
   const isLoading = companiesLoading || departmentsLoading || shiftsLoading;
@@ -425,7 +442,7 @@ export default function SchedulerSchedule() {
                 ))}
 
                 {/* Shift rows */}
-                {SHIFT_SLOTS.map((slot) => (
+                {shiftSlots.map((slot) => (
                   <div key={slot.id} className="contents">
                     <div className="font-medium text-sm p-3 border rounded bg-muted/50 relative group">
                       <div>{slot.name}</div>
@@ -442,11 +459,17 @@ export default function SchedulerSchedule() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            setEditingSlot(slot);
+                            setShowSlotEditModal(true);
+                          }}>
                             <Edit className="h-4 w-4 mr-2" />
                             Edit Slot Times
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            // TODO: Implement bulk assign functionality
+                            alert('Bulk assign functionality coming soon!');
+                          }}>
                             <Plus className="h-4 w-4 mr-2" />
                             Bulk Assign
                           </DropdownMenuItem>
@@ -477,7 +500,7 @@ export default function SchedulerSchedule() {
                                   key={shift.id}
                                   className="group relative flex items-center gap-2 p-2 rounded bg-primary/10 border border-primary/20 cursor-move hover:bg-primary/20"
                                   onClick={() => handleEditShift(shift)}
-                                  draggable={isEditMode}
+                                  draggable={true}
                                   onDragStart={(e) => handleDragStart(e, shift.employee_id, shift)}
                                   onDragEnd={handleDragEnd}
                                 >
@@ -766,6 +789,13 @@ export default function SchedulerSchedule() {
         open={showCreateEmployee} 
         onOpenChange={setShowCreateEmployee}
         companyId={selectedCompany}
+      />
+      
+      <SlotEditModal 
+        open={showSlotEditModal} 
+        onOpenChange={setShowSlotEditModal}
+        slot={editingSlot}
+        onSave={handleSlotSave}
       />
     </div>
   );
