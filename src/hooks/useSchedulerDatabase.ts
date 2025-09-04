@@ -288,6 +288,23 @@ export function useEmployees(companyId?: string) {
 
   useEffect(() => {
     fetchEmployees();
+    
+    // Set up real-time subscription for employees
+    const subscription = supabase
+      .channel('employees_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'employees',
+        filter: companyId ? `company_id=eq.${companyId}` : undefined
+      }, () => {
+        fetchEmployees();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [companyId]);
 
   return {
@@ -393,6 +410,23 @@ export function useShifts(companyId?: string, weekStart?: Date) {
 
   useEffect(() => {
     fetchShifts();
+    
+    // Set up real-time subscription for shifts
+    const subscription = supabase
+      .channel('shifts_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'shifts',
+        filter: companyId ? `company_id=eq.${companyId}` : undefined
+      }, () => {
+        fetchShifts();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [companyId, weekStart]);
 
   return {

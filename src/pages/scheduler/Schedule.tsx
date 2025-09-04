@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar, ChevronLeft, ChevronRight, Plus, Users, Clock, Building, Edit, Trash2, MoreHorizontal } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Plus, Users, Clock, Building, Edit, Trash2, MoreHorizontal, Download, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,12 +33,14 @@ export default function SchedulerSchedule() {
   const [preSelectedDate, setPreSelectedDate] = useState<Date | undefined>();
   const [preSelectedSlot, setPreSelectedSlot] = useState<{ id: string; startHour: number; endHour: number } | undefined>();
   const [draggedEmployee, setDraggedEmployee] = useState<string | null>(null);
+  const [draggedShift, setDraggedShift] = useState<Shift | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   
   // Database hooks
   const { companies, loading: companiesLoading } = useCompanies();
   const { departments, loading: departmentsLoading } = useDepartments(selectedCompany);
   const { employees, loading: employeesLoading } = useEmployees(selectedCompany);
-  const { shifts, loading: shiftsLoading, createShift } = useShifts(selectedCompany, getWeekStart(selectedWeek));
+  const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift } = useShifts(selectedCompany, getWeekStart(selectedWeek));
 
   // Set first company as default when companies load
   useEffect(() => {
@@ -113,8 +115,12 @@ export default function SchedulerSchedule() {
   };
 
   // Drag and Drop handlers
-  const handleDragStart = (e: React.DragEvent, employeeId: string) => {
+  const handleDragStart = (e: React.DragEvent, employeeId: string, shift?: Shift) => {
     e.dataTransfer.setData('employeeId', employeeId);
+    if (shift) {
+      e.dataTransfer.setData('shiftId', shift.id);
+      setDraggedShift(shift);
+    }
     setDraggedEmployee(employeeId);
   };
 
@@ -125,13 +131,13 @@ export default function SchedulerSchedule() {
   const handleDrop = (e: React.DragEvent, dayIndex: number, slotId: string) => {
     e.preventDefault();
     const employeeId = e.dataTransfer.getData('employeeId');
+    const shiftId = e.dataTransfer.getData('shiftId');
     
     if (employeeId && selectedCompany) {
       const date = weekDates[dayIndex];
       const slot = SHIFT_SLOTS.find(s => s.id === slotId);
       
       if (slot) {
-        // Create shift automatically when employee is dropped
         const startDateTime = new Date(date);
         startDateTime.setHours(slot.startHour, 0, 0, 0);
         
@@ -145,30 +151,78 @@ export default function SchedulerSchedule() {
 
         const employee = employees.find(e => e.id === employeeId);
         
-        createShift({
-          employee_id: employeeId,
-          company_id: selectedCompany,
-          department_id: employee?.department_id || undefined,
-          start_time: startDateTime.toISOString(),
-          end_time: endDateTime.toISOString(),
-          break_minutes: 30,
-          hourly_rate: employee?.hourly_rate || undefined,
-          status: 'scheduled'
-        });
+        if (shiftId && draggedShift) {
+          // Moving existing shift to new slot
+          updateShift(shiftId, {
+            start_time: startDateTime.toISOString(),
+            end_time: endDateTime.toISOString(),
+            employee_id: employeeId,
+          });
+        } else {
+          // Creating new shift
+          createShift({
+            employee_id: employeeId,
+            company_id: selectedCompany,
+            department_id: employee?.department_id || undefined,
+            start_time: startDateTime.toISOString(),
+            end_time: endDateTime.toISOString(),
+            break_minutes: 30,
+            hourly_rate: employee?.hourly_rate || undefined,
+            status: 'scheduled'
+          });
+        }
       }
     }
     
     setDraggedEmployee(null);
+    setDraggedShift(null);
   };
 
   const handleDragEnd = () => {
     setDraggedEmployee(null);
+    setDraggedShift(null);
+  };
+
+  const printSchedule = () => {
+    window.print();
+  };
+
+  const downloadSchedule = () => {
+    const companyName = companies.find(c => c.id === selectedCompany)?.name || 'Schedule';
+    const weekRange = `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    
+    // Create CSV content
+    let csvContent = `${companyName} - Weekly Schedule (${weekRange})\n\n`;
+    csvContent += 'Day,Shift,Employee,Start Time,End Time,Break (min),Status\n';
+    
+    SHIFT_SLOTS.forEach(slot => {
+      days.forEach((day, dayIndex) => {
+        const dayShifts = getShiftsForDayAndSlot(dayIndex, slot.id);
+        dayShifts.forEach(shift => {
+          const employeeName = getEmployeeName(shift.employee_id);
+          const startTime = new Date(shift.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+          const endTime = new Date(shift.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+          csvContent += `${day},${slot.name},${employeeName},${startTime},${endTime},${shift.break_minutes || 0},${shift.status}\n`;
+        });
+      });
+    });
+    
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${companyName.replace(/\s+/g, '_')}_Schedule_${weekDates[0].toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   };
 
   const isLoading = companiesLoading || departmentsLoading || shiftsLoading;
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6 print-schedule">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Schedule Management</h1>
@@ -188,6 +242,14 @@ export default function SchedulerSchedule() {
           <Button onClick={() => setShowCreateShift(true)} disabled={!selectedCompany}>
             <Plus className="h-4 w-4 mr-2" />
             Add Shift
+          </Button>
+          <Button variant="outline" onClick={printSchedule} disabled={!selectedCompany}>
+            <Printer className="h-4 w-4 mr-2" />
+            Print
+          </Button>
+          <Button variant="outline" onClick={downloadSchedule} disabled={!selectedCompany}>
+            <Download className="h-4 w-4 mr-2" />
+            Download
           </Button>
         </div>
       </div>
@@ -289,9 +351,13 @@ export default function SchedulerSchedule() {
               <CardTitle className="flex items-center justify-between">
                 <span>Weekly Schedule</span>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant={isEditMode ? "default" : "outline"} 
+                    size="sm"
+                    onClick={() => setIsEditMode(!isEditMode)}
+                  >
                     <Edit className="h-4 w-4 mr-1" />
-                    Edit Schedule
+                    {isEditMode ? "Exit Edit" : "Edit Schedule"}
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -407,65 +473,58 @@ export default function SchedulerSchedule() {
                             const endTime = new Date(shift.end_time);
                             
                             return (
-                              <div
-                                key={shift.id}
-                                className="group relative flex items-center gap-2 p-2 rounded bg-primary/10 border border-primary/20 cursor-pointer hover:bg-primary/20"
-                                onClick={() => handleEditShift(shift)}
-                              >
-                                <Avatar className="h-6 w-6">
-                                  <AvatarFallback className="text-xs">
-                                    {employeeName.split(' ').map(n => n[0]).join('')}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-medium truncate">
-                                    {employeeName}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {startTime.toLocaleTimeString('en-US', { 
-                                      hour: 'numeric', 
-                                      minute: '2-digit',
-                                      hour12: true 
-                                    })} - {endTime.toLocaleTimeString('en-US', { 
-                                      hour: 'numeric', 
-                                      minute: '2-digit',
-                                      hour12: true 
-                                    })}
-                                  </div>
-                                </div>
-                                <Badge 
-                                  variant={shift.status === 'confirmed' ? 'default' : 
-                                          shift.status === 'scheduled' ? 'secondary' : 
-                                          shift.status === 'pending' ? 'outline' : 'destructive'}
-                                  className="text-xs"
+                                <div
+                                  key={shift.id}
+                                  className="group relative flex items-center gap-2 p-2 rounded bg-primary/10 border border-primary/20 cursor-move hover:bg-primary/20"
+                                  onClick={() => handleEditShift(shift)}
+                                  draggable={isEditMode}
+                                  onDragStart={(e) => handleDragStart(e, shift.employee_id, shift)}
+                                  onDragEnd={handleDragEnd}
                                 >
-                                  {shift.status}
-                                </Badge>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100">
-                                      <MoreHorizontal className="h-3 w-3" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleEditShift(shift);
-                                    }}>
-                                      <Edit className="h-4 w-4 mr-2" />
-                                      Edit Shift
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                      <Users className="h-4 w-4 mr-2" />
-                                      Change Employee
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem>
-                                      <Clock className="h-4 w-4 mr-2" />
-                                      Adjust Times
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
+                                  <Avatar className="h-6 w-6">
+                                    <AvatarFallback className="text-xs">
+                                      {employeeName.split(' ').map(n => n[0]).join('')}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-medium truncate">
+                                      {employeeName}
+                                    </div>
+                                  </div>
+                                  <Badge 
+                                    variant={shift.status === 'confirmed' ? 'default' : 
+                                            shift.status === 'scheduled' ? 'secondary' : 
+                                            shift.status === 'pending' ? 'outline' : 'destructive'}
+                                    className="text-xs"
+                                  >
+                                    {shift.status}
+                                  </Badge>
+                                  {isEditMode && (
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100">
+                                          <MoreHorizontal className="h-3 w-3" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEditShift(shift);
+                                        }}>
+                                          <Edit className="h-4 w-4 mr-2" />
+                                          Edit Shift
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={(e) => {
+                                          e.stopPropagation();
+                                          deleteShift(shift.id);
+                                        }}>
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Delete Shift
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  )}
+                                </div>
                             );
                           })}
                           {dayShifts.length === 0 && (
@@ -505,7 +564,7 @@ export default function SchedulerSchedule() {
         </div>
 
         {/* Right Sidebar - Available Employees */}
-        <div className="xl:col-span-1">
+        <div className="xl:col-span-1 no-print">
           <Card className="sticky top-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">

@@ -99,3 +99,26 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  /* Hide sidebar and action buttons when printing */
+  .xl\\:col-span-1,
+  button:not(.print-safe),
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Expand schedule grid to full width */
+  .xl\\:col-span-3 {
+    grid-column: span 4 / span 4;
+  }
+  
+  /* Optimize for print */
+  .print-schedule {
+    font-size: 12px;
+  }
+  
+  .print-schedule .text-xs {
+    font-size: 10px;
+  }
+}
