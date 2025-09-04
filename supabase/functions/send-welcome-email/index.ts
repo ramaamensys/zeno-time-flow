@@ -5,7 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://zenotimeflow.com, http://localhost:3000",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
@@ -26,6 +26,51 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Verify authorization - only authenticated users with proper roles can send emails
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('No authorization header provided for send-welcome-email');
+      return new Response(JSON.stringify({ error: 'Unauthorized - missing authorization header' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Create Supabase client to verify the caller
+    const supabaseUrl = "https://usjvqsqotpedesvldkln.supabase.co";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, anonKey, {
+      global: {
+        headers: {
+          Authorization: authHeader
+        }
+      }
+    });
+
+    // Verify the caller is authenticated and has admin or super_admin role
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.error('Failed to get user for email sending:', userError);
+      return new Response(JSON.stringify({ error: 'Invalid authentication' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Check if user has admin or super_admin role
+    const { data: roles, error: roleError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+
+    if (roleError || !roles?.some(r => ['admin', 'super_admin'].includes(r.role))) {
+      console.error('User is not authorized to send emails:', { userId: user.id, roles });
+      return new Response(JSON.stringify({ error: 'Insufficient permissions - admin role required' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     const { email, full_name, role, password }: WelcomeEmailRequest = await req.json();
 
     console.log(`Sending welcome email to: ${email}`);
