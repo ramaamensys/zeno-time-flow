@@ -26,7 +26,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { email, full_name, role, password, isReinvite }: EmailRequest = await req.json();
 
     const emailResponse = await resend.emails.send({
-      from: "ZenoTimeFlow <onboarding@resend.dev>",
+      from: "ZenoTimeFlow <noreply@zenotimeflow.com>",
       to: [email],
       subject: isReinvite ? "You're Reinvited to ZenoTimeFlow!" : "Welcome to ZenoTimeFlow!",
       html: `
