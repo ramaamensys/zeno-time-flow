@@ -17,41 +17,58 @@ interface WelcomeEmailRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  console.log('=== SEND WELCOME EMAIL FUNCTION START ===');
   console.log('Request URL:', req.url);
+  console.log('Request method:', req.method);
   
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
+    console.log('Handling CORS preflight request');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { email, full_name, role, password, isReinvite }: WelcomeEmailRequest = await req.json();
+    console.log('Reading request body...');
+    const requestBody = await req.json();
+    console.log('Request body received:', Object.keys(requestBody));
+    
+    const { email, full_name, role, password, isReinvite }: WelcomeEmailRequest = requestBody;
 
-    console.log(`Sending ${isReinvite ? 'reinvite' : 'welcome'} email to: ${email}`);
-    console.log('Resend API Key configured:', !!Deno.env.get("RESEND_API_KEY"));
+    console.log(`Processing ${isReinvite ? 'reinvite' : 'welcome'} email for: ${email}`);
+    
+    // Check API key first
+    const apiKey = Deno.env.get("RESEND_API_KEY");
+    console.log('API Key status:', apiKey ? 'Present' : 'Missing');
+    console.log('API Key length:', apiKey ? apiKey.length : 0);
+    console.log('API Key starts with:', apiKey ? apiKey.substring(0, 7) + '...' : 'N/A');
 
-    if (!Deno.env.get("RESEND_API_KEY")) {
-      console.error("RESEND_API_KEY environment variable is missing");
+    if (!apiKey) {
+      console.error("CRITICAL: RESEND_API_KEY environment variable is missing");
       throw new Error("RESEND_API_KEY is not configured");
     }
 
-    // Initialize Resend client with the API key
-    const resend = new Resend(Deno.env.get("RESEND_API_KEY")!);
+    console.log('Initializing Resend client...');
+    const resend = new Resend(apiKey);
+    console.log('Resend client initialized successfully');
 
-    // Direct login link to ZenoTimeFlow project
+    // Prepare email content
     const loginLink = 'https://zenotimeflow.com/auth';
+    const emailSubject = isReinvite ? "You're Reinvited to ZenoTimeFlow!" : "Welcome to ZenoTimeFlow - Your Account Details!";
+    
+    console.log('Email subject:', emailSubject);
+    console.log('Login link:', loginLink);
 
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">🎉 Welcome to ZenoTimeFlow!</h1>
+          <h1 style="color: white; margin: 0; font-size: 28px;">🎉 ${isReinvite ? 'Welcome Back to' : 'Welcome to'} ZenoTimeFlow!</h1>
         </div>
         
         <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
           <h2 style="color: #333; margin-top: 0;">Hello ${full_name || 'there'}!</h2>
           
           <p style="color: #555; line-height: 1.6; font-size: 16px;">
-            Your account has been created for ZenoTimeFlow! 🌟 Below are your login credentials to get started immediately.
+            ${isReinvite ? 'You have been reinvited to' : 'Your account has been created for'} ZenoTimeFlow! 🌟 Below are your login credentials to get started immediately.
           </p>
           
           <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
@@ -87,36 +104,57 @@ const handler = async (req: Request): Promise<Response> => {
       </div>
     `;
 
+    console.log('Sending email via Resend API...');
     const emailResponse = await resend.emails.send({
       from: "ZenoTimeFlow <onboarding@resend.dev>",
       to: [email],
-      subject: isReinvite ? "You're Reinvited to ZenoTimeFlow!" : "Welcome to ZenoTimeFlow - Your Account Details!",
+      subject: emailSubject,
       html: htmlContent,
     });
 
-    console.log('Email send attempt completed:', {
-      success: !emailResponse.error,
-      error: emailResponse.error ? emailResponse.error : null
-    });
-
+    console.log('Resend API response status:', emailResponse.error ? 'ERROR' : 'SUCCESS');
+    
     if (emailResponse.error) {
-      console.error("Resend API error:", JSON.stringify(emailResponse.error, null, 2));
-      throw new Error(`Email sending failed: ${emailResponse.error.message || 'Unknown error'}`);
+      console.error("Resend API Error Details:", {
+        name: emailResponse.error.name,
+        message: emailResponse.error.message,
+        full_error: JSON.stringify(emailResponse.error, null, 2)
+      });
+      throw new Error(`Email sending failed: ${emailResponse.error.message || 'Unknown Resend error'}`);
     }
 
-    console.log("Welcome email sent successfully:", emailResponse);
+    console.log("Email sent successfully:", {
+      id: emailResponse.data?.id,
+      from: emailResponse.data?.from,
+      to: emailResponse.data?.to
+    });
 
-    return new Response(JSON.stringify({ success: true, emailResponse }), {
+    console.log('=== FUNCTION SUCCESS ===');
+    
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: `${isReinvite ? 'Reinvite' : 'Welcome'} email sent successfully`,
+      emailId: emailResponse.data?.id 
+    }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
         ...corsHeaders,
       },
     });
+    
   } catch (error: any) {
-    console.error("Error in send-welcome-email function:", error);
+    console.error("=== FUNCTION ERROR ===");
+    console.error("Error type:", error.constructor.name);
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
+    console.error("Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message || 'Unknown error occurred',
+        details: error.name || 'UnknownError'
+      }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
