@@ -13,6 +13,7 @@ interface WelcomeEmailRequest {
   full_name: string;
   role: string;
   password: string;
+  isReinvite?: boolean;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -24,12 +25,13 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, full_name, role, password }: WelcomeEmailRequest = await req.json();
+    const { email, full_name, role, password, isReinvite }: WelcomeEmailRequest = await req.json();
 
-    console.log(`Sending welcome email to: ${email}`);
+    console.log(`Sending ${isReinvite ? 'reinvite' : 'welcome'} email to: ${email}`);
     console.log('Resend API Key configured:', !!Deno.env.get("RESEND_API_KEY"));
 
     if (!Deno.env.get("RESEND_API_KEY")) {
+      console.error("RESEND_API_KEY environment variable is missing");
       throw new Error("RESEND_API_KEY is not configured");
     }
 
@@ -86,15 +88,20 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     const emailResponse = await resend.emails.send({
-      from: "ZenoTimeFlow <noreply@zenotimeflow.com>",
+      from: "ZenoTimeFlow <onboarding@resend.dev>",
       to: [email],
-      subject: "Welcome to ZenoTimeFlow - Your Account Details!",
+      subject: isReinvite ? "You're Reinvited to ZenoTimeFlow!" : "Welcome to ZenoTimeFlow - Your Account Details!",
       html: htmlContent,
     });
 
+    console.log('Email send attempt completed:', {
+      success: !emailResponse.error,
+      error: emailResponse.error ? emailResponse.error : null
+    });
+
     if (emailResponse.error) {
-      console.error("Resend error:", emailResponse.error);
-      throw new Error(`Email sending failed: ${emailResponse.error.message}`);
+      console.error("Resend API error:", JSON.stringify(emailResponse.error, null, 2));
+      throw new Error(`Email sending failed: ${emailResponse.error.message || 'Unknown error'}`);
     }
 
     console.log("Welcome email sent successfully:", emailResponse);
