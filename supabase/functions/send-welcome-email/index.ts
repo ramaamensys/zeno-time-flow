@@ -13,9 +13,13 @@ serve(async (req) => {
 
   try {
     const { email, full_name, role, password, isReinvite } = await req.json();
+    console.log("Processing email for:", email);
     
     const apiKey = Deno.env.get("RESEND_API_KEY");
+    console.log("API key exists:", !!apiKey);
+    
     if (!apiKey) {
+      console.error("No RESEND_API_KEY found");
       return new Response(
         JSON.stringify({ error: "Email service not configured" }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -23,11 +27,15 @@ serve(async (req) => {
     }
 
     // Import Resend
+    console.log("Importing Resend...");
     const { Resend } = await import("npm:resend@2.0.0");
+    console.log("Resend imported successfully");
+    
     const resend = new Resend(apiKey);
 
     // Send email
-    const { data, error } = await resend.emails.send({
+    console.log("Sending email...");
+    const emailResult = await resend.emails.send({
       from: "ZenoTimeFlow <onboarding@resend.dev>",
       to: [email],
       subject: isReinvite ? "You're Reinvited to ZenoTimeFlow!" : "Welcome to ZenoTimeFlow!",
@@ -53,21 +61,26 @@ serve(async (req) => {
       `,
     });
 
-    if (error) {
+    console.log("Email result:", JSON.stringify(emailResult));
+
+    if (emailResult.error) {
+      console.error("Resend error details:", JSON.stringify(emailResult.error));
       return new Response(
-        JSON.stringify({ error: error.message }),
+        JSON.stringify({ error: `Email failed: ${emailResult.error.message || 'Unknown error'}` }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
+    console.log("Email sent successfully!");
     return new Response(
       JSON.stringify({ success: true, message: "Email sent successfully" }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
 
   } catch (error) {
+    console.error("Function error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: `Function error: ${error.message}` }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
