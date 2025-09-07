@@ -28,6 +28,7 @@ export default function AssignManagerModal({
 }: AssignManagerModalProps) {
   const [loading, setLoading] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<Profile[]>([]);
+  const [availableOpsManagers, setAvailableOpsManagers] = useState<Profile[]>([]);
   const [operationsManager, setOperationsManager] = useState("");
   const [companyManager, setCompanyManager] = useState("");
 
@@ -41,6 +42,7 @@ export default function AssignManagerModal({
 
   const fetchAvailableUsers = async () => {
     try {
+      // Fetch all active users
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, full_name, email')
@@ -49,7 +51,33 @@ export default function AssignManagerModal({
         .eq('status', 'active') // Only show active users
         .order('full_name');
 
-      setAvailableUsers(profiles || []);
+      if (!profiles) {
+        setAvailableUsers([]);
+        setAvailableOpsManagers([]);
+        return;
+      }
+
+      // Set all users for company manager dropdown
+      setAvailableUsers(profiles);
+
+      // For operations manager dropdown, filter by company field_type
+      const expectedAppType = company?.field_type === 'IT' ? 'calendar' : 'scheduler';
+      
+      // Get operations managers with matching app_type
+      const { data: operationsManagers } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'operations_manager')
+        .eq('app_type', expectedAppType);
+
+      const operationsManagerIds = new Set(operationsManagers?.map(om => om.user_id) || []);
+
+      // Filter profiles to only show matching operations managers
+      const filteredOpsManagers = profiles.filter(profile => 
+        operationsManagerIds.has(profile.user_id)
+      );
+
+      setAvailableOpsManagers(filteredOpsManagers);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error('Failed to load available users');
@@ -142,24 +170,29 @@ export default function AssignManagerModal({
             <div className="space-y-2">
               <Label htmlFor="operations-manager" className="flex items-center gap-2">
                 <User className="w-4 h-4" />
-                Operations Manager
+                Operations Manager ({company.field_type} only)
               </Label>
               <Select
                 value={operationsManager}
                 onValueChange={setOperationsManager}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select operations manager" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background border shadow-lg z-50">
                   <SelectItem value="">No operations manager</SelectItem>
-                  {availableUsers.map((user) => (
+                  {availableOpsManagers.map((user) => (
                     <SelectItem key={user.user_id} value={user.user_id}>
                       {user.full_name} ({user.email})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {availableOpsManagers.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  No {company.field_type} operations managers found. Create one in User Management first.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -171,10 +204,10 @@ export default function AssignManagerModal({
                 value={companyManager}
                 onValueChange={setCompanyManager}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select company manager" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background border shadow-lg z-50">
                   <SelectItem value="">No company manager</SelectItem>
                   {availableUsers.map((user) => (
                     <SelectItem key={user.user_id} value={user.user_id}>
