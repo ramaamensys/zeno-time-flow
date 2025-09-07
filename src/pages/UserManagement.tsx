@@ -69,12 +69,15 @@ export default function UserManagement() {
   const [isAssignCompanyDialogOpen, setIsAssignCompanyDialogOpen] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [selectedUserForAssignment, setSelectedUserForAssignment] = useState<UserProfile | null>(null);
+  
+  // Multi-user assignment states
+  const [selectedUsersForAssignment, setSelectedUsersForAssignment] = useState<string[]>([]);
+  const [availableUsersForAssignment, setAvailableUsersForAssignment] = useState<UserProfile[]>([]);
+  
   const [assignmentData, setAssignmentData] = useState({
     company_id: "",
     role: "operations_manager" as "operations_manager" | "admin"
   });
-  const [selectedUsersForAssignment, setSelectedUsersForAssignment] = useState<string[]>([]);
-  const [availableUsersForAssignment, setAvailableUsersForAssignment] = useState<UserProfile[]>([]);
 
   useEffect(() => {
     if (isAssignCompanyDialogOpen) {
