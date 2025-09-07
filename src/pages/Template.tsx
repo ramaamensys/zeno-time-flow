@@ -122,7 +122,7 @@ const LearningTemplates = () => {
     
     if (data && data.length > 0) {
       const roles = data.map(item => item.role);
-      setIsAdmin(roles.includes('super_admin') || roles.includes('admin'));
+      setIsAdmin(roles.includes('super_admin') || roles.includes('admin') || roles.includes('operations_manager'));
     } else {
       setIsAdmin(false);
     }
@@ -172,7 +172,9 @@ const LearningTemplates = () => {
     
     const { data } = await supabase
       .from('profiles')
-      .select('user_id, full_name, email');
+      .select('user_id, full_name, email')
+      .neq('status', 'deleted') // Exclude deleted users
+      .eq('status', 'active'); // Only show active users
 
     setTeamMembers(data || []);
   };

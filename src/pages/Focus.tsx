@@ -103,6 +103,8 @@ const Focus = () => {
         .from('profiles')
         .select('user_id, full_name, email')
         .neq('user_id', user.id) // Exclude current user from the list
+        .neq('status', 'deleted') // Exclude deleted users
+        .eq('status', 'active') // Only show active users
         .order('full_name');
 
       if (profilesError) {

@@ -45,6 +45,8 @@ export default function AssignManagerModal({
         .from('profiles')
         .select('user_id, full_name, email')
         .neq('user_id', company?.created_by || '')
+        .neq('status', 'deleted') // Exclude deleted users
+        .eq('status', 'active') // Only show active users
         .order('full_name');
 
       setAvailableUsers(profiles || []);
@@ -66,14 +68,15 @@ export default function AssignManagerModal({
       if (operationsManager !== company.operations_manager_id) {
         updates.operations_manager_id = operationsManager || null;
         
-        // Assign operations_manager role
+        // Assign operations_manager role with proper app_type based on company field_type
         if (operationsManager) {
+          const appType = company.field_type === 'IT' ? 'calendar' : 'scheduler';
           await supabase
             .from('user_roles')
             .upsert({ 
               user_id: operationsManager, 
               role: 'operations_manager',
-              app_type: 'scheduler'
+              app_type: appType
             });
         }
       }
@@ -81,14 +84,15 @@ export default function AssignManagerModal({
       if (companyManager !== company.company_manager_id) {
         updates.company_manager_id = companyManager || null;
         
-        // Assign admin role for company manager
+        // Assign admin role for company manager with proper app_type
         if (companyManager) {
+          const appType = company.field_type === 'IT' ? 'calendar' : 'scheduler';
           await supabase
             .from('user_roles')
             .upsert({ 
               user_id: companyManager, 
               role: 'admin',
-              app_type: 'scheduler'
+              app_type: appType
             });
         }
       }
