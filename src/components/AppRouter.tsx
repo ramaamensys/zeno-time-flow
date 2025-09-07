@@ -4,7 +4,6 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Layout from "@/components/Layout";
 
 // Calendar App Pages
-import Dashboard from "@/pages/Dashboard";
 import Tasks from "@/pages/Tasks";
 import Calendar from "@/pages/Calendar";
 import Focus from "@/pages/Focus";
@@ -15,7 +14,6 @@ import UserManagement from "@/pages/UserManagement";
 import Template from "@/pages/Template";
 
 // Scheduler App Pages
-import SchedulerDashboard from "@/pages/scheduler/Dashboard";
 import SchedulerCompanies from "@/pages/scheduler/Companies";
 import SchedulerSchedule from "@/pages/scheduler/Schedule";
 import SchedulerEmployees from "@/pages/scheduler/Employees";
@@ -47,8 +45,8 @@ const AppRouter = () => {
         <ProtectedRoute>
           <Layout>
             <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/" element={<Calendar />} />
+              <Route path="/dashboard" element={<Calendar />} />
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/tasks" element={<Tasks />} />
               <Route path="/focus" element={<Focus />} />
@@ -59,7 +57,7 @@ const AppRouter = () => {
               <Route path="/profile" element={<Profile />} />
               
               {/* Scheduler Features */}
-              <Route path="/scheduler" element={<SchedulerDashboard />} />
+              <Route path="/scheduler" element={<SchedulerCompanies />} />
               <Route path="/scheduler/companies" element={<SchedulerCompanies />} />
               <Route path="/scheduler/schedule" element={<SchedulerSchedule />} />
               <Route path="/scheduler/employees" element={<SchedulerEmployees />} />

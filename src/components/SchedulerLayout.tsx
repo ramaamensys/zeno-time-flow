@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Calendar, Users, Clock, Settings, LogOut, Menu, BarChart3, ArrowLeftRight } from "lucide-react";
+import { Calendar, Users, Clock, Settings, LogOut, Menu, Building, ArrowLeftRight } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -43,7 +43,7 @@ const SchedulerLayout = ({ children }: SchedulerLayoutProps) => {
   }, [user]);
 
   const navigation = [
-    { name: "Dashboard", href: "/scheduler", icon: BarChart3 },
+    { name: "Companies", href: "/scheduler/companies", icon: Building },
     { name: "Schedule", href: "/scheduler/schedule", icon: Calendar },
     { name: "Employees", href: "/scheduler/employees", icon: Users },
     { name: "Time Clock", href: "/scheduler/time-clock", icon: Clock },
@@ -69,8 +69,7 @@ const SchedulerLayout = ({ children }: SchedulerLayoutProps) => {
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1">
             {navigation.map((item) => {
-              const isActive = location.pathname === item.href || 
-                              (item.href === "/scheduler" && location.pathname === "/scheduler");
+              const isActive = location.pathname === item.href;
               
               return (
                 <NavLink

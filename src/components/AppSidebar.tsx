@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard,
   CheckSquare,
   Calendar,
   Timer,
@@ -67,7 +66,6 @@ export function AppSidebar() {
   }, [user]);
 
   const items = [
-    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
     { title: "Calendar", url: "/calendar", icon: Calendar },
     { title: "Tasks", url: "/tasks", icon: CheckSquare },
     { title: "Focus Hours", url: "/focus", icon: Timer },
@@ -75,7 +73,6 @@ export function AppSidebar() {
   ];
 
   const schedulerItems = [
-    { title: "Scheduler Dashboard", url: "/scheduler", icon: BarChart3 },
     { title: "Companies", url: "/scheduler/companies", icon: Building },
     { title: "Schedule", url: "/scheduler/schedule", icon: Calendar },
     { title: "Employees", url: "/scheduler/employees", icon: UserCheck },
