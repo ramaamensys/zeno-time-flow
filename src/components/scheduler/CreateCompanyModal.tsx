@@ -1,15 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCompanies } from "@/hooks/useSchedulerDatabase";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface CreateCompanyModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+}
+
+interface Profile {
+  user_id: string;
+  full_name: string;
+  email: string;
 }
 
 const COMPANY_TYPES = [
@@ -25,6 +33,7 @@ const COMPANY_TYPES = [
 export default function CreateCompanyModal({ open, onOpenChange, onSuccess }: CreateCompanyModalProps) {
   const { createCompany } = useCompanies();
   const [loading, setLoading] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<Profile[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     type: "motel",
@@ -32,8 +41,32 @@ export default function CreateCompanyModal({ open, onOpenChange, onSuccess }: Cr
     color: "#3b82f6",
     address: "",
     phone: "",
-    email: ""
+    email: "",
+    operations_manager_id: "",
+    company_manager_id: ""
   });
+
+  useEffect(() => {
+    if (open) {
+      fetchAvailableUsers();
+    }
+  }, [open]);
+
+  const fetchAvailableUsers = async () => {
+    try {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email')
+        .neq('status', 'deleted')
+        .eq('status', 'active')
+        .order('full_name');
+
+      setAvailableUsers(profiles || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Failed to load available users');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +77,44 @@ export default function CreateCompanyModal({ open, onOpenChange, onSuccess }: Cr
 
     setLoading(true);
     try {
-      await createCompany(formData);
+      // Create the company
+      const companyData = {
+        name: formData.name,
+        type: formData.type,
+        field_type: formData.field_type,
+        color: formData.color,
+        address: formData.address,
+        phone: formData.phone,
+        email: formData.email,
+        operations_manager_id: formData.operations_manager_id || null,
+        company_manager_id: formData.company_manager_id || null
+      };
+
+      await createCompany(companyData);
+
+      // Assign roles to the selected managers
+      if (formData.operations_manager_id) {
+        const appType = formData.field_type === 'IT' ? 'calendar' : 'scheduler';
+        await supabase
+          .from('user_roles')
+          .upsert({ 
+            user_id: formData.operations_manager_id, 
+            role: 'operations_manager',
+            app_type: appType
+          });
+      }
+
+      if (formData.company_manager_id) {
+        const appType = formData.field_type === 'IT' ? 'calendar' : 'scheduler';
+        await supabase
+          .from('user_roles')
+          .upsert({ 
+            user_id: formData.company_manager_id, 
+            role: 'admin',
+            app_type: appType
+          });
+      }
+
       onOpenChange(false);
       onSuccess?.();
       setFormData({
@@ -54,10 +124,14 @@ export default function CreateCompanyModal({ open, onOpenChange, onSuccess }: Cr
         color: "#3b82f6",
         address: "",
         phone: "",
-        email: ""
+        email: "",
+        operations_manager_id: "",
+        company_manager_id: ""
       });
+      toast.success('Company created successfully!');
     } catch (error) {
       console.error('Failed to create company:', error);
+      toast.error('Failed to create company');
     } finally {
       setLoading(false);
     }
@@ -166,6 +240,48 @@ export default function CreateCompanyModal({ open, onOpenChange, onSuccess }: Cr
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                 placeholder="contact@company.com"
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="operations-manager">Operations Manager</Label>
+              <Select
+                value={formData.operations_manager_id}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, operations_manager_id: value }))}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Select operations manager" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="">No operations manager</SelectItem>
+                  {availableUsers.map((user) => (
+                    <SelectItem key={user.user_id} value={user.user_id}>
+                      {user.full_name} ({user.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="company-manager">Company Manager</Label>
+              <Select
+                value={formData.company_manager_id}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, company_manager_id: value }))}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Select company manager" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="">No company manager</SelectItem>
+                  {availableUsers.map((user) => (
+                    <SelectItem key={user.user_id} value={user.user_id}>
+                      {user.full_name} ({user.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
