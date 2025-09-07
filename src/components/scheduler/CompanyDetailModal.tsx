@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEmployees } from "@/hooks/useSchedulerDatabase";
 import { toast } from "sonner";
 import { Building, User, UserPlus, Phone, Mail, MapPin, UserCheck } from "lucide-react";
-import CreateEmployeeModal from "./CreateEmployeeModal";
+import SimpleEmployeeModal from "./SimpleEmployeeModal";
 
 interface CompanyDetailModalProps {
   open: boolean;
@@ -241,10 +241,12 @@ export default function CompanyDetailModal({
         </DialogContent>
       </Dialog>
 
-      <CreateEmployeeModal
+      <SimpleEmployeeModal
         open={showAddEmployee}
         onOpenChange={setShowAddEmployee}
         companyId={company?.id}
+        companyFieldType={company?.field_type}
+        companyName={company?.name}
       />
     </>
   );

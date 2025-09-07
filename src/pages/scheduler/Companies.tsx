@@ -103,55 +103,60 @@ export default function Companies() {
           {companies.map((company) => (
             <Card key={company.id} className="group hover:shadow-xl transition-all duration-300 border border-border/50 hover:border-primary/30 bg-gradient-to-br from-card to-card/95">
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start space-x-3 flex-1 min-w-0">
                     <div 
-                      className="w-14 h-14 rounded-xl flex items-center justify-center shadow-lg"
+                      className="w-14 h-14 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
                       style={{ backgroundColor: company.color || '#3b82f6' }}
                     >
                       <Building className="w-7 h-7 text-white" />
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <Button
                         variant="ghost"
-                        className="p-0 h-auto font-semibold text-lg text-left hover:text-primary transition-colors"
+                        className="p-0 h-auto font-semibold text-lg text-left hover:text-primary transition-colors w-full justify-start"
                         onClick={() => handleViewCompany(company)}
+                        title={company.name}
                       >
-                        {company.name}
+                        <span className="truncate block max-w-full">{company.name}</span>
                       </Button>
-                      <CardDescription className="text-sm mt-1">{company.type}</CardDescription>
+                      <CardDescription className="text-sm mt-1 truncate">{company.type}</CardDescription>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge 
+                          variant={company.field_type === 'IT' ? 'default' : 'secondary'}
+                          className="text-xs"
+                        >
+                          {company.field_type}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge 
-                      variant={company.field_type === 'IT' ? 'default' : 'secondary'}
-                      className="text-xs"
-                    >
-                      {company.field_type}
-                    </Badge>
-                    {canAssignManager && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <Settings className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewCompany(company)}>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditCompany(company)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit Company
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleAssignManager(company)}>
-                            <UserCheck className="w-4 h-4 mr-2" />
-                            Assign Managers
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
+                  <div className="flex-shrink-0">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-70 hover:opacity-100">
+                          <Settings className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-background border shadow-lg">
+                        <DropdownMenuItem onClick={() => handleViewCompany(company)}>
+                          <Eye className="w-4 h-4 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
+                        {canAssignManager && (
+                          <>
+                            <DropdownMenuItem onClick={() => handleEditCompany(company)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Company
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleAssignManager(company)}>
+                              <UserCheck className="w-4 h-4 mr-2" />
+                              Assign Managers
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               </CardHeader>
