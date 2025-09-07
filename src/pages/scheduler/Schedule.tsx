@@ -48,12 +48,12 @@ export default function SchedulerSchedule() {
   // Filter companies to only show Non-IT companies for scheduling
   const nonITCompanies = companies.filter(company => company.field_type === "Non-IT");
 
-  // Set first non-IT company as default when companies load
-  useEffect(() => {
-    if (nonITCompanies.length > 0 && !selectedCompany) {
-      setSelectedCompany(nonITCompanies[0].id);
-    }
-  }, [nonITCompanies, selectedCompany]);
+  // Don't auto-select company - let user choose
+  // useEffect(() => {
+  //   if (nonITCompanies.length > 0 && !selectedCompany) {
+  //     setSelectedCompany(nonITCompanies[0].id);
+  //   }
+  // }, [nonITCompanies, selectedCompany]);
 
   function getWeekStart(date: Date) {
     const start = new Date(date);
@@ -242,8 +242,29 @@ export default function SchedulerSchedule() {
   const isLoading = companiesLoading || departmentsLoading || shiftsLoading;
 
   return (
-    <div className="space-y-6 p-6 print-schedule">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 p-6">
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            .print-schedule, .print-schedule * {
+              visibility: visible;
+            }
+            .print-schedule {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+            }
+            .no-print {
+              display: none !important;
+            }
+          }
+        `
+      }} />
+      <div className="flex items-center justify-between no-print">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Schedule Management</h1>
           <p className="text-muted-foreground">
@@ -251,30 +272,14 @@ export default function SchedulerSchedule() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setShowCreateCompany(true)}>
-            <Building className="h-4 w-4 mr-2" />
-            Add Company
-          </Button>
-          <Button variant="outline" onClick={() => setShowCreateEmployee(true)} disabled={!selectedCompany}>
-            <Users className="h-4 w-4 mr-2" />
-            Add Employee
-          </Button>
           <Button onClick={() => setShowCreateShift(true)} disabled={!selectedCompany}>
             <Plus className="h-4 w-4 mr-2" />
             Add Shift
           </Button>
-          <Button variant="outline" onClick={printSchedule} disabled={!selectedCompany}>
-            <Printer className="h-4 w-4 mr-2" />
-            Print
-          </Button>
-          <Button variant="outline" onClick={downloadSchedule} disabled={!selectedCompany}>
-            <Download className="h-4 w-4 mr-2" />
-            Download
-          </Button>
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between no-print">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Button
@@ -314,7 +319,7 @@ export default function SchedulerSchedule() {
             </SelectContent>
           </Select>
           
-          <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+          <Select value={selectedDepartment} onValueChange={setSelectedDepartment} disabled={!selectedCompany}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select department" />
             </SelectTrigger>
@@ -331,7 +336,7 @@ export default function SchedulerSchedule() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
+      <div className="grid gap-4 md:grid-cols-3 mb-6 no-print">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
@@ -365,7 +370,7 @@ export default function SchedulerSchedule() {
       {/* Main Layout: Schedule Grid + Employee Sidebar */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         {/* Schedule Grid - Takes 3/4 of the space */}
-        <div className="xl:col-span-3">
+        <div className="xl:col-span-3 print-schedule">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -375,13 +380,22 @@ export default function SchedulerSchedule() {
                     variant={isEditMode ? "default" : "outline"} 
                     size="sm"
                     onClick={() => setIsEditMode(!isEditMode)}
+                    disabled={!selectedCompany}
                   >
                     <Edit className="h-4 w-4 mr-1" />
                     {isEditMode ? "Exit Edit" : "Edit Schedule"}
                   </Button>
+                  <Button variant="outline" size="sm" onClick={printSchedule} disabled={!selectedCompany}>
+                    <Printer className="h-4 w-4 mr-1" />
+                    Print
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={downloadSchedule} disabled={!selectedCompany}>
+                    <Download className="h-4 w-4 mr-1" />
+                    Download
+                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" disabled={!selectedCompany}>
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
