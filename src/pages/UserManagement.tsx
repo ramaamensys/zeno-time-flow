@@ -536,6 +536,17 @@ export default function UserManagement() {
     }
 
     try {
+      // First get the company details to determine app_type based on field_type
+      const { data: companyData, error: companyFetchError } = await supabase
+        .from('companies')
+        .select('field_type')
+        .eq('id', assignmentData.company_id)
+        .single();
+
+      if (companyFetchError) throw companyFetchError;
+
+      const appType = companyData.field_type === 'IT' ? 'calendar' : 'scheduler';
+
       // Process each selected user
       for (const userId of selectedUsersForAssignment) {
         // For operations_manager role, update the company
@@ -581,7 +592,7 @@ export default function UserManagement() {
           }
         }
 
-        // Update user role - for employee, we keep them as 'user' role but with scheduler app_type
+        // Update user role based on assignment and company type
         let finalRole: "user" | "admin" | "super_admin" | "operations_manager" | "manager" = "user";
         
         if (assignmentData.role === "operations_manager") {
@@ -589,25 +600,25 @@ export default function UserManagement() {
         } else if (assignmentData.role === "admin") {
           finalRole = "manager"; // Company managers get the manager role
         } else if (assignmentData.role === "employee") {
-          finalRole = "user"; // Employees are users with scheduler access
+          finalRole = "user"; // Employees get user role with app access based on company type
         }
         
-        // First, delete any existing scheduler role for this user
+        // First, delete any existing roles for this user (both calendar and scheduler)
         const { error: deleteRoleError } = await supabase
           .from('user_roles')
           .delete()
           .eq('user_id', userId)
-          .eq('app_type', 'scheduler');
+          .in('app_type', ['calendar', 'scheduler']);
 
         if (deleteRoleError) throw deleteRoleError;
 
-        // Then insert the new role
+        // Then insert the new role with correct app_type based on company field_type
         const { error: roleError } = await supabase
           .from('user_roles')
           .insert({
             user_id: userId,
             role: finalRole,
-            app_type: 'scheduler'
+            app_type: appType
           });
 
         if (roleError) throw roleError;
