@@ -45,12 +45,15 @@ export default function SchedulerSchedule() {
   const { employees, loading: employeesLoading } = useEmployees(selectedCompany);
   const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift } = useShifts(selectedCompany, getWeekStart(selectedWeek));
 
-  // Set first company as default when companies load
+  // Filter companies to only show Non-IT companies for scheduling
+  const nonITCompanies = companies.filter(company => company.field_type === "Non-IT");
+
+  // Set first non-IT company as default when companies load
   useEffect(() => {
-    if (companies.length > 0 && !selectedCompany) {
-      setSelectedCompany(companies[0].id);
+    if (nonITCompanies.length > 0 && !selectedCompany) {
+      setSelectedCompany(nonITCompanies[0].id);
     }
-  }, [companies, selectedCompany]);
+  }, [nonITCompanies, selectedCompany]);
 
   function getWeekStart(date: Date) {
     const start = new Date(date);
@@ -191,7 +194,7 @@ export default function SchedulerSchedule() {
   };
 
   const downloadSchedule = () => {
-    const companyName = companies.find(c => c.id === selectedCompany)?.name || 'Schedule';
+    const companyName = nonITCompanies.find(c => c.id === selectedCompany)?.name || 'Schedule';
     const weekRange = `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
     
     // Create CSV content
@@ -303,7 +306,7 @@ export default function SchedulerSchedule() {
               <SelectValue placeholder="Select company" />
             </SelectTrigger>
             <SelectContent>
-              {companies.map((company) => (
+              {nonITCompanies.map((company) => (
                 <SelectItem key={company.id} value={company.id}>
                   {company.name}
                 </SelectItem>
