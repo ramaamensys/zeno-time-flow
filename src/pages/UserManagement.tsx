@@ -100,6 +100,20 @@ export default function UserManagement() {
         }
       });
 
+      // Add employees from employees table
+      const { data: employees, error: employeesError } = await supabase
+        .from('employees')
+        .select('user_id')
+        .eq('status', 'active');
+
+      if (employeesError) throw employeesError;
+
+      employees?.forEach(employee => {
+        if (employee.user_id) {
+          assignedUserIds.add(employee.user_id);
+        }
+      });
+
       // Filter users to show only unassigned ones
       const availableUsers = users.filter(userProfile => {
         // Exclude current user (super admin doing the assignment)
