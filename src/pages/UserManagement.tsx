@@ -578,9 +578,19 @@ export default function UserManagement() {
           finalRole = "user"; // Employees are users with scheduler access
         }
         
+        // First, delete any existing scheduler role for this user
+        const { error: deleteRoleError } = await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', userId)
+          .eq('app_type', 'scheduler');
+
+        if (deleteRoleError) throw deleteRoleError;
+
+        // Then insert the new role
         const { error: roleError } = await supabase
           .from('user_roles')
-          .upsert({
+          .insert({
             user_id: userId,
             role: finalRole,
             app_type: 'scheduler'
