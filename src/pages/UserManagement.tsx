@@ -43,6 +43,7 @@ interface UserProfile {
   role: string;
   manager_id?: string;
   manager_name?: string;
+  field_type?: 'IT' | 'Non-IT';
 }
 
 export default function UserManagement() {
@@ -56,11 +57,12 @@ export default function UserManagement() {
     email: "",
     full_name: "",
     password: "",
-    role: "user" as "user" | "admin" | "super_admin" | "operations_manager",
+    role: "user" as "user" | "admin" | "super_admin" | "operations_manager" | "manager",
     field_type: "IT" as "IT" | "Non-IT",
     manager_id: "none"
   });
   const [managers, setManagers] = useState<UserProfile[]>([]);
+  const [operationsManagers, setOperationsManagers] = useState<UserProfile[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -102,6 +104,7 @@ export default function UserManagement() {
         setCurrentUserRole('super_admin');
         await loadUsers();
         await loadManagers();
+        await loadOperationsManagers();
       } else {
         setIsAuthorized(false);
         setLoading(false);
@@ -149,6 +152,8 @@ export default function UserManagement() {
               highestRole = 'super_admin';
             } else if (roles.includes('operations_manager')) {
               highestRole = 'operations_manager';
+            } else if (roles.includes('manager')) {
+              highestRole = 'manager';
             } else if (roles.includes('admin')) {
               highestRole = 'admin';
             } else if (roles.includes('user')) {
@@ -204,6 +209,40 @@ export default function UserManagement() {
     }
   };
 
+  const loadOperationsManagers = async () => {
+    try {
+      // Get all users with operations_manager role
+      const { data: opsManagerRoles } = await supabase
+        .from('user_roles')
+        .select('user_id, app_type')
+        .eq('role', 'operations_manager');
+
+      if (opsManagerRoles && opsManagerRoles.length > 0) {
+        const { data: opsManagerProfiles } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('user_id', opsManagerRoles.map(r => r.user_id))
+          .eq('status', 'active');
+
+        if (opsManagerProfiles) {
+          // Map profiles with their app_type (field_type)
+          const profilesWithFieldType = opsManagerProfiles.map(profile => {
+            const roleData = opsManagerRoles.find(r => r.user_id === profile.user_id);
+            const fieldType = roleData?.app_type === 'calendar' ? 'IT' : 'Non-IT';
+            return {
+              ...profile,
+              role: 'operations_manager',
+              field_type: fieldType as 'IT' | 'Non-IT'
+            };
+          });
+          setOperationsManagers(profilesWithFieldType);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading operations managers:', error);
+    }
+  };
+
   const loadCompanies = async () => {
     try {
       const { data, error } = await supabase
@@ -218,7 +257,7 @@ export default function UserManagement() {
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: 'user' | 'admin' | 'super_admin' | 'operations_manager') => {
+  const updateUserRole = async (userId: string, newRole: 'user' | 'admin' | 'super_admin' | 'operations_manager' | 'manager') => {
     try {
       const { error } = await supabase
         .from('user_roles')
@@ -492,6 +531,8 @@ export default function UserManagement() {
         return 'destructive';
       case 'operations_manager':
         return 'default';
+      case 'manager':
+        return 'default';
       case 'admin':
         return 'default';
       default:
@@ -578,6 +619,7 @@ export default function UserManagement() {
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="user">User</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
                   <SelectItem value="operations_manager">Operations Manager</SelectItem>
                   <SelectItem value="super_admin">Super Admin</SelectItem>
                 </SelectContent>
@@ -669,13 +711,13 @@ export default function UserManagement() {
                     <Label htmlFor="role" className="text-right">
                       Role
                     </Label>
-                    <Select value={newUser.role} onValueChange={(value: "user" | "admin" | "super_admin" | "operations_manager") => setNewUser({ ...newUser, role: value })}>
+                    <Select value={newUser.role} onValueChange={(value: "user" | "admin" | "super_admin" | "operations_manager" | "manager") => setNewUser({ ...newUser, role: value })}>
                       <SelectTrigger className="col-span-3">
                         <SelectValue />
                       </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="user">User</SelectItem>
-                          {currentUserRole === 'super_admin' && <SelectItem value="admin">Manager</SelectItem>}
+                          {currentUserRole === 'super_admin' && <SelectItem value="manager">Manager</SelectItem>}
                           {currentUserRole === 'super_admin' && <SelectItem value="operations_manager">Operations Manager</SelectItem>}
                           {currentUserRole === 'super_admin' && <SelectItem value="super_admin">Super Admin</SelectItem>}
                         </SelectContent>
@@ -695,6 +737,31 @@ export default function UserManagement() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {newUser.role === "manager" && (
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="operations_manager" className="text-right">
+                        Operations Manager
+                      </Label>
+                      <Select 
+                        value={newUser.manager_id} 
+                        onValueChange={(value) => setNewUser({ ...newUser, manager_id: value })}
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Select operations manager" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Manager</SelectItem>
+                          {operationsManagers
+                            .filter(manager => manager.field_type === newUser.field_type)
+                            .map((manager) => (
+                            <SelectItem key={manager.user_id} value={manager.user_id}>
+                              {manager.full_name} ({manager.field_type})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button
