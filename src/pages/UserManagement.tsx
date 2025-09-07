@@ -454,26 +454,22 @@ export default function UserManagement() {
   };
 
   const deleteUser = async (userId: string, userEmail: string) => {
-    if (!confirm(`Are you sure you want to delete user ${userEmail}? This will mark the user as deleted.`)) {
+    if (!confirm(`Are you sure you want to permanently delete user ${userEmail}? This action cannot be undone.`)) {
       return;
     }
 
     try {
       console.log('Deleting user:', userId, userEmail);
       
-      // Mark user as deleted in profiles table
-      const { error, data } = await supabase
-        .from('profiles')
-        .update({ status: 'deleted' })
-        .eq('user_id', userId)
-        .select();
+      // Use Supabase Admin API to permanently delete the user from Auth
+      const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
 
-      if (error) {
-        console.error('Deletion error:', error);
-        throw error;
+      if (deleteError) {
+        console.error('Auth deletion error:', deleteError);
+        throw deleteError;
       }
 
-      console.log('Deletion successful, updated records:', data);
+      console.log('User deletion successful');
 
       // Force reload users data from server
       setUsers([]);
@@ -481,7 +477,7 @@ export default function UserManagement() {
 
       toast({
         title: "Success", 
-        description: "User marked as deleted successfully",
+        description: "User permanently deleted successfully",
       });
     } catch (error: any) {
       console.error('Error deleting user:', error);
