@@ -454,20 +454,37 @@ export default function UserManagement() {
   };
 
   const deleteUser = async (userId: string, userEmail: string) => {
-    if (!confirm(`Are you sure you want to permanently delete user ${userEmail}? This action cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to delete user ${userEmail}? This will mark the user as deleted and remove them from the list.`)) {
       return;
     }
 
     try {
       console.log('Deleting user:', userId, userEmail);
       
-      // Use Supabase Admin API to permanently delete the user from Auth
-      const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
+      // Mark user as deleted in profiles table and clean up related data
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ status: 'deleted' })
+        .eq('user_id', userId);
 
-      if (deleteError) {
-        console.error('Auth deletion error:', deleteError);
-        throw deleteError;
-      }
+      if (profileError) throw profileError;
+
+      // Clean up user roles
+      const { error: rolesError } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+
+      if (rolesError) throw rolesError;
+
+      // Clean up employee records if any
+      const { error: employeeError } = await supabase
+        .from('employees')
+        .delete()
+        .eq('user_id', userId);
+
+      // Don't throw error for employee cleanup as user might not be an employee
+      if (employeeError) console.log('No employee record to clean up');
 
       console.log('User deletion successful');
 
@@ -477,7 +494,7 @@ export default function UserManagement() {
 
       toast({
         title: "Success", 
-        description: "User permanently deleted successfully",
+        description: "User deleted successfully and removed from system",
       });
     } catch (error: any) {
       console.error('Error deleting user:', error);
