@@ -540,9 +540,32 @@ export default function UserManagement() {
             .eq('id', assignmentData.company_id);
 
           if (companyError) throw companyError;
+        } else if (assignmentData.role === "employee") {
+          // For employee role, create employee record
+          // First get the user profile data
+          const { data: userProfile, error: profileError } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('user_id', userId)
+            .single();
+
+          if (profileError) throw profileError;
+
+          if (userProfile) {
+            const { error: employeeError } = await supabase
+              .from('employees')
+              .insert({
+                user_id: userId,
+                first_name: userProfile.full_name?.split(' ')[0] || '',
+                last_name: userProfile.full_name?.split(' ').slice(1).join(' ') || '',
+                email: userProfile.email || '',
+                company_id: assignmentData.company_id,
+                status: 'active'
+              });
+
+            if (employeeError) throw employeeError;
+          }
         }
-        // For employee role, we don't update company directly
-        // We just assign the role to the user
 
         // Update user role - for employee, we keep them as 'user' role but with scheduler app_type
         let finalRole: "user" | "admin" | "super_admin" | "operations_manager" | "manager" = "user";
