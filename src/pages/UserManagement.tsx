@@ -76,7 +76,7 @@ export default function UserManagement() {
   
   const [assignmentData, setAssignmentData] = useState({
     company_id: "",
-    role: "operations_manager" as "operations_manager" | "admin"
+    role: "operations_manager" as "operations_manager" | "admin" | "employee"
   });
 
   useEffect(() => {
@@ -541,13 +541,25 @@ export default function UserManagement() {
 
           if (companyError) throw companyError;
         }
+        // For employee role, we don't update company directly
+        // We just assign the role to the user
 
-        // Update user role
+        // Update user role - for employee, we keep them as 'user' role but with scheduler app_type
+        let finalRole: "user" | "admin" | "super_admin" | "operations_manager" | "manager" = "user";
+        
+        if (assignmentData.role === "operations_manager") {
+          finalRole = "operations_manager";
+        } else if (assignmentData.role === "admin") {
+          finalRole = "manager"; // Company managers get the manager role
+        } else if (assignmentData.role === "employee") {
+          finalRole = "user"; // Employees are users with scheduler access
+        }
+        
         const { error: roleError } = await supabase
           .from('user_roles')
           .upsert({
             user_id: userId,
-            role: assignmentData.role,
+            role: finalRole,
             app_type: 'scheduler'
           });
 
@@ -576,11 +588,16 @@ export default function UserManagement() {
   };
 
   const toggleUserSelection = (userId: string) => {
-    setSelectedUsersForAssignment(prev => 
-      prev.includes(userId) 
+    console.log('Toggling user selection for:', userId);
+    console.log('Current selected users:', selectedUsersForAssignment);
+    
+    setSelectedUsersForAssignment(prev => {
+      const newSelection = prev.includes(userId) 
         ? prev.filter(id => id !== userId)
-        : [...prev, userId]
-    );
+        : [...prev, userId];
+      console.log('New selection:', newSelection);
+      return newSelection;
+    });
   };
 
   const selectAllUsers = () => {
@@ -900,25 +917,29 @@ export default function UserManagement() {
                         </div>
                       ) : (
                         availableUsersForAssignment.map((user) => (
-                          <div
-                            key={user.user_id}
-                            className="flex items-center gap-3 p-3 border-b last:border-b-0 hover:bg-muted/50 cursor-pointer"
-                            onClick={() => toggleUserSelection(user.user_id)}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedUsersForAssignment.includes(user.user_id)}
-                              onChange={() => toggleUserSelection(user.user_id)}
-                              className="h-4 w-4 rounded border-gray-300"
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium text-sm">{user.full_name}</div>
-                              <div className="text-xs text-muted-foreground">{user.email}</div>
+                            <div
+                              key={user.user_id}
+                              className="flex items-center gap-3 p-3 border-b last:border-b-0 hover:bg-muted/50"
+                            >
+                              <label className="flex items-center gap-3 cursor-pointer flex-1">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedUsersForAssignment.includes(user.user_id)}
+                                  onChange={(e) => {
+                                    console.log('Checkbox changed for:', user.user_id, e.target.checked);
+                                    toggleUserSelection(user.user_id);
+                                  }}
+                                  className="h-4 w-4 rounded border-gray-300"
+                                />
+                                <div className="flex-1">
+                                  <div className="font-medium text-sm">{user.full_name}</div>
+                                  <div className="text-xs text-muted-foreground">{user.email}</div>
+                                </div>
+                                <Badge variant={getRoleBadgeVariant(user.role)} className="text-xs">
+                                  {user.role === 'admin' ? 'Admin (Unassigned)' : user.role.replace('_', ' ')}
+                                </Badge>
+                              </label>
                             </div>
-                            <Badge variant={getRoleBadgeVariant(user.role)} className="text-xs">
-                              {user.role === 'admin' ? 'Admin (Unassigned)' : user.role.replace('_', ' ')}
-                            </Badge>
-                          </div>
                         ))
                       )}
                     </div>
@@ -949,7 +970,7 @@ export default function UserManagement() {
                     </Label>
                     <Select 
                       value={assignmentData.role} 
-                      onValueChange={(value: "operations_manager" | "admin") => setAssignmentData({ ...assignmentData, role: value })}
+                      onValueChange={(value: "operations_manager" | "admin" | "employee") => setAssignmentData({ ...assignmentData, role: value })}
                     >
                       <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Select role" />
@@ -957,6 +978,7 @@ export default function UserManagement() {
                       <SelectContent>
                         <SelectItem value="operations_manager">Operations Manager</SelectItem>
                         <SelectItem value="admin">Company Manager</SelectItem>
+                        <SelectItem value="employee">Employee</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
