@@ -38,6 +38,8 @@ export default function Companies() {
           setUserRole('super_admin');
         } else if (roles.includes('operations_manager')) {
           setUserRole('operations_manager');
+        } else if (roles.includes('manager')) {
+          setUserRole('manager');
         } else if (roles.includes('admin')) {
           setUserRole('admin');
         } else {
@@ -51,6 +53,7 @@ export default function Companies() {
 
   const canCreateCompany = userRole === 'super_admin' || userRole === 'operations_manager';
   const canAssignManager = userRole === 'super_admin' || userRole === 'operations_manager';
+  const canEditCompany = userRole === 'super_admin' || userRole === 'operations_manager';
 
   const handleAssignManager = (company: any) => {
     setSelectedCompany(company);
@@ -143,17 +146,17 @@ export default function Companies() {
                           <Eye className="w-4 h-4 mr-2" />
                           View Details
                         </DropdownMenuItem>
+                        {canEditCompany && (
+                          <DropdownMenuItem onClick={() => handleEditCompany(company)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Company
+                          </DropdownMenuItem>
+                        )}
                         {canAssignManager && (
-                          <>
-                            <DropdownMenuItem onClick={() => handleEditCompany(company)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit Company
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleAssignManager(company)}>
-                              <UserCheck className="w-4 h-4 mr-2" />
-                              Assign Managers
-                            </DropdownMenuItem>
-                          </>
+                          <DropdownMenuItem onClick={() => handleAssignManager(company)}>
+                            <UserCheck className="w-4 h-4 mr-2" />
+                            Assign Managers
+                          </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>

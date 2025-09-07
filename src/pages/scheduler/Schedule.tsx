@@ -7,6 +7,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useCompanies, useDepartments, useEmployees, useShifts, Shift } from "@/hooks/useSchedulerDatabase";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import CreateCompanyModal from "@/components/scheduler/CreateCompanyModal";
 import CreateShiftModal from "@/components/scheduler/CreateShiftModal";
 import EditShiftModal from "@/components/scheduler/EditShiftModal";
@@ -16,6 +18,8 @@ import SlotEditModal from "@/components/scheduler/SlotEditModal";
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function SchedulerSchedule() {
+  const { user } = useAuth();
+  
   // Predefined shift slots (mutable for editing)
   const [shiftSlots, setShiftSlots] = useState([
     { id: "morning", name: "Morning Shift", time: "6:00 AM - 2:00 PM", startHour: 6, endHour: 14 },
@@ -38,6 +42,7 @@ export default function SchedulerSchedule() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [showSlotEditModal, setShowSlotEditModal] = useState(false);
   const [editingSlot, setEditingSlot] = useState<{ id: string; name: string; time: string; startHour: number; endHour: number } | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   
   // Database hooks
   const { companies, loading: companiesLoading } = useCompanies();
@@ -45,8 +50,54 @@ export default function SchedulerSchedule() {
   const { employees, loading: employeesLoading } = useEmployees(selectedCompany);
   const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift } = useShifts(selectedCompany, getWeekStart(selectedWeek));
 
-  // Filter companies to only show Non-IT companies for scheduling
-  const nonITCompanies = companies.filter(company => company.field_type === "Non-IT");
+  // Fetch user role for access control
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!user) return;
+      
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+      
+      if (data && data.length > 0) {
+        const roles = data.map(item => item.role);
+        if (roles.includes('super_admin')) {
+          setUserRole('super_admin');
+        } else if (roles.includes('operations_manager')) {
+          setUserRole('operations_manager');
+        } else if (roles.includes('manager')) {
+          setUserRole('manager');
+        } else {
+          setUserRole('user');
+        }
+      }
+    };
+
+    fetchUserRole();
+  }, [user]);
+
+  // Filter companies based on user role and access
+  const availableCompanies = companies.filter(company => {
+    // Super admins can see all companies
+    if (userRole === 'super_admin') return true;
+    
+    // Operations managers can see companies they manage
+    if (userRole === 'operations_manager') {
+      return company.operations_manager_id === user?.id;
+    }
+    
+    // Company managers can see only their assigned company
+    if (userRole === 'manager') {
+      return company.company_manager_id === user?.id;
+    }
+    
+    // Regular users can't access scheduling
+    return false;
+  });
+
+  // Further filter to only show Non-IT companies for scheduling
+  const nonITCompanies = availableCompanies.filter(company => company.field_type === "Non-IT");
 
   // Don't auto-select company - let user choose
   // useEffect(() => {
