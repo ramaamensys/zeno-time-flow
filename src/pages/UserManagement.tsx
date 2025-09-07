@@ -850,38 +850,46 @@ export default function UserManagement() {
                       <div className="flex items-center gap-2">
                         {userProfile.user_id !== user?.id && userProfile.status === 'active' && (
                           <>
-                               <Select
+                            {/* Only show role dropdown for basic users, show badge for assigned roles */}
+                            {userProfile.role === 'user' ? (
+                              <Select
                                 value={userProfile.role}
                                 onValueChange={(value) => updateUserRole(userProfile.user_id, value as 'user' | 'admin' | 'super_admin' | 'operations_manager')}
-                                disabled={currentUserRole !== 'super_admin' && (userProfile.role === 'admin' || userProfile.role === 'super_admin' || userProfile.role === 'operations_manager')}
+                                disabled={currentUserRole !== 'super_admin'}
                               >
-                               <SelectTrigger className="w-32">
-                                 <SelectValue />
-                               </SelectTrigger>
+                                <SelectTrigger className="w-32">
+                                  <SelectValue />
+                                </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="user">User</SelectItem>
                                   {currentUserRole === 'super_admin' && <SelectItem value="admin">Admin</SelectItem>}
                                   {currentUserRole === 'super_admin' && <SelectItem value="operations_manager">Operations Manager</SelectItem>}
                                   {currentUserRole === 'super_admin' && <SelectItem value="super_admin">Super Admin</SelectItem>}
                                 </SelectContent>
-                             </Select>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setEditingUser(userProfile);
-                                setIsEditDialogOpen(true);
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => deleteUser(userProfile.user_id, userProfile.email)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                              </Select>
+                            ) : (
+                              /* Show badge for admin, operations_manager, super_admin - no changes allowed */
+                              <Badge variant={getRoleBadgeVariant(userProfile.role)} className="w-32 justify-center">
+                                {userProfile.role.replace('_', ' ')}
+                              </Badge>
+                            )}
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={() => {
+                                 setEditingUser(userProfile);
+                                 setIsEditDialogOpen(true);
+                               }}
+                             >
+                               <Edit className="h-4 w-4" />
+                             </Button>
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={() => deleteUser(userProfile.user_id, userProfile.email)}
+                             >
+                               <Trash2 className="h-4 w-4" />
+                             </Button>
                           </>
                         )}
                         {userProfile.user_id === user?.id && (
