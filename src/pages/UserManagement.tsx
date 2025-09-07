@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Users, Plus, Edit, Trash2, Search, Filter, Mail } from "lucide-react";
+import { Loader2, Users, Plus, Edit, Trash2, Search, Filter, Mail, Building } from "lucide-react";
 
 interface UserProfile {
   id: string;
@@ -64,6 +64,13 @@ export default function UserManagement() {
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAssignCompanyDialogOpen, setIsAssignCompanyDialogOpen] = useState(false);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [selectedUserForAssignment, setSelectedUserForAssignment] = useState<UserProfile | null>(null);
+  const [assignmentData, setAssignmentData] = useState({
+    company_id: "",
+    role: "operations_manager" as "operations_manager" | "admin"
+  });
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState("");
@@ -74,6 +81,7 @@ export default function UserManagement() {
 
   useEffect(() => {
     checkAuthorizationAndLoadUsers();
+    loadCompanies();
   }, [user]);
 
   const checkAuthorizationAndLoadUsers = async () => {
@@ -193,6 +201,20 @@ export default function UserManagement() {
       }
     } catch (error) {
       console.error('Error loading managers:', error);
+    }
+  };
+
+  const loadCompanies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setCompanies(data || []);
+    } catch (error) {
+      console.error('Error loading companies:', error);
     }
   };
 
@@ -397,6 +419,62 @@ export default function UserManagement() {
     }
   };
 
+  const assignUserToCompany = async () => {
+    if (!selectedUserForAssignment || !assignmentData.company_id) {
+      toast({
+        title: "Error",
+        description: "Please select a user and company",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Update the company with the user assignment
+      const updateData: any = {};
+      if (assignmentData.role === "operations_manager") {
+        updateData.operations_manager_id = selectedUserForAssignment.user_id;
+      } else if (assignmentData.role === "admin") {
+        updateData.company_manager_id = selectedUserForAssignment.user_id;
+      }
+
+      const { error: companyError } = await supabase
+        .from('companies')
+        .update(updateData)
+        .eq('id', assignmentData.company_id);
+
+      if (companyError) throw companyError;
+
+      // Update user role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .upsert({
+          user_id: selectedUserForAssignment.user_id,
+          role: assignmentData.role,
+          app_type: 'scheduler'
+        });
+
+      if (roleError) throw roleError;
+
+      toast({
+        title: "Success",
+        description: `User assigned to company as ${assignmentData.role.replace('_', ' ')} successfully`,
+      });
+
+      setIsAssignCompanyDialogOpen(false);
+      setSelectedUserForAssignment(null);
+      setAssignmentData({ company_id: "", role: "operations_manager" });
+      await loadUsers();
+    } catch (error: any) {
+      console.error('Error assigning user to company:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to assign user to company",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'active':
@@ -533,14 +611,15 @@ export default function UserManagement() {
               <Users className="h-5 w-5" />
               Users ({filteredUsers.length} of {users.length})
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add User
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
+            <div className="flex items-center gap-2">
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add User
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>Add New User</DialogTitle>
                   <DialogDescription>
@@ -630,87 +709,94 @@ export default function UserManagement() {
               </DialogContent>
             </Dialog>
 
-            {/* Edit User Dialog */}
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <Dialog open={isAssignCompanyDialogOpen} onOpenChange={setIsAssignCompanyDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Building className="h-4 w-4 mr-2" />
+                  Assign to Company
+                </Button>
+              </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                  <DialogTitle>Edit User</DialogTitle>
+                  <DialogTitle>Assign User to Company</DialogTitle>
                   <DialogDescription>
-                    Update user information.
+                    Select a user and assign them to a company with a specific role.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="edit_email" className="text-right">
-                      Email
+                    <Label htmlFor="user_select" className="text-right">
+                      User
                     </Label>
-                    <Input
-                      id="edit_email"
-                      type="email"
-                      value={editingUser?.email || ""}
-                      onChange={(e) => setEditingUser(editingUser ? { ...editingUser, email: e.target.value } : null)}
-                      className="col-span-3"
-                      placeholder="user@example.com"
-                    />
+                    <Select 
+                      value={selectedUserForAssignment?.user_id || ""} 
+                      onValueChange={(value) => {
+                        const user = users.find(u => u.user_id === value);
+                        setSelectedUserForAssignment(user || null);
+                      }}
+                    >
+                      <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Select a user" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.filter(user => user.status === 'active').map((user) => (
+                          <SelectItem key={user.user_id} value={user.user_id}>
+                            {user.full_name} ({user.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="edit_full_name" className="text-right">
-                      Full Name
+                    <Label htmlFor="company_select" className="text-right">
+                      Company
                     </Label>
-                    <Input
-                      id="edit_full_name"
-                      value={editingUser?.full_name || ""}
-                      onChange={(e) => setEditingUser(editingUser ? { ...editingUser, full_name: e.target.value } : null)}
-                      className="col-span-3"
-                      placeholder="John Doe"
-                    />
+                    <Select 
+                      value={assignmentData.company_id} 
+                      onValueChange={(value) => setAssignmentData({ ...assignmentData, company_id: value })}
+                    >
+                      <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Select a company" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((company) => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name} ({company.field_type})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  {/* Only show manager assignment for regular users */}
-                  {editingUser?.role === 'user' && (
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="edit_manager" className="text-right">
-                        Assign Manager
-                      </Label>
-                      <Select
-                        value={editingUser?.manager_id || "none"}
-                        onValueChange={(value) => setEditingUser(editingUser ? { ...editingUser, manager_id: value } : null)}
-                      >
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Select a manager (optional)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No Manager</SelectItem>
-                          {managers.filter(manager => manager.user_id && manager.full_name && manager.user_id !== editingUser?.user_id).map((manager) => (
-                            <SelectItem key={manager.user_id} value={manager.user_id}>
-                              {manager.full_name} ({manager.email})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  {/* Show info for admin users */}
-                  {editingUser?.role === 'admin' && (
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label className="text-right text-sm text-muted-foreground">
-                        Manager
-                      </Label>
-                      <div className="col-span-3 text-sm text-muted-foreground">
-                        Super Admin (automatically assigned)
-                      </div>
-                    </div>
-                  )}
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="assignment_role" className="text-right">
+                      Role
+                    </Label>
+                    <Select 
+                      value={assignmentData.role} 
+                      onValueChange={(value: "operations_manager" | "admin") => setAssignmentData({ ...assignmentData, role: value })}
+                    >
+                      <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="operations_manager">Operations Manager</SelectItem>
+                        <SelectItem value="admin">Company Manager</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button
                     type="submit"
-                    onClick={editUser}
+                    onClick={assignUserToCompany}
+                    disabled={!selectedUserForAssignment || !assignmentData.company_id}
                   >
-                    Update User
+                    Assign to Company
                   </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
