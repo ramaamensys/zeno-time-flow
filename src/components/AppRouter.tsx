@@ -16,6 +16,7 @@ import Template from "@/pages/Template";
 
 // Scheduler App Pages
 import SchedulerDashboard from "@/pages/scheduler/Dashboard";
+import SchedulerCompanies from "@/pages/scheduler/Companies";
 import SchedulerSchedule from "@/pages/scheduler/Schedule";
 import SchedulerEmployees from "@/pages/scheduler/Employees";
 import SchedulerTimeClock from "@/pages/scheduler/TimeClock";
@@ -60,6 +61,7 @@ const AppRouter = () => {
               
               {/* Scheduler Features */}
               <Route path="/scheduler" element={<SchedulerDashboard />} />
+              <Route path="/scheduler/companies" element={<SchedulerCompanies />} />
               <Route path="/scheduler/schedule" element={<SchedulerSchedule />} />
               <Route path="/scheduler/employees" element={<SchedulerEmployees />} />
               <Route path="/scheduler/time-clock" element={<SchedulerTimeClock />} />

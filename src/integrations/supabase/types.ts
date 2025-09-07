@@ -193,10 +193,14 @@ export type Database = {
         Row: {
           address: string | null
           color: string | null
+          company_manager_id: string | null
           created_at: string
+          created_by: string | null
           email: string | null
+          field_type: string | null
           id: string
           name: string
+          operations_manager_id: string | null
           phone: string | null
           type: string
           updated_at: string
@@ -204,10 +208,14 @@ export type Database = {
         Insert: {
           address?: string | null
           color?: string | null
+          company_manager_id?: string | null
           created_at?: string
+          created_by?: string | null
           email?: string | null
+          field_type?: string | null
           id?: string
           name: string
+          operations_manager_id?: string | null
           phone?: string | null
           type: string
           updated_at?: string
@@ -215,10 +223,14 @@ export type Database = {
         Update: {
           address?: string | null
           color?: string | null
+          company_manager_id?: string | null
           created_at?: string
+          created_by?: string | null
           email?: string | null
+          field_type?: string | null
           id?: string
           name?: string
+          operations_manager_id?: string | null
           phone?: string | null
           type?: string
           updated_at?: string

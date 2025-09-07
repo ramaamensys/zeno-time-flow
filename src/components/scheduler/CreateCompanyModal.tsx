@@ -9,6 +9,7 @@ import { useCompanies } from "@/hooks/useSchedulerDatabase";
 interface CreateCompanyModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
 const COMPANY_TYPES = [
@@ -21,12 +22,13 @@ const COMPANY_TYPES = [
   { value: "other", label: "Other" }
 ];
 
-export default function CreateCompanyModal({ open, onOpenChange }: CreateCompanyModalProps) {
+export default function CreateCompanyModal({ open, onOpenChange, onSuccess }: CreateCompanyModalProps) {
   const { createCompany } = useCompanies();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    type: "motel", // Default to first option to avoid empty string
+    type: "motel",
+    field_type: "IT" as "IT" | "Non-IT",
     color: "#3b82f6",
     address: "",
     phone: "",
@@ -44,9 +46,11 @@ export default function CreateCompanyModal({ open, onOpenChange }: CreateCompany
     try {
       await createCompany(formData);
       onOpenChange(false);
+      onSuccess?.();
       setFormData({
         name: "",
-        type: "motel", // Default to first option to avoid empty string
+        type: "motel",
+        field_type: "IT" as "IT" | "Non-IT",
         color: "#3b82f6",
         address: "",
         phone: "",
@@ -76,6 +80,22 @@ export default function CreateCompanyModal({ open, onOpenChange }: CreateCompany
               placeholder="Enter company name"
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="field-type">Field Type *</Label>
+            <Select
+              value={formData.field_type}
+              onValueChange={(value: "IT" | "Non-IT") => setFormData(prev => ({ ...prev, field_type: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select field type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="IT">IT</SelectItem>
+                <SelectItem value="Non-IT">Non-IT</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

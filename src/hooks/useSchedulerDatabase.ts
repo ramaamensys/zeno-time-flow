@@ -10,7 +10,12 @@ export interface Company {
   address?: string;
   phone?: string;
   email?: string;
+  field_type?: 'IT' | 'Non-IT';
+  operations_manager_id?: string;
+  company_manager_id?: string;
+  created_by?: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Department {
@@ -74,7 +79,7 @@ export function useCompanies() {
     }
   };
 
-  const createCompany = async (companyData: Omit<Company, 'id' | 'created_at'>) => {
+  const createCompany = async (companyData: Omit<Company, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       const { data, error } = await (supabase as any)
         .from('companies')
@@ -143,7 +148,8 @@ export function useCompanies() {
     createCompany,
     updateCompany,
     deleteCompany,
-    refetch: fetchCompanies
+    refetch: fetchCompanies,
+    fetchCompanies
   };
 }
 
