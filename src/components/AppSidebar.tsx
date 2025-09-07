@@ -49,22 +49,28 @@ export function AppSidebar() {
         .eq('user_id', user.id);
       
       if (data && data.length > 0) {
-        // Check for highest role priority: super_admin > admin > user
+        // Check for highest role priority: super_admin > operations_manager > admin > user
         const roles = data.map(item => item.role);
         const appTypes = data.map(item => item.app_type);
         
         if (roles.includes('super_admin')) {
           setUserRole('super_admin');
+          setUserAppType('both'); // Super admins see everything
+        } else if (roles.includes('operations_manager')) {
+          setUserRole('operations_manager');
+          // Operations managers see features based on their company type
+          // IT operations managers see calendar + companies, non-IT see scheduler
+          const appType = appTypes[0] || 'calendar';
+          if (appType === 'calendar') {
+            setUserAppType('calendar_plus'); // Special type for IT operations managers
+          } else {
+            setUserAppType('scheduler');
+          }
         } else if (roles.includes('admin')) {
           setUserRole('admin');
-        } else {
-          setUserRole('user');
-        }
-
-        // Set app type - for admins, they can see both, for regular users, use their specific app_type
-        if (roles.includes('super_admin') || roles.includes('admin')) {
           setUserAppType('both'); // Admins get access to both
         } else {
+          setUserRole('user');
           setUserAppType(appTypes[0] || 'calendar'); // Regular users get their assigned app type
         }
       } else {
@@ -92,7 +98,7 @@ export function AppSidebar() {
 
   const bottomItems = [
     { title: "Account", url: "/account", icon: Settings },
-    ...(userRole === 'super_admin' || userRole === 'admin' ? [
+    ...(userRole === 'super_admin' || userRole === 'admin' || userRole === 'operations_manager' ? [
       { title: "Check Lists", url: "/template", icon: GraduationCap }
     ] : []),
     ...(userRole === 'super_admin' ? [
@@ -109,7 +115,7 @@ export function AppSidebar() {
     <Sidebar className={collapsed ? "w-14" : "w-60"} collapsible="icon">
       <SidebarContent>
         {/* Show Main Features for calendar users or admins */}
-        {(userAppType === 'calendar' || userAppType === 'both') && (
+        {(userAppType === 'calendar' || userAppType === 'both' || userAppType === 'calendar_plus') && (
           <SidebarGroup>
             <SidebarGroupLabel>Main Features</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -129,22 +135,37 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {/* Show Scheduler for scheduler users or admins */}
-        {(userAppType === 'scheduler' || userAppType === 'both') && (
+        {/* Show Companies for IT Operations Managers and Scheduler users/admins */}
+        {(userAppType === 'scheduler' || userAppType === 'both' || userAppType === 'calendar_plus') && (
           <SidebarGroup>
-            <SidebarGroupLabel>Scheduler</SidebarGroupLabel>
+            <SidebarGroupLabel>
+              {userAppType === 'calendar_plus' ? 'Companies' : 'Scheduler'}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {schedulerItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
+                {userAppType === 'calendar_plus' ? (
+                  // IT Operations Manager - only show Companies
+                  <SidebarMenuItem>
                     <SidebarMenuButton asChild>
-                      <NavLink to={item.url} end className={getNavCls}>
-                        <item.icon className="h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
+                      <NavLink to="/scheduler/companies" end className={getNavCls}>
+                        <Building className="h-4 w-4" />
+                        {!collapsed && <span>Companies</span>}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                ))}
+                ) : (
+                  // Full scheduler menu for non-IT operations managers and admins
+                  schedulerItems.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild>
+                        <NavLink to={item.url} end className={getNavCls}>
+                          <item.icon className="h-4 w-4" />
+                          {!collapsed && <span>{item.title}</span>}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
