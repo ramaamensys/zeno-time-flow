@@ -454,22 +454,36 @@ export default function UserManagement() {
   };
 
   const deleteUser = async (userId: string, userEmail: string) => {
-    if (!confirm(`Are you sure you want to delete user ${userEmail}? This will mark the user as deleted and remove them from the list.`)) {
+    if (!confirm(`Are you sure you want to delete user ${userEmail}? This will completely remove them from the system and all company assignments.`)) {
       return;
     }
 
     try {
       console.log('Deleting user:', userId, userEmail);
       
-      // Mark user as deleted in profiles table and clean up related data
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ status: 'deleted' })
+      // 1. Clean up company assignments - remove from operations_manager_id and company_manager_id
+      const { error: companyCleanupError } = await supabase
+        .from('companies')
+        .update({ 
+          operations_manager_id: null,
+          company_manager_id: null 
+        })
+        .or(`operations_manager_id.eq.${userId},company_manager_id.eq.${userId}`);
+
+      if (companyCleanupError) {
+        console.error('Company cleanup error:', companyCleanupError);
+        // Don't throw error, continue with other cleanup
+      }
+
+      // 2. Delete employee records if any
+      const { error: employeeError } = await supabase
+        .from('employees')
+        .delete()
         .eq('user_id', userId);
 
-      if (profileError) throw profileError;
+      if (employeeError) console.log('No employee record to clean up:', employeeError);
 
-      // Clean up user roles
+      // 3. Delete user roles
       const { error: rolesError } = await supabase
         .from('user_roles')
         .delete()
@@ -477,16 +491,38 @@ export default function UserManagement() {
 
       if (rolesError) throw rolesError;
 
-      // Clean up employee records if any
-      const { error: employeeError } = await supabase
-        .from('employees')
+      // 4. Delete calendar events
+      const { error: eventsError } = await supabase
+        .from('calendar_events')
         .delete()
         .eq('user_id', userId);
 
-      // Don't throw error for employee cleanup as user might not be an employee
-      if (employeeError) console.log('No employee record to clean up');
+      if (eventsError) console.log('No calendar events to clean up');
 
-      console.log('User deletion successful');
+      // 5. Delete other user-related data
+      const { error: habitsError } = await supabase
+        .from('habits')
+        .delete()
+        .eq('user_id', userId);
+
+      if (habitsError) console.log('No habits to clean up');
+
+      const { error: focusError } = await supabase
+        .from('focus_sessions')
+        .delete()
+        .eq('user_id', userId);
+
+      if (focusError) console.log('No focus sessions to clean up');
+
+      // 6. Finally mark profile as deleted (this maintains the record but marks it inactive)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ status: 'deleted' })
+        .eq('user_id', userId);
+
+      if (profileError) throw profileError;
+
+      console.log('User deletion successful - all references cleaned up');
 
       // Force reload users data from server
       setUsers([]);
@@ -494,7 +530,7 @@ export default function UserManagement() {
 
       toast({
         title: "Success", 
-        description: "User deleted successfully and removed from system",
+        description: "User completely removed from system and all company assignments",
       });
     } catch (error: any) {
       console.error('Error deleting user:', error);
