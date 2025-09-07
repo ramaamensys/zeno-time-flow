@@ -1061,12 +1061,13 @@ export default function UserManagement() {
                 <TableHead>Role</TableHead>
                 <TableHead>Manager</TableHead>
                 <TableHead>Joined</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No users found matching the current filters.
                   </TableCell>
                 </TableRow>
@@ -1096,6 +1097,16 @@ export default function UserManagement() {
                   </TableCell>
                   <TableCell>
                     {new Date(userProfile.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => deleteUser(userProfile.user_id, userProfile.email)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
                 ))
