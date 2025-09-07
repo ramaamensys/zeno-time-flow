@@ -72,13 +72,6 @@ export function AppSidebar() {
     { title: "Tasks", url: "/tasks", icon: CheckSquare },
     { title: "Focus Hours", url: "/focus", icon: Timer },
     { title: "Daily Routines", url: "/habits", icon: Target },
-    { title: "Account", url: "/account", icon: Settings },
-    ...(userRole === 'super_admin' || userRole === 'admin' ? [
-      { title: "Check Lists", url: "/template", icon: GraduationCap }
-    ] : []),
-    ...(userRole === 'super_admin' ? [
-      { title: "User Management", url: "/user-management", icon: Users }
-    ] : [])
   ];
 
   const schedulerItems = [
@@ -87,7 +80,16 @@ export function AppSidebar() {
     { title: "Schedule", url: "/scheduler/schedule", icon: Calendar },
     { title: "Employees", url: "/scheduler/employees", icon: UserCheck },
     { title: "Time Clock", url: "/scheduler/time-clock", icon: Clock },
-    { title: "Settings", url: "/scheduler/settings", icon: Settings },
+  ];
+
+  const bottomItems = [
+    { title: "Account", url: "/account", icon: Settings },
+    ...(userRole === 'super_admin' || userRole === 'admin' ? [
+      { title: "Check Lists", url: "/template", icon: GraduationCap }
+    ] : []),
+    ...(userRole === 'super_admin' ? [
+      { title: "User Management", url: "/user-management", icon: Users }
+    ] : [])
   ];
 
   const isActive = (path: string) => currentPath === path;
@@ -121,6 +123,24 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {schedulerItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url} end className={getNavCls}>
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Management</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {bottomItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end className={getNavCls}>
