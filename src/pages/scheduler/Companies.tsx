@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
-import { Plus, Building, UserCheck, Settings } from "lucide-react";
+import { Plus, Building, UserCheck, Settings, Edit, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { useCompanies } from "@/hooks/useSchedulerDatabase";
 import { supabase } from "@/integrations/supabase/client";
 import CreateCompanyModal from "@/components/scheduler/CreateCompanyModal";
+import EditCompanyModal from "@/components/scheduler/EditCompanyModal";
+import CompanyDetailModal from "@/components/scheduler/CompanyDetailModal";
 import AssignManagerModal from "@/components/scheduler/AssignManagerModal";
 import { toast } from "sonner";
 
@@ -14,6 +17,8 @@ export default function Companies() {
   const { user } = useAuth();
   const { companies, loading, fetchCompanies } = useCompanies();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -52,6 +57,16 @@ export default function Companies() {
     setShowAssignModal(true);
   };
 
+  const handleEditCompany = (company: any) => {
+    setSelectedCompany(company);
+    setShowEditModal(true);
+  };
+
+  const handleViewCompany = (company: any) => {
+    setSelectedCompany(company);
+    setShowDetailModal(true);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -86,71 +101,97 @@ export default function Companies() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {companies.map((company) => (
-            <Card key={company.id} className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/20">
-              <CardHeader>
+            <Card key={company.id} className="group hover:shadow-xl transition-all duration-300 border border-border/50 hover:border-primary/30 bg-gradient-to-br from-card to-card/95">
+              <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div 
-                      className="w-12 h-12 rounded-lg flex items-center justify-center"
+                      className="w-14 h-14 rounded-xl flex items-center justify-center shadow-lg"
                       style={{ backgroundColor: company.color || '#3b82f6' }}
                     >
-                      <Building className="w-6 h-6 text-white" />
+                      <Building className="w-7 h-7 text-white" />
                     </div>
-                    <div>
-                      <CardTitle className="text-lg">{company.name}</CardTitle>
-                      <CardDescription>{company.type}</CardDescription>
+                    <div className="flex-1">
+                      <Button
+                        variant="ghost"
+                        className="p-0 h-auto font-semibold text-lg text-left hover:text-primary transition-colors"
+                        onClick={() => handleViewCompany(company)}
+                      >
+                        {company.name}
+                      </Button>
+                      <CardDescription className="text-sm mt-1">{company.type}</CardDescription>
                     </div>
                   </div>
-                  <Badge 
-                    variant={company.field_type === 'IT' ? 'default' : 'secondary'}
-                    className="text-xs"
-                  >
-                    {company.field_type}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge 
+                      variant={company.field_type === 'IT' ? 'default' : 'secondary'}
+                      className="text-xs"
+                    >
+                      {company.field_type}
+                    </Badge>
+                    {canAssignManager && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <Settings className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewCompany(company)}>
+                            <Eye className="w-4 h-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditCompany(company)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit Company
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleAssignManager(company)}>
+                            <UserCheck className="w-4 h-4 mr-2" />
+                            Assign Managers
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               
-              <CardContent className="space-y-4">
-                <div className="space-y-2 text-sm text-muted-foreground">
+              <CardContent className="pt-0 space-y-4">
+                <div className="space-y-2 text-sm">
                   {company.address && (
-                    <p><span className="font-medium">Address:</span> {company.address}</p>
+                    <p className="flex items-start gap-2">
+                      <span className="font-medium text-muted-foreground min-w-0 flex-shrink-0">Address:</span> 
+                      <span className="text-foreground">{company.address}</span>
+                    </p>
                   )}
                   {company.phone && (
-                    <p><span className="font-medium">Phone:</span> {company.phone}</p>
+                    <p className="flex items-center gap-2">
+                      <span className="font-medium text-muted-foreground">Phone:</span> 
+                      <span className="text-foreground">{company.phone}</span>
+                    </p>
                   )}
                   {company.email && (
-                    <p><span className="font-medium">Email:</span> {company.email}</p>
+                    <p className="flex items-center gap-2">
+                      <span className="font-medium text-muted-foreground">Email:</span> 
+                      <span className="text-foreground">{company.email}</span>
+                    </p>
                   )}
                 </div>
 
-                <div className="space-y-2">
+                <div className="flex flex-wrap gap-2 pt-2">
                   {company.operations_manager_id && (
-                    <div className="flex items-center text-sm">
-                      <UserCheck className="w-4 h-4 mr-2 text-green-600" />
-                      <span className="text-muted-foreground">Operations Manager Assigned</span>
-                    </div>
+                    <Badge variant="outline" className="text-xs bg-green-50 border-green-200 text-green-700">
+                      <UserCheck className="w-3 h-3 mr-1" />
+                      Ops Manager
+                    </Badge>
                   )}
                   {company.company_manager_id && (
-                    <div className="flex items-center text-sm">
-                      <UserCheck className="w-4 h-4 mr-2 text-blue-600" />
-                      <span className="text-muted-foreground">Company Manager Assigned</span>
-                    </div>
+                    <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200 text-blue-700">
+                      <UserCheck className="w-3 h-3 mr-1" />
+                      Company Manager
+                    </Badge>
                   )}
                 </div>
-
-                {canAssignManager && (
-                  <div className="flex space-x-2 pt-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleAssignManager(company)}
-                      className="flex-1"
-                    >
-                      <Settings className="w-4 h-4 mr-2" />
-                      Manage
-                    </Button>
-                  </div>
-                )}
               </CardContent>
             </Card>
           ))}
@@ -183,6 +224,22 @@ export default function Companies() {
           fetchCompanies();
           toast.success("Company created successfully!");
         }}
+      />
+
+      <EditCompanyModal 
+        open={showEditModal} 
+        onOpenChange={setShowEditModal}
+        company={selectedCompany}
+        onSuccess={() => {
+          fetchCompanies();
+          toast.success("Company updated successfully!");
+        }}
+      />
+
+      <CompanyDetailModal 
+        open={showDetailModal} 
+        onOpenChange={setShowDetailModal}
+        company={selectedCompany}
       />
 
       <AssignManagerModal 
