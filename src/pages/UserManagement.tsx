@@ -74,6 +74,55 @@ export default function UserManagement() {
     role: "operations_manager" as "operations_manager" | "admin"
   });
   const [selectedUsersForAssignment, setSelectedUsersForAssignment] = useState<string[]>([]);
+  const [availableUsersForAssignment, setAvailableUsersForAssignment] = useState<UserProfile[]>([]);
+
+  useEffect(() => {
+    if (isAssignCompanyDialogOpen) {
+      loadAvailableUsers();
+    }
+  }, [isAssignCompanyDialogOpen, users, companies]);
+
+  const loadAvailableUsers = async () => {
+    try {
+      // Get all users who are already assigned to companies
+      const assignedUserIds = new Set();
+      
+      // Add operations managers and company managers from companies
+      companies.forEach(company => {
+        if (company.operations_manager_id) {
+          assignedUserIds.add(company.operations_manager_id);
+        }
+        if (company.company_manager_id) {
+          assignedUserIds.add(company.company_manager_id);
+        }
+      });
+
+      // Filter users to show only unassigned ones
+      const availableUsers = users.filter(userProfile => {
+        // Exclude current user (super admin doing the assignment)
+        if (userProfile.user_id === user?.id) {
+          return false;
+        }
+        
+        // Exclude users who are already assigned to companies
+        if (assignedUserIds.has(userProfile.user_id)) {
+          return false;
+        }
+        
+        // Only show active users
+        if (userProfile.status !== 'active') {
+          return false;
+        }
+        
+        // Show users and admins (potential candidates for assignment)
+        return ['user', 'admin'].includes(userProfile.role);
+      });
+
+      setAvailableUsersForAssignment(availableUsers);
+    } catch (error) {
+      console.error('Error loading available users:', error);
+    }
+  };
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState("");
@@ -532,8 +581,8 @@ export default function UserManagement() {
   };
 
   const selectAllUsers = () => {
-    const activeUsers = users.filter(user => user.status === 'active').map(user => user.user_id);
-    setSelectedUsersForAssignment(activeUsers);
+    const availableUserIds = availableUsersForAssignment.map(user => user.user_id);
+    setSelectedUsersForAssignment(availableUserIds);
   };
 
   const clearUserSelection = () => {
@@ -820,7 +869,7 @@ export default function UserManagement() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <Label className="text-sm font-medium">
-                        Users ({selectedUsersForAssignment.length} selected)
+                        Available Users ({selectedUsersForAssignment.length} selected)
                       </Label>
                       <div className="flex gap-2">
                         <Button
@@ -842,27 +891,33 @@ export default function UserManagement() {
                       </div>
                     </div>
                     <div className="border rounded-md max-h-48 overflow-y-auto">
-                      {users.filter(user => user.status === 'active').map((user) => (
-                        <div
-                          key={user.user_id}
-                          className="flex items-center gap-3 p-3 border-b last:border-b-0 hover:bg-muted/50 cursor-pointer"
-                          onClick={() => toggleUserSelection(user.user_id)}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedUsersForAssignment.includes(user.user_id)}
-                            onChange={() => toggleUserSelection(user.user_id)}
-                            className="h-4 w-4 rounded border-gray-300"
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium text-sm">{user.full_name}</div>
-                            <div className="text-xs text-muted-foreground">{user.email}</div>
-                          </div>
-                          <Badge variant={getRoleBadgeVariant(user.role)} className="text-xs">
-                            {user.role.replace('_', ' ')}
-                          </Badge>
+                      {availableUsersForAssignment.length === 0 ? (
+                        <div className="p-4 text-center text-muted-foreground text-sm">
+                          No available users to assign. All users are either already assigned to companies or don't have the required permissions.
                         </div>
-                      ))}
+                      ) : (
+                        availableUsersForAssignment.map((user) => (
+                          <div
+                            key={user.user_id}
+                            className="flex items-center gap-3 p-3 border-b last:border-b-0 hover:bg-muted/50 cursor-pointer"
+                            onClick={() => toggleUserSelection(user.user_id)}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedUsersForAssignment.includes(user.user_id)}
+                              onChange={() => toggleUserSelection(user.user_id)}
+                              className="h-4 w-4 rounded border-gray-300"
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium text-sm">{user.full_name}</div>
+                              <div className="text-xs text-muted-foreground">{user.email}</div>
+                            </div>
+                            <Badge variant={getRoleBadgeVariant(user.role)} className="text-xs">
+                              {user.role === 'admin' ? 'Admin (Unassigned)' : user.role.replace('_', ' ')}
+                            </Badge>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
