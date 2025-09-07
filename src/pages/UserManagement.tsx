@@ -56,8 +56,8 @@ export default function UserManagement() {
     email: "",
     full_name: "",
     password: "",
-    role: "user" as "user" | "admin" | "super_admin",
-    app_type: "calendar" as "calendar" | "scheduler",
+    role: "user" as "user" | "admin" | "super_admin" | "operations_manager",
+    field_type: "IT" as "IT" | "Non-IT",
     manager_id: "none"
   });
   const [managers, setManagers] = useState<UserProfile[]>([]);
@@ -139,6 +139,8 @@ export default function UserManagement() {
             const roles = rolesData.map(r => r.role);
             if (roles.includes('super_admin')) {
               highestRole = 'super_admin';
+            } else if (roles.includes('operations_manager')) {
+              highestRole = 'operations_manager';
             } else if (roles.includes('admin')) {
               highestRole = 'admin';
             } else if (roles.includes('user')) {
@@ -194,7 +196,7 @@ export default function UserManagement() {
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: 'user' | 'admin' | 'super_admin') => {
+  const updateUserRole = async (userId: string, newRole: 'user' | 'admin' | 'super_admin' | 'operations_manager') => {
     try {
       const { error } = await supabase
         .from('user_roles')
@@ -238,7 +240,7 @@ export default function UserManagement() {
           full_name: newUser.full_name,
           role: newUser.role,
           password: newUser.password,
-          app_type: newUser.app_type,
+          app_type: newUser.field_type === "IT" ? "calendar" : "scheduler",
           manager_id: newUser.manager_id && newUser.manager_id !== "none" ? newUser.manager_id : null
         }
       });
@@ -256,7 +258,7 @@ export default function UserManagement() {
       });
 
       // Clear the form and close dialog
-      setNewUser({ email: "", full_name: "", role: "user", password: "", app_type: "calendar", manager_id: "none" });
+      setNewUser({ email: "", full_name: "", role: "user", password: "", field_type: "IT", manager_id: "none" });
       setIsDialogOpen(false);
       
       // Reload users to show the new user
@@ -410,6 +412,8 @@ export default function UserManagement() {
     switch (role) {
       case 'super_admin':
         return 'destructive';
+      case 'operations_manager':
+        return 'default';
       case 'admin':
         return 'default';
       default:
@@ -496,6 +500,7 @@ export default function UserManagement() {
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="user">User</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="operations_manager">Operations Manager</SelectItem>
                   <SelectItem value="super_admin">Super Admin</SelectItem>
                 </SelectContent>
               </Select>
@@ -585,51 +590,32 @@ export default function UserManagement() {
                     <Label htmlFor="role" className="text-right">
                       Role
                     </Label>
-                    <Select value={newUser.role} onValueChange={(value: "user" | "admin" | "super_admin") => setNewUser({ ...newUser, role: value })}>
+                    <Select value={newUser.role} onValueChange={(value: "user" | "admin" | "super_admin" | "operations_manager") => setNewUser({ ...newUser, role: value })}>
                       <SelectTrigger className="col-span-3">
                         <SelectValue />
                       </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="user">User</SelectItem>
                           {currentUserRole === 'super_admin' && <SelectItem value="admin">Manager</SelectItem>}
+                          {currentUserRole === 'super_admin' && <SelectItem value="operations_manager">Operations Manager</SelectItem>}
                           {currentUserRole === 'super_admin' && <SelectItem value="super_admin">Super Admin</SelectItem>}
                         </SelectContent>
                     </Select>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="app_type" className="text-right">
-                      App Type
+                    <Label htmlFor="field_type" className="text-right">
+                      Field
                     </Label>
-                    <Select value={newUser.app_type} onValueChange={(value: "calendar" | "scheduler") => setNewUser({ ...newUser, app_type: value })}>
+                    <Select value={newUser.field_type} onValueChange={(value: "IT" | "Non-IT") => setNewUser({ ...newUser, field_type: value })}>
                       <SelectTrigger className="col-span-3">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="calendar">Zeno Time Flow (Calendar)</SelectItem>
-                        {currentUserRole === 'super_admin' && <SelectItem value="scheduler">Roster Joy (Scheduler)</SelectItem>}
+                        <SelectItem value="IT">IT</SelectItem>
+                        <SelectItem value="Non-IT">Non-IT</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  {newUser.role === "user" && (
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="manager" className="text-right">
-                        Assign Manager
-                      </Label>
-                      <Select value={newUser.manager_id} onValueChange={(value) => setNewUser({ ...newUser, manager_id: value })}>
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Select a manager (optional)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No Manager</SelectItem>
-                          {managers.filter(manager => manager.user_id && manager.full_name).map((manager) => (
-                            <SelectItem key={manager.user_id} value={manager.user_id}>
-                              {manager.full_name} ({manager.email})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
                 </div>
                 <DialogFooter>
                   <Button
@@ -778,19 +764,20 @@ export default function UserManagement() {
                       <div className="flex items-center gap-2">
                         {userProfile.user_id !== user?.id && userProfile.status === 'active' && (
                           <>
-                             <Select
-                               value={userProfile.role}
-                               onValueChange={(value) => updateUserRole(userProfile.user_id, value as 'user' | 'admin' | 'super_admin')}
-                               disabled={currentUserRole !== 'super_admin' && (userProfile.role === 'admin' || userProfile.role === 'super_admin')}
-                             >
+                               <Select
+                                value={userProfile.role}
+                                onValueChange={(value) => updateUserRole(userProfile.user_id, value as 'user' | 'admin' | 'super_admin' | 'operations_manager')}
+                                disabled={currentUserRole !== 'super_admin' && (userProfile.role === 'admin' || userProfile.role === 'super_admin' || userProfile.role === 'operations_manager')}
+                              >
                                <SelectTrigger className="w-32">
                                  <SelectValue />
                                </SelectTrigger>
-                               <SelectContent>
-                                 <SelectItem value="user">User</SelectItem>
-                                 {currentUserRole === 'super_admin' && <SelectItem value="admin">Admin</SelectItem>}
-                                 {currentUserRole === 'super_admin' && <SelectItem value="super_admin">Super Admin</SelectItem>}
-                               </SelectContent>
+                                <SelectContent>
+                                  <SelectItem value="user">User</SelectItem>
+                                  {currentUserRole === 'super_admin' && <SelectItem value="admin">Admin</SelectItem>}
+                                  {currentUserRole === 'super_admin' && <SelectItem value="operations_manager">Operations Manager</SelectItem>}
+                                  {currentUserRole === 'super_admin' && <SelectItem value="super_admin">Super Admin</SelectItem>}
+                                </SelectContent>
                              </Select>
                             <Button
                               variant="outline"
