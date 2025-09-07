@@ -34,22 +34,25 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const { user } = useAuth();
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [userAppType, setUserAppType] = useState<string | null>(null);
   const location = useLocation();
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";
 
   useEffect(() => {
-    const fetchUserRole = async () => {
+    const fetchUserData = async () => {
       if (!user) return;
       
       const { data } = await supabase
         .from('user_roles')
-        .select('role')
+        .select('role, app_type')
         .eq('user_id', user.id);
       
       if (data && data.length > 0) {
         // Check for highest role priority: super_admin > admin > user
         const roles = data.map(item => item.role);
+        const appTypes = data.map(item => item.app_type);
+        
         if (roles.includes('super_admin')) {
           setUserRole('super_admin');
         } else if (roles.includes('admin')) {
@@ -57,12 +60,20 @@ export function AppSidebar() {
         } else {
           setUserRole('user');
         }
+
+        // Set app type - for admins, they can see both, for regular users, use their specific app_type
+        if (roles.includes('super_admin') || roles.includes('admin')) {
+          setUserAppType('both'); // Admins get access to both
+        } else {
+          setUserAppType(appTypes[0] || 'calendar'); // Regular users get their assigned app type
+        }
       } else {
         setUserRole(null);
+        setUserAppType('calendar'); // Default to calendar if no role found
       }
     };
 
-    fetchUserRole();
+    fetchUserData();
   }, [user]);
 
   const items = [
@@ -97,42 +108,49 @@ export function AppSidebar() {
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"} collapsible="icon">
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Main Features</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} end className={getNavCls}>
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/* Show Main Features for calendar users or admins */}
+        {(userAppType === 'calendar' || userAppType === 'both') && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Main Features</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {items.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink to={item.url} end className={getNavCls}>
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Scheduler</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {schedulerItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} end className={getNavCls}>
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/* Show Scheduler for scheduler users or admins */}
+        {(userAppType === 'scheduler' || userAppType === 'both') && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Scheduler</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {schedulerItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink to={item.url} end className={getNavCls}>
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
+        {/* Always show Management section */}
         <SidebarGroup>
           <SidebarGroupLabel>Management</SidebarGroupLabel>
           <SidebarGroupContent>
