@@ -83,6 +83,7 @@ export function AppSidebar() {
 
   const schedulerItems = [
     { title: "Scheduler Dashboard", url: "/scheduler", icon: BarChart3 },
+    { title: "Companies", url: "/scheduler/companies", icon: Building },
     { title: "Schedule", url: "/scheduler/schedule", icon: Calendar },
     { title: "Employees", url: "/scheduler/employees", icon: UserCheck },
     { title: "Time Clock", url: "/scheduler/time-clock", icon: Clock },
