@@ -73,6 +73,7 @@ export default function UserManagement() {
     company_id: "",
     role: "operations_manager" as "operations_manager" | "admin"
   });
+  const [selectedUsersForAssignment, setSelectedUsersForAssignment] = useState<string[]>([]);
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState("");
@@ -458,60 +459,85 @@ export default function UserManagement() {
     }
   };
 
-  const assignUserToCompany = async () => {
-    if (!selectedUserForAssignment || !assignmentData.company_id) {
+  const assignUsersToCompany = async () => {
+    if (selectedUsersForAssignment.length === 0 || !assignmentData.company_id) {
       toast({
         title: "Error",
-        description: "Please select a user and company",
+        description: "Please select at least one user and a company",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      // Update the company with the user assignment
-      const updateData: any = {};
-      if (assignmentData.role === "operations_manager") {
-        updateData.operations_manager_id = selectedUserForAssignment.user_id;
-      } else if (assignmentData.role === "admin") {
-        updateData.company_manager_id = selectedUserForAssignment.user_id;
+      // Process each selected user
+      for (const userId of selectedUsersForAssignment) {
+        // For operations_manager role, update the company
+        if (assignmentData.role === "operations_manager") {
+          const { error: companyError } = await supabase
+            .from('companies')
+            .update({ operations_manager_id: userId })
+            .eq('id', assignmentData.company_id);
+
+          if (companyError) throw companyError;
+        } else if (assignmentData.role === "admin") {
+          // For admin role (company manager), update the company
+          const { error: companyError } = await supabase
+            .from('companies')
+            .update({ company_manager_id: userId })
+            .eq('id', assignmentData.company_id);
+
+          if (companyError) throw companyError;
+        }
+
+        // Update user role
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .upsert({
+            user_id: userId,
+            role: assignmentData.role,
+            app_type: 'scheduler'
+          });
+
+        if (roleError) throw roleError;
       }
 
-      const { error: companyError } = await supabase
-        .from('companies')
-        .update(updateData)
-        .eq('id', assignmentData.company_id);
-
-      if (companyError) throw companyError;
-
-      // Update user role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .upsert({
-          user_id: selectedUserForAssignment.user_id,
-          role: assignmentData.role,
-          app_type: 'scheduler'
-        });
-
-      if (roleError) throw roleError;
-
+      const userCount = selectedUsersForAssignment.length;
       toast({
         title: "Success",
-        description: `User assigned to company as ${assignmentData.role.replace('_', ' ')} successfully`,
+        description: `${userCount} user${userCount > 1 ? 's' : ''} assigned to company as ${assignmentData.role.replace('_', ' ')} successfully`,
       });
 
       setIsAssignCompanyDialogOpen(false);
       setSelectedUserForAssignment(null);
+      setSelectedUsersForAssignment([]);
       setAssignmentData({ company_id: "", role: "operations_manager" });
       await loadUsers();
     } catch (error: any) {
-      console.error('Error assigning user to company:', error);
+      console.error('Error assigning users to company:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to assign user to company",
+        description: error.message || "Failed to assign users to company",
         variant: "destructive",
       });
     }
+  };
+
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUsersForAssignment(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const selectAllUsers = () => {
+    const activeUsers = users.filter(user => user.status === 'active').map(user => user.user_id);
+    setSelectedUsersForAssignment(activeUsers);
+  };
+
+  const clearUserSelection = () => {
+    setSelectedUsersForAssignment([]);
   };
 
   const getStatusBadgeVariant = (status: string) => {
@@ -791,28 +817,53 @@ export default function UserManagement() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="user_select" className="text-right">
-                      User
-                    </Label>
-                    <Select 
-                      value={selectedUserForAssignment?.user_id || ""} 
-                      onValueChange={(value) => {
-                        const user = users.find(u => u.user_id === value);
-                        setSelectedUserForAssignment(user || null);
-                      }}
-                    >
-                      <SelectTrigger className="col-span-3">
-                        <SelectValue placeholder="Select a user" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users.filter(user => user.status === 'active').map((user) => (
-                          <SelectItem key={user.user_id} value={user.user_id}>
-                            {user.full_name} ({user.email})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">
+                        Users ({selectedUsersForAssignment.length} selected)
+                      </Label>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={selectAllUsers}
+                        >
+                          Select All
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={clearUserSelection}
+                        >
+                          Clear All
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="border rounded-md max-h-48 overflow-y-auto">
+                      {users.filter(user => user.status === 'active').map((user) => (
+                        <div
+                          key={user.user_id}
+                          className="flex items-center gap-3 p-3 border-b last:border-b-0 hover:bg-muted/50 cursor-pointer"
+                          onClick={() => toggleUserSelection(user.user_id)}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedUsersForAssignment.includes(user.user_id)}
+                            onChange={() => toggleUserSelection(user.user_id)}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{user.full_name}</div>
+                            <div className="text-xs text-muted-foreground">{user.email}</div>
+                          </div>
+                          <Badge variant={getRoleBadgeVariant(user.role)} className="text-xs">
+                            {user.role.replace('_', ' ')}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="company_select" className="text-right">
@@ -855,10 +906,10 @@ export default function UserManagement() {
                 <DialogFooter>
                   <Button
                     type="submit"
-                    onClick={assignUserToCompany}
-                    disabled={!selectedUserForAssignment || !assignmentData.company_id}
+                    onClick={assignUsersToCompany}
+                    disabled={selectedUsersForAssignment.length === 0 || !assignmentData.company_id}
                   >
-                    Assign to Company
+                    Assign {selectedUsersForAssignment.length} User{selectedUsersForAssignment.length !== 1 ? 's' : ''} to Company
                   </Button>
                 </DialogFooter>
               </DialogContent>
