@@ -189,7 +189,7 @@ export default function UserManagement() {
 
   const loadUsers = async () => {
     try {
-      // Get all profiles including manager information
+      // Get all profiles EXCEPT deleted ones
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select(`
@@ -199,6 +199,7 @@ export default function UserManagement() {
             full_name
           )
         `)
+        .neq('status', 'deleted') // Filter out deleted users
         .order('created_at', { ascending: false });
 
       if (profilesError) throw profilesError;
@@ -361,35 +362,87 @@ export default function UserManagement() {
 
     setIsCreating(true);
     try {
-      // Call the create-user edge function
-      const { data, error } = await supabase.functions.invoke('create-user', {
-        body: {
-          email: newUser.email,
-          full_name: newUser.full_name,
-          role: newUser.role,
-          password: newUser.password,
-          app_type: newUser.field_type === "IT" ? "calendar" : "scheduler",
-          manager_id: newUser.manager_id && newUser.manager_id !== "none" ? newUser.manager_id : null
-        }
-      });
+      // First check if user already exists (including deleted ones)
+      const { data: existingProfile, error: checkError } = await supabase
+        .from('profiles')
+        .select('user_id, status')
+        .eq('email', newUser.email)
+        .single();
 
-      if (error) {
-        console.error('Edge function error:', error);
-        throw error;
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows found
+        throw checkError;
       }
 
-      console.log('User creation response:', data);
+      if (existingProfile) {
+        if (existingProfile.status === 'deleted') {
+          // Reactivate the deleted user instead of creating duplicate
+          const { error: reactivateError } = await supabase
+            .from('profiles')
+            .update({ 
+              status: 'active',
+              full_name: newUser.full_name,
+              updated_at: new Date().toISOString()
+            })
+            .eq('user_id', existingProfile.user_id);
 
-      toast({
-        title: "Success",
-        description: "User created successfully. Welcome email will be sent shortly.",
-      });
+          if (reactivateError) throw reactivateError;
+
+          // Add the new role
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .insert({
+              user_id: existingProfile.user_id,
+              role: newUser.role,
+              app_type: newUser.field_type === "IT" ? "calendar" : "scheduler"
+            });
+
+          if (roleError) throw roleError;
+
+          toast({
+            title: "Success",
+            description: "User reactivated successfully",
+          });
+        } else {
+          // User already exists and is active
+          toast({
+            title: "Error",
+            description: "User with this email already exists",
+            variant: "destructive",
+          });
+          setIsCreating(false);
+          return;
+        }
+      } else {
+        // Create completely new user
+        const { data, error } = await supabase.functions.invoke('create-user', {
+          body: {
+            email: newUser.email,
+            full_name: newUser.full_name,
+            role: newUser.role,
+            password: newUser.password,
+            app_type: newUser.field_type === "IT" ? "calendar" : "scheduler",
+            manager_id: newUser.manager_id && newUser.manager_id !== "none" ? newUser.manager_id : null
+          }
+        });
+
+        if (error) {
+          console.error('Edge function error:', error);
+          throw error;
+        }
+
+        console.log('User creation response:', data);
+
+        toast({
+          title: "Success",
+          description: "User created successfully. Welcome email will be sent shortly.",
+        });
+      }
 
       // Clear the form and close dialog
       setNewUser({ email: "", full_name: "", role: "user", password: "", field_type: "IT", manager_id: "none" });
       setIsDialogOpen(false);
       
-      // Reload users to show the new user
+      // Reload users to show the updated user list
       await loadUsers();
     } catch (error: any) {
       console.error('Error creating user:', error);
