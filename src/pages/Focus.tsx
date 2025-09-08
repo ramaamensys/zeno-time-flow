@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Play, Pause, Square, Timer, Target, Brain, Users, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Play, Pause, Square, Timer, Target, Brain, Users, FileText, ChevronDown, ChevronUp, Calendar, Plus, Filter } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +22,32 @@ interface FocusSession {
   productivity_score: number | null;
   interruptions: number;
   notes: string | null;
+  created_at: string;
+  title?: string;
+  task_id?: string;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: string;
+  created_by: string;
+  user_id: string;
+  event_type: string;
+  start_time: string | null;
+  end_time: string | null;
+}
+
+interface PlannedFocusSession {
+  id: string;
+  task_id: string | null;
+  planned_date: string;
+  planned_duration: number; // in minutes
+  title: string;
+  description: string | null;
+  completed: boolean;
+  user_id: string;
   created_at: string;
 }
 
@@ -40,11 +67,33 @@ const Focus = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
 
+  // New state for task-based focus sessions
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState<string>("");
+  const [plannedSessions, setPlannedSessions] = useState<PlannedFocusSession[]>([]);
+  const [showTaskDialog, setShowTaskDialog] = useState(false);
+  const [showPlanDialog, setShowPlanDialog] = useState(false);
+  
+  // Filter states
+  const [filterPeriod, setFilterPeriod] = useState<string>("week");
+  const [filterType, setFilterType] = useState<string>("all");
+  
+  // Planning form states
+  const [planTitle, setPlanTitle] = useState("");
+  const [planDescription, setPlanDescription] = useState("");
+  const [planDate, setPlanDate] = useState("");
+  const [planDuration, setPlanDuration] = useState("25");
+  const [planTaskId, setPlanTaskId] = useState("");
+
   useEffect(() => {
     if (user) {
       const initializeData = async () => {
         await checkUserRole();
-        fetchSessions();
+        await Promise.all([
+          fetchSessions(),
+          fetchTasks(),
+          fetchPlannedSessions()
+        ]);
       };
       initializeData();
     }
@@ -132,7 +181,7 @@ const Focus = () => {
       .select("*")
       .eq('user_id', targetUserId)
       .order("created_at", { ascending: false })
-      .limit(10);
+      .limit(20);
 
     if (error) {
       toast({
@@ -146,17 +195,48 @@ const Focus = () => {
     setIsLoading(false);
   };
 
-  const startSession = async () => {
+  const fetchTasks = async () => {
+    if (!user) return;
+
+    const targetUserId = selectedUserId || user.id;
+    
+    const { data, error } = await supabase
+      .from("calendar_events")
+      .select("id, title, description, priority, created_by, user_id, event_type, start_time, end_time")
+      .eq('user_id', targetUserId)
+      .eq('event_type', 'task')
+      .eq('completed', false)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching tasks:", error);
+    } else {
+      setTasks(data || []);
+    }
+  };
+
+  const fetchPlannedSessions = async () => {
+    if (!user) return;
+    
+    // For now, we'll store planned sessions in focus_sessions with a special flag
+    // or create a separate table. For simplicity, let's extend the current approach.
+  };
+
+  const startSession = async (taskId?: string) => {
+    const selectedTask = taskId ? tasks.find(t => t.id === taskId) : null;
+    const sessionTitle = selectedTask ? `Focus: ${selectedTask.title}` : "Focus Session";
+    
     const { data, error } = await supabase
       .from("focus_sessions")
       .insert([{
-        title: "Focus Session",
+        title: sessionTitle,
         start_time: new Date().toISOString(),
         end_time: new Date(Date.now() + 25 * 60 * 1000).toISOString(), // 25 minutes default
         user_id: user?.id,
         interruptions: 0,
         productivity_score: 0,
         notes: "",
+        task_id: taskId || null,
       }])
       .select()
       .single();
@@ -174,10 +254,63 @@ const Focus = () => {
       setInterruptions(0);
       setNotes("");
       setProductivityScore(5);
+      setSelectedTaskId("");
+      setShowTaskDialog(false);
       toast({
         title: "Focus session started",
-        description: "Stay focused and productive!",
+        description: selectedTask ? `Working on: ${selectedTask.title}` : "Stay focused and productive!",
       });
+    }
+  };
+
+  const startTaskFocusSession = () => {
+    if (selectedTaskId) {
+      startSession(selectedTaskId);
+    }
+  };
+
+  const createPlannedSession = async () => {
+    if (!planTitle || !planDate || !planDuration) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const { error } = await supabase
+      .from("focus_sessions")
+      .insert([{
+        title: planTitle,
+        description: planDescription,
+        start_time: new Date(planDate).toISOString(),
+        end_time: new Date(new Date(planDate).getTime() + parseInt(planDuration) * 60 * 1000).toISOString(),
+        user_id: user?.id,
+        task_id: planTaskId || null,
+        interruptions: 0,
+        productivity_score: 0,
+        notes: "Planned session - not yet started",
+      }]);
+
+    if (error) {
+      toast({
+        title: "Error creating planned session",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Planned session created",
+        description: `Scheduled for ${new Date(planDate).toLocaleDateString()}`
+      });
+      setShowPlanDialog(false);
+      setPlanTitle("");
+      setPlanDescription("");
+      setPlanDate("");
+      setPlanDuration("25");
+      setPlanTaskId("");
+      fetchSessions();
     }
   };
 
@@ -340,16 +473,164 @@ const Focus = () => {
               )}
 
               {/* Control Buttons */}
-              <div className="flex items-center justify-center gap-4">
+              <div className="flex items-center justify-center gap-4 flex-wrap">
                 {!currentSession && (!selectedUserId || selectedUserId === user?.id) ? (
-                  <Button 
-                    onClick={startSession} 
-                    size="lg"
-                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 h-14 px-8 text-lg font-semibold rounded-2xl"
-                  >
-                    <Play className="mr-3 h-5 w-5" />
-                    Begin Productive Session
-                  </Button>
+                  <>
+                    <Button 
+                      onClick={() => startSession()} 
+                      size="lg"
+                      className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 h-14 px-8 text-lg font-semibold rounded-2xl"
+                    >
+                      <Play className="mr-3 h-5 w-5" />
+                      Begin Productive Session
+                    </Button>
+                    
+                    <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          variant="outline"
+                          size="lg"
+                          className="border-2 border-indigo-300 text-indigo-600 hover:bg-indigo-50 h-14 px-8 text-lg font-semibold rounded-2xl"
+                        >
+                          <Target className="mr-3 h-5 w-5" />
+                          Focus on Task
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Select Task to Focus On</DialogTitle>
+                          <DialogDescription>
+                            Choose a task from your list to start a focused work session.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <Select value={selectedTaskId} onValueChange={setSelectedTaskId}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select a task..." />
+                            </SelectTrigger>
+                            <SelectContent className="bg-background border shadow-lg z-50">
+                              {tasks.map((task) => (
+                                <SelectItem key={task.id} value={task.id}>
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{task.title}</span>
+                                    <span className="text-sm text-muted-foreground">
+                                      {task.priority} priority
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <div className="flex justify-end gap-3">
+                            <Button variant="outline" onClick={() => setShowTaskDialog(false)}>
+                              Cancel
+                            </Button>
+                            <Button 
+                              onClick={startTaskFocusSession} 
+                              disabled={!selectedTaskId}
+                              className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                              Start Focus Session
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+
+                    <Dialog open={showPlanDialog} onOpenChange={setShowPlanDialog}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          variant="outline"
+                          size="lg"
+                          className="border-2 border-green-300 text-green-600 hover:bg-green-50 h-14 px-8 text-lg font-semibold rounded-2xl"
+                        >
+                          <Calendar className="mr-3 h-5 w-5" />
+                          Plan Session
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-lg">
+                        <DialogHeader>
+                          <DialogTitle>Plan a Focus Session</DialogTitle>
+                          <DialogDescription>
+                            Schedule a focus session for later. You can plan sessions for the week or longer.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="plan-title">Session Title</Label>
+                            <Input
+                              id="plan-title"
+                              value={planTitle}
+                              onChange={(e) => setPlanTitle(e.target.value)}
+                              placeholder="What will you focus on?"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="plan-description">Description (Optional)</Label>
+                            <Textarea
+                              id="plan-description"
+                              value={planDescription}
+                              onChange={(e) => setPlanDescription(e.target.value)}
+                              placeholder="Additional details about this session..."
+                              rows={3}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="plan-task">Link to Task (Optional)</Label>
+                            <Select value={planTaskId} onValueChange={setPlanTaskId}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a task to link..." />
+                              </SelectTrigger>
+                              <SelectContent className="bg-background border shadow-lg z-50">
+                                <SelectItem value="">No task selected</SelectItem>
+                                {tasks.map((task) => (
+                                  <SelectItem key={task.id} value={task.id}>
+                                    {task.title}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="plan-date">Planned Date & Time</Label>
+                              <Input
+                                id="plan-date"
+                                type="datetime-local"
+                                value={planDate}
+                                onChange={(e) => setPlanDate(e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="plan-duration">Duration (minutes)</Label>
+                              <Select value={planDuration} onValueChange={setPlanDuration}>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-background border shadow-lg z-50">
+                                  <SelectItem value="15">15 minutes</SelectItem>
+                                  <SelectItem value="25">25 minutes</SelectItem>
+                                  <SelectItem value="30">30 minutes</SelectItem>
+                                  <SelectItem value="45">45 minutes</SelectItem>
+                                  <SelectItem value="60">1 hour</SelectItem>
+                                  <SelectItem value="90">1.5 hours</SelectItem>
+                                  <SelectItem value="120">2 hours</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <div className="flex justify-end gap-3">
+                            <Button variant="outline" onClick={() => setShowPlanDialog(false)}>
+                              Cancel
+                            </Button>
+                            <Button onClick={createPlannedSession} className="bg-green-600 hover:bg-green-700">
+                              Create Plan
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </>
                 ) : currentSession ? (
                   <>
                     {isActive ? (
@@ -382,11 +663,11 @@ const Focus = () => {
                       Stop Session
                     </Button>
                   </>
-                ) : selectedUserId && selectedUserId !== user?.id && (
+                ) : selectedUserId && selectedUserId !== user?.id ? (
                   <div className="bg-gray-100 px-6 py-4 rounded-2xl">
                     <p className="text-gray-600 font-medium">Viewing another user's sessions (read-only)</p>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
 
@@ -411,15 +692,57 @@ const Focus = () => {
           </CardContent>
         </Card>
 
+        {/* Filter Controls */}
+        <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
+            <CardTitle className="flex items-center justify-center gap-3 text-xl font-bold">
+              <Filter className="h-6 w-6" />
+              Filter Sessions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-center gap-6 flex-wrap">
+              <div className="flex items-center gap-3">
+                <Label className="text-sm font-medium">Period:</Label>
+                <Select value={filterPeriod} onValueChange={setFilterPeriod}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border shadow-lg z-50">
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="week">This Week</SelectItem>
+                    <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="all">All Time</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-3">
+                <Label className="text-sm font-medium">Type:</Label>
+                <Select value={filterType} onValueChange={setFilterType}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border shadow-lg z-50">
+                    <SelectItem value="all">All Sessions</SelectItem>
+                    <SelectItem value="task-based">Task-based</SelectItem>
+                    <SelectItem value="free-form">Free-form</SelectItem>
+                    <SelectItem value="planned">Planned</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Recent Sessions Card */}
         <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white">
             <CardTitle className="flex items-center justify-center gap-3 text-2xl font-bold">
               <Brain className="h-7 w-7" />
-              Recent Sessions
+              Focus Sessions
             </CardTitle>
             <CardDescription className="text-purple-100 text-center text-lg">
-              Your focus session history
+              Your focus session history and planned sessions
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6">
@@ -441,8 +764,23 @@ const Focus = () => {
                   >
                     <div className="flex items-center justify-between">
                       <div className="space-y-2 flex-1">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           <span className="font-semibold text-lg text-gray-800">
+                            {session.title || "Focus Session"}
+                          </span>
+                          {session.task_id && (
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                              Task-based
+                            </Badge>
+                          )}
+                          {session.notes === "Planned session - not yet started" && (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              Planned
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-gray-500 bg-gray-100 px-3 py-1 rounded-full text-sm">
                             {new Date(session.start_time).toLocaleDateString()}
                           </span>
                           <span className="text-gray-500 bg-gray-100 px-3 py-1 rounded-full text-sm">
