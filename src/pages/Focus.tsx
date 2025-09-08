@@ -287,7 +287,7 @@ const Focus = () => {
         start_time: new Date(planDate).toISOString(),
         end_time: new Date(new Date(planDate).getTime() + parseInt(planDuration) * 60 * 1000).toISOString(),
         user_id: user?.id,
-        task_id: planTaskId || null,
+        task_id: (planTaskId && planTaskId !== "none") ? planTaskId : null,
         interruptions: 0,
         productivity_score: 0,
         notes: "Planned session - not yet started",
@@ -582,7 +582,7 @@ const Focus = () => {
                                 <SelectValue placeholder="Select a task to link..." />
                               </SelectTrigger>
                               <SelectContent className="bg-background border shadow-lg z-50">
-                                <SelectItem value="">No task selected</SelectItem>
+                                <SelectItem value="none">No task selected</SelectItem>
                                 {tasks.map((task) => (
                                   <SelectItem key={task.id} value={task.id}>
                                     {task.title}

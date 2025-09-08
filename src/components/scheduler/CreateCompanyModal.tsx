@@ -86,14 +86,14 @@ export default function CreateCompanyModal({ open, onOpenChange, onSuccess }: Cr
         address: formData.address,
         phone: formData.phone,
         email: formData.email,
-        operations_manager_id: formData.operations_manager_id || null,
-        company_manager_id: formData.company_manager_id || null
+        operations_manager_id: (formData.operations_manager_id && formData.operations_manager_id !== "none") ? formData.operations_manager_id : null,
+        company_manager_id: (formData.company_manager_id && formData.company_manager_id !== "none") ? formData.company_manager_id : null
       };
 
       await createCompany(companyData);
 
       // Assign roles to the selected managers
-      if (formData.operations_manager_id) {
+      if (formData.operations_manager_id && formData.operations_manager_id !== "none") {
         const appType = formData.field_type === 'IT' ? 'calendar' : 'scheduler';
         await supabase
           .from('user_roles')
@@ -104,7 +104,7 @@ export default function CreateCompanyModal({ open, onOpenChange, onSuccess }: Cr
           });
       }
 
-      if (formData.company_manager_id) {
+      if (formData.company_manager_id && formData.company_manager_id !== "none") {
         const appType = formData.field_type === 'IT' ? 'calendar' : 'scheduler';
         await supabase
           .from('user_roles')
@@ -254,7 +254,7 @@ export default function CreateCompanyModal({ open, onOpenChange, onSuccess }: Cr
                   <SelectValue placeholder="Select operations manager" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="">No operations manager</SelectItem>
+                  <SelectItem value="none">No operations manager</SelectItem>
                   {availableUsers.map((user) => (
                     <SelectItem key={user.user_id} value={user.user_id}>
                       {user.full_name} ({user.email})
@@ -274,7 +274,7 @@ export default function CreateCompanyModal({ open, onOpenChange, onSuccess }: Cr
                   <SelectValue placeholder="Select company manager" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="">No company manager</SelectItem>
+                  <SelectItem value="none">No company manager</SelectItem>
                   {availableUsers.map((user) => (
                     <SelectItem key={user.user_id} value={user.user_id}>
                       {user.full_name} ({user.email})

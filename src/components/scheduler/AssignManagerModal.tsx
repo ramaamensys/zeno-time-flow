@@ -94,10 +94,10 @@ export default function AssignManagerModal({
       const updates: any = {};
       
       if (operationsManager !== company.operations_manager_id) {
-        updates.operations_manager_id = operationsManager || null;
+        updates.operations_manager_id = (operationsManager && operationsManager !== "none") ? operationsManager : null;
         
         // Assign operations_manager role with proper app_type based on company field_type
-        if (operationsManager) {
+        if (operationsManager && operationsManager !== "none") {
           const appType = company.field_type === 'IT' ? 'calendar' : 'scheduler';
           await supabase
             .from('user_roles')
@@ -110,10 +110,10 @@ export default function AssignManagerModal({
       }
       
       if (companyManager !== company.company_manager_id) {
-        updates.company_manager_id = companyManager || null;
+        updates.company_manager_id = (companyManager && companyManager !== "none") ? companyManager : null;
         
         // Assign admin role for company manager with proper app_type
-        if (companyManager) {
+        if (companyManager && companyManager !== "none") {
           const appType = company.field_type === 'IT' ? 'calendar' : 'scheduler';
           await supabase
             .from('user_roles')
@@ -180,7 +180,7 @@ export default function AssignManagerModal({
                   <SelectValue placeholder="Select operations manager" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="">No operations manager</SelectItem>
+                  <SelectItem value="none">No operations manager</SelectItem>
                   {availableOpsManagers.map((user) => (
                     <SelectItem key={user.user_id} value={user.user_id}>
                       {user.full_name} ({user.email})
@@ -208,7 +208,7 @@ export default function AssignManagerModal({
                   <SelectValue placeholder="Select company manager" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="">No company manager</SelectItem>
+                  <SelectItem value="none">No company manager</SelectItem>
                   {availableUsers.map((user) => (
                     <SelectItem key={user.user_id} value={user.user_id}>
                       {user.full_name} ({user.email})
