@@ -397,6 +397,7 @@ export type Database = {
           notes: string | null
           productivity_score: number | null
           start_time: string
+          task_id: string | null
           title: string
           updated_at: string | null
           user_id: string
@@ -411,6 +412,7 @@ export type Database = {
           notes?: string | null
           productivity_score?: number | null
           start_time: string
+          task_id?: string | null
           title: string
           updated_at?: string | null
           user_id: string
@@ -425,11 +427,20 @@ export type Database = {
           notes?: string | null
           productivity_score?: number | null
           start_time?: string
+          task_id?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "focus_sessions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       habit_completions: {
         Row: {
