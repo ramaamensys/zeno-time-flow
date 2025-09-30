@@ -134,8 +134,8 @@ const Focus = () => {
       const role = roles?.role || 'user';
       setUserRole(role);
       
-      // Load users if admin
-      if (role === 'admin' || role === 'super_admin') {
+      // Load users if manager
+      if (role === 'manager' || role === 'super_admin') {
         await loadUsers();
       }
     } catch (error) {
@@ -421,7 +421,7 @@ const Focus = () => {
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Track your focus work time and efficiency
           </p>
-          {selectedUserId && userRole && (userRole === 'admin' || userRole === 'super_admin') && (
+          {selectedUserId && userRole && (userRole === 'manager' || userRole === 'super_admin') && (
             <p className="text-sm text-purple-600 mt-2 font-medium">
               Viewing focus hours for: {users.find(u => u.id === selectedUserId)?.full_name}
             </p>
@@ -836,8 +836,8 @@ const Focus = () => {
           </CardContent>
         </Card>
 
-        {/* Admin User Filter */}
-        {userRole && (userRole === 'admin' || userRole === 'super_admin') && (
+        {/* Manager User Filter */}
+        {userRole && (userRole === 'manager' || userRole === 'super_admin') && (
           <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white">
               <CardTitle className="flex items-center justify-center gap-3 text-xl font-bold">

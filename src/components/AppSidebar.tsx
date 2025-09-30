@@ -66,9 +66,12 @@ export function AppSidebar() {
           } else {
             setUserAppType('scheduler');
           }
+        } else if (roles.includes('manager')) {
+          setUserRole('manager');
+          setUserAppType('calendar'); // Managers are for calendar
         } else if (roles.includes('admin')) {
           setUserRole('admin');
-          setUserAppType('both'); // Admins get access to both
+          setUserAppType('scheduler'); // Admins are for scheduler
         } else {
           setUserRole('user');
           setUserAppType(appTypes[0] || 'calendar'); // Regular users get their assigned app type
@@ -98,7 +101,7 @@ export function AppSidebar() {
 
   const bottomItems = [
     { title: "Account", url: "/account", icon: Settings },
-    ...(userRole === 'super_admin' || userRole === 'admin' || userRole === 'operations_manager' ? [
+    ...(userRole === 'super_admin' || userRole === 'manager' ? [
       { title: "Check Lists", url: "/template", icon: GraduationCap }
     ] : []),
     ...(userRole === 'super_admin' ? [

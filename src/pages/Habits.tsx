@@ -131,8 +131,8 @@ const Habits = () => {
       const role = roles?.role || 'user';
       setUserRole(role);
       
-      // Load users if admin
-      if (role === 'admin' || role === 'super_admin') {
+      // Load users if manager
+      if (role === 'manager' || role === 'super_admin') {
         await loadUsers();
       }
     } catch (error) {
@@ -519,7 +519,7 @@ const Habits = () => {
                 Daily Routines
               </h1>
               <p className="text-lg text-muted-foreground">Fuel your daily motivation and build powerful routines</p>
-              {selectedUserId && userRole && (userRole === 'admin' || userRole === 'super_admin') && (
+              {selectedUserId && userRole && (userRole === 'manager' || userRole === 'super_admin') && (
                 <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
                   <Users className="w-4 h-4 mr-2 text-primary" />
                   <span className="text-sm text-primary font-medium">

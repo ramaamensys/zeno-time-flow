@@ -106,12 +106,12 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskNot
             .select('role')
             .eq('user_id', note.author_id);
 
-          const isAdminAuthor = roleData?.some(r => r.role === 'admin' || r.role === 'super_admin');
+          const isAdminAuthor = roleData?.some(r => r.role === 'super_admin' || r.role === 'manager');
           
           return {
             ...note,
             files: Array.isArray(note.files) ? (note.files as string[]) : [],
-            author_name: profile?.full_name || profile?.email || (isAdminAuthor ? 'Admin' : 'User'),
+            author_name: profile?.full_name || profile?.email || (isAdminAuthor ? 'Manager' : 'User'),
             is_admin_author: isAdminAuthor
           };
         })
