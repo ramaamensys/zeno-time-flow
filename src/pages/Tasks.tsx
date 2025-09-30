@@ -96,8 +96,8 @@ const Tasks = () => {
     status: "all",
   });
 
-  // Helper variable for admin permissions
-  const isAdminUser = userRole === 'admin' || userRole === 'super_admin' || userRole === 'operations_manager';
+  // Helper variable for admin permissions - manager is for calendar, operations_manager is for scheduler
+  const isAdminUser = userRole === 'admin' || userRole === 'super_admin' || userRole === 'manager';
   const [newEvent, setNewEvent] = useState({
     title: "",
     description: "",
@@ -152,7 +152,7 @@ const Tasks = () => {
   }, [user, userRole]);
 
   useEffect(() => {
-    if (userRole === 'admin' || userRole === 'super_admin' || userRole === 'operations_manager') {
+    if (userRole === 'admin' || userRole === 'super_admin' || userRole === 'manager') {
       fetchTeamMembers();
     }
   }, [userRole]);
@@ -222,8 +222,8 @@ const Tasks = () => {
       const roles = data.map(item => item.role);
       if (roles.includes('super_admin')) {
         setUserRole('super_admin');
-      } else if (roles.includes('operations_manager')) {
-        setUserRole('operations_manager');
+      } else if (roles.includes('manager')) {
+        setUserRole('manager');
       } else if (roles.includes('admin')) {
         setUserRole('admin');
       } else {
@@ -242,10 +242,10 @@ const Tasks = () => {
       created_by
     `);
     
-    if (userRole !== 'admin' && userRole !== 'super_admin' && userRole !== 'operations_manager') {
+    if (userRole !== 'admin' && userRole !== 'super_admin' && userRole !== 'manager') {
       eventsQuery = eventsQuery.eq('user_id', user.id);
     } else {
-      if (userRole === 'super_admin' || userRole === 'operations_manager') {
+      if (userRole === 'super_admin' || userRole === 'manager') {
         eventsQuery = eventsQuery.is('template_id', null);
       } else {
         const { data: managedUsers } = await supabase
@@ -303,7 +303,7 @@ const Tasks = () => {
   };
 
   const fetchTeamMembers = async () => {
-    if (userRole !== 'admin' && userRole !== 'super_admin' && userRole !== 'operations_manager') return;
+    if (userRole !== 'admin' && userRole !== 'super_admin' && userRole !== 'manager') return;
     
     const { data, error } = await supabase
       .from("profiles")
@@ -368,7 +368,7 @@ const Tasks = () => {
       }
     }
 
-    if (userRole === 'admin' || userRole === 'super_admin' || userRole === 'operations_manager') {
+    if (userRole === 'admin' || userRole === 'super_admin' || userRole === 'manager') {
       if (filters.teamMember && filters.teamMember !== "all") {
         filtered = filtered.filter(event => event.user_id === filters.teamMember);
       }

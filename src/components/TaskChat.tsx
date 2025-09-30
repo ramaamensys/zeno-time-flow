@@ -255,7 +255,7 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
             .select('role')
             .eq('user_id', msg.sender_id);
 
-          const isAdminSender = roleData?.some(r => r.role === 'admin' || r.role === 'super_admin');
+    const isAdminSender = roleData?.some(r => r.role === 'admin' || r.role === 'super_admin' || r.role === 'manager');
           
           return {
             ...msg,
@@ -314,7 +314,7 @@ export const TaskChat = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskChat
       .select('role')
       .eq('user_id', newMessage.sender_id);
 
-    const isAdminSender = roleData?.some(r => r.role === 'admin' || r.role === 'super_admin');
+    const isAdminSender = roleData?.some(r => r.role === 'admin' || r.role === 'super_admin' || r.role === 'manager');
 
     const messageWithName: ChatMessage = {
       ...newMessage,

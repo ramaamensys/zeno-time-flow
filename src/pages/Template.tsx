@@ -122,7 +122,7 @@ const LearningTemplates = () => {
     
     if (data && data.length > 0) {
       const roles = data.map(item => item.role);
-      setIsAdmin(roles.includes('super_admin') || roles.includes('admin') || roles.includes('operations_manager'));
+      setIsAdmin(roles.includes('super_admin') || roles.includes('admin') || roles.includes('manager'));
     } else {
       setIsAdmin(false);
     }
