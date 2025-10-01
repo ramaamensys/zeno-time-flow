@@ -397,6 +397,7 @@ export type Database = {
           notes: string | null
           productivity_score: number | null
           start_time: string
+          task_id: string | null
           title: string
           updated_at: string | null
           user_id: string
@@ -411,6 +412,7 @@ export type Database = {
           notes?: string | null
           productivity_score?: number | null
           start_time: string
+          task_id?: string | null
           title: string
           updated_at?: string | null
           user_id: string
@@ -425,11 +427,20 @@ export type Database = {
           notes?: string | null
           productivity_score?: number | null
           start_time?: string
+          task_id?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "focus_sessions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       habit_completions: {
         Row: {
@@ -786,6 +797,45 @@ export type Database = {
           files?: Json | null
           id?: string
           note_text?: string
+          task_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      task_work_sessions: {
+        Row: {
+          created_at: string
+          end_location: Json | null
+          end_time: string | null
+          id: string
+          notes: string | null
+          start_location: Json | null
+          start_time: string
+          task_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_location?: Json | null
+          end_time?: string | null
+          id?: string
+          notes?: string | null
+          start_location?: Json | null
+          start_time?: string
+          task_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          end_location?: Json | null
+          end_time?: string | null
+          id?: string
+          notes?: string | null
+          start_location?: Json | null
+          start_time?: string
           task_id?: string
           updated_at?: string
           user_id?: string

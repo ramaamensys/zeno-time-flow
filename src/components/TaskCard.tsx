@@ -6,11 +6,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { FileUpload } from "@/components/ui/file-upload";
-import { CheckSquare, Clock, Flag, MessageCircle, User, Edit, Trash2, Calendar, Save, BookOpen } from "lucide-react";
+import { CheckSquare, Clock, Flag, MessageCircle, User, Edit, Trash2, Calendar, Save, BookOpen, PlayCircle, StopCircle, MapPin } from "lucide-react";
 import { TaskChat } from "@/components/TaskChat";
 import { TaskNotes } from "@/components/TaskNotes";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface TaskCardProps {
   task: {
@@ -80,15 +81,33 @@ export const TaskCard = ({
   const [files, setFiles] = useState<string[]>(task.files || []);
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [activeWorkSession, setActiveWorkSession] = useState<any>(null);
+  const [isStartingWork, setIsStartingWork] = useState(false);
 
-  // Get current user to check if task is self-created
+  // Get current user and active work session
   useEffect(() => {
     const getCurrentUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
+      
+      if (user) {
+        // Check for active work session
+        const { data: sessions } = await supabase
+          .from('task_work_sessions')
+          .select('*')
+          .eq('task_id', task.id)
+          .eq('user_id', user.id)
+          .is('end_time', null)
+          .order('start_time', { ascending: false })
+          .limit(1);
+        
+        if (sessions && sessions.length > 0) {
+          setActiveWorkSession(sessions[0]);
+        }
+      }
     };
     getCurrentUser();
-  }, []);
+  }, [task.id]);
 
   // Check if this is a template task that shouldn't be edited by users
   const isTemplateTask = task.template_id !== null;
@@ -158,6 +177,97 @@ export const TaskCard = ({
     }
     
     setFiles(prev => prev.filter(f => f !== fileUrl));
+  };
+
+  const getLocation = (): Promise<{ latitude: number; longitude: number; accuracy: number }> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported by your browser'));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          });
+        },
+        (error) => {
+          reject(error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      );
+    });
+  };
+
+  const handleStartWork = async () => {
+    if (!currentUser) return;
+    
+    setIsStartingWork(true);
+    try {
+      const location = await getLocation();
+      
+      const { data, error } = await supabase
+        .from('task_work_sessions')
+        .insert({
+          task_id: task.id,
+          user_id: currentUser.id,
+          start_location: location,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setActiveWorkSession(data);
+      toast.success('Work session started! Location tracked.');
+    } catch (error: any) {
+      console.error('Error starting work session:', error);
+      if (error.message.includes('Geolocation')) {
+        toast.error('Please allow location access to track work sessions');
+      } else {
+        toast.error('Failed to start work session');
+      }
+    } finally {
+      setIsStartingWork(false);
+    }
+  };
+
+  const handleStopWork = async () => {
+    if (!currentUser || !activeWorkSession) return;
+    
+    setIsStartingWork(true);
+    try {
+      const location = await getLocation();
+      
+      const { error } = await supabase
+        .from('task_work_sessions')
+        .update({
+          end_time: new Date().toISOString(),
+          end_location: location,
+        })
+        .eq('id', activeWorkSession.id);
+
+      if (error) throw error;
+      
+      setActiveWorkSession(null);
+      toast.success('Work session completed! Location tracked.');
+    } catch (error: any) {
+      console.error('Error stopping work session:', error);
+      if (error.message.includes('Geolocation')) {
+        toast.error('Please allow location access to complete work session');
+      } else {
+        toast.error('Failed to stop work session');
+      }
+    } finally {
+      setIsStartingWork(false);
+    }
   };
 
   return (
@@ -250,6 +360,30 @@ export const TaskCard = ({
 
                 {/* Action Buttons */}
                 <div className="flex items-center space-x-1">
+                  {/* Work Session Tracking - Only for users working on tasks */}
+                  {isUserTask && (
+                    <Button
+                      variant={activeWorkSession ? "destructive" : "default"}
+                      size="sm"
+                      onClick={activeWorkSession ? handleStopWork : handleStartWork}
+                      disabled={isStartingWork}
+                      className="h-6 text-xs px-2"
+                    >
+                      {isStartingWork ? (
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+                      ) : activeWorkSession ? (
+                        <>
+                          <StopCircle className="h-3 w-3 mr-1" />
+                          Stop
+                        </>
+                      ) : (
+                        <>
+                          <PlayCircle className="h-3 w-3 mr-1" />
+                          Start
+                        </>
+                      )}
+                    </Button>
+                  )}
                   {/* Notes Dialog - Only for users with their own tasks or admins */}
                   {(isUserTask || isAdmin) && (
                     <Dialog open={isNotesDialogOpen} onOpenChange={setIsNotesDialogOpen}>
@@ -378,6 +512,24 @@ export const TaskCard = ({
                   )}
                 </div>
               </div>
+
+              {/* Active Work Session Indicator */}
+              {activeWorkSession && (
+                <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Clock className="h-3 w-3 text-green-600 animate-pulse" />
+                      <span className="text-xs text-green-700 dark:text-green-300 font-medium">
+                        Working since {format(new Date(activeWorkSession.start_time), 'h:mm a')}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <MapPin className="h-3 w-3 text-green-600" />
+                      <span className="text-xs text-green-600">Location tracked</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Notes Preview */}
               {task.notes && (
