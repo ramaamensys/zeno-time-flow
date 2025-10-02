@@ -94,6 +94,7 @@ interface AdminTaskCardProps {
   onUpdateNotes?: (taskId: string, notes: string, files?: string[]) => void;
   onDeleteTask?: (taskId: string) => void;
   isAdmin: boolean;
+  level?: number; // For nested indentation
 }
 
 const getInitials = (name: string) => {
@@ -123,6 +124,7 @@ export const AdminTaskCard = ({
   onUpdateNotes,
   onDeleteTask,
   isAdmin,
+  level = 0,
 }: AdminTaskCardProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSubTasksExpanded, setIsSubTasksExpanded] = useState(true);
@@ -307,8 +309,24 @@ export const AdminTaskCard = ({
     }
   };
 
+  const getIndentClass = (level: number) => {
+    switch(level) {
+      case 1: return 'ml-4';
+      case 2: return 'ml-8';
+      case 3: return 'ml-12';
+      default: return level > 3 ? 'ml-16' : '';
+    }
+  };
+  
+  const indentClass = getIndentClass(level);
+  const isSubTask = level > 0;
+  
   return (
-    <Card className="group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+    <Card className={`group hover:shadow-md transition-all duration-200 ${
+      isSubTask 
+        ? 'bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/30 dark:to-purple-950/30 border-l-4 border-l-blue-500' 
+        : 'bg-white dark:bg-gray-800'
+    } border border-gray-200 dark:border-gray-700 ${indentClass}`}>
       <CardContent className="p-4">
         {/* Collapsed View */}
         <div 
@@ -353,6 +371,11 @@ export const AdminTaskCard = ({
               <Badge variant={getPriorityColor(task.priority)} className="text-xs">
                 {task.priority}
               </Badge>
+              {isSubTask && (
+                <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200">
+                  Sub-task
+                </Badge>
+              )}
               {isTemplateTask && (
                 <Badge variant="outline" className="text-xs">
                   <BookOpen className="h-3 w-3 mr-1" />
@@ -374,10 +397,15 @@ export const AdminTaskCard = ({
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                   {task.title}
                 </h2>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 flex-wrap">
                   <Badge variant={getPriorityColor(task.priority)}>
                     {task.priority}
                   </Badge>
+                  {isSubTask && (
+                    <Badge variant="outline" className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 text-blue-700 dark:text-blue-300 border-blue-300">
+                      Sub-task
+                    </Badge>
+                  )}
                   {isCompleted && (
                     <Badge variant="default" className="bg-green-100 text-green-800">
                       <CheckSquare className="mr-1 h-3 w-3" />
@@ -559,13 +587,13 @@ export const AdminTaskCard = ({
                 </div>
               )}
 
-              {/* Sub-tasks Section */}
+              {/* Sub-tasks Section - Rendered as full task cards */}
               {hasSubTasks && (
                 <div>
                   <Collapsible open={isSubTasksExpanded} onOpenChange={setIsSubTasksExpanded}>
                     <div className="border-t pt-4">
                       <CollapsibleTrigger asChild>
-                        <Button variant="ghost" className="flex items-center space-x-2 p-0 h-auto text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white mb-3">
+                        <Button variant="ghost" className="flex items-center space-x-2 p-0 h-auto text-sm font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 mb-3">
                           {isSubTasksExpanded ? (
                             <ChevronDown className="h-4 w-4" />
                           ) : (
@@ -575,57 +603,20 @@ export const AdminTaskCard = ({
                         </Button>
                       </CollapsibleTrigger>
                       
-                      <CollapsibleContent className="space-y-2">
+                      <CollapsibleContent className="space-y-3 mt-3">
                         {task.sub_tasks!.map((subTask) => (
-                          <div key={subTask.id} className="group/sub flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                            <div className="flex items-center space-x-3 flex-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onToggleComplete(subTask.id, subTask.completed || false);
-                                }}
-                                className="h-6 w-6 p-0"
-                              >
-                                {subTask.completed ? (
-                                  <CheckSquare className="h-4 w-4 text-green-600" />
-                                ) : (
-                                  <div className="h-4 w-4 border border-gray-400 rounded transition-colors hover:border-blue-500" />
-                                )
-                              }
-                              </Button>
-                              
-                              <div className="flex-1 min-w-0">
-                                <p className={`text-sm font-medium ${subTask.completed ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                                  {subTask.title}
-                                </p>
-                                {subTask.description && (
-                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{subTask.description}</p>
-                                )}
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center space-x-2">
-                              <Badge variant={getPriorityColor(subTask.priority)} className="text-xs">
-                                {subTask.priority}
-                              </Badge>
-                              
-                              {isAdmin && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onEditTask(subTask);
-                                  }}
-                                  className="h-6 w-6 p-0 opacity-0 group-hover/sub:opacity-100"
-                                >
-                                  <Edit className="h-3 w-3 text-gray-400 hover:text-blue-500" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
+                          <AdminTaskCard
+                            key={subTask.id}
+                            task={subTask}
+                            onToggleComplete={onToggleComplete}
+                            onAddSubTask={onAddSubTask}
+                            onEditTask={onEditTask}
+                            onViewDetails={onViewDetails}
+                            onUpdateNotes={onUpdateNotes}
+                            onDeleteTask={onDeleteTask}
+                            isAdmin={isAdmin}
+                            level={level + 1}
+                          />
                         ))}
                       </CollapsibleContent>
                     </div>
