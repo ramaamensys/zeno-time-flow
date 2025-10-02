@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Users, Plus, Settings, BookOpen, TrendingUp, Calendar, ChevronRight, MessageCircle } from "lucide-react";
+import { Users, Plus, Settings, BookOpen, TrendingUp, Calendar, ChevronRight, MessageCircle, CheckSquare, X, Edit, Trash2 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { TaskChat } from "@/components/TaskChat";
 import { TaskNotes } from "@/components/TaskNotes";
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { FileUpload } from "@/components/ui/file-upload";
 import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
 
 interface LearningTemplate {
   id: string;

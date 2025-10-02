@@ -278,99 +278,208 @@ function UserTemplateTasks() {
           <CardContent>
             <div className="space-y-3">
               {tasks.map((task) => {
-                const StatusIcon = getStatusIcon(task.status);
+                const [isExpanded, setIsExpanded] = useState(false);
                 return (
-                  <Card key={task.id} className="border-l-4 border-l-primary/20">
+                  <Card key={task.id} className="hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                     <CardContent className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <StatusIcon className="h-4 w-4" />
-                             <h4 className="font-medium">{task.title}</h4>
+                      {/* Collapsed View */}
+                      <div 
+                        className="flex items-center justify-between cursor-pointer"
+                        onClick={() => setIsExpanded(!isExpanded)}
+                      >
+                        <div className="flex items-center space-x-3 flex-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const newStatus = task.completed ? 'pending' : 'completed';
+                              updateTaskStatus(task.id, newStatus);
+                            }}
+                            className="h-6 w-6 p-0"
+                          >
+                            {task.completed ? (
+                              <CheckCircle className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <div className="h-5 w-5 border-2 border-gray-300 rounded" />
+                            )}
+                          </Button>
+                          
+                          <div className="flex-1">
+                            <h3 className={`text-base font-semibold ${
+                              task.completed ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
+                            }`}>
+                              {task.title}
+                            </h3>
+                            <div className="flex items-center space-x-2 mt-1 text-xs text-gray-500">
+                              <span>Created {format(new Date(task.created_at), 'MMM dd, yyyy')}</span>
+                            </div>
                           </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            <Badge variant={getPriorityColor(task.priority)} className="text-xs">
+                              {task.priority}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              <BookOpen className="h-3 w-3 mr-1" />
+                              Template
+                            </Badge>
+                          </div>
+                          
+                          {isExpanded ? (
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          ) : (
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Expanded View */}
+                      {isExpanded && (
+                        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                          {/* Header with Actions */}
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                                {task.title}
+                              </h2>
+                              <div className="flex items-center space-x-2">
+                                <Badge variant={getPriorityColor(task.priority)}>
+                                  {task.priority}
+                                </Badge>
+                                {task.completed && (
+                                  <Badge variant="default" className="bg-green-100 text-green-800">
+                                    <CheckCircle className="mr-1 h-3 w-3" />
+                                    Completed
+                                  </Badge>
+                                )}
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                                  <BookOpen className="mr-1 h-3 w-3" />
+                                  Template Task
+                                </Badge>
+                              </div>
+                            </div>
+                            
+                            {/* Top Right Actions */}
+                            <div className="flex items-center space-x-2">
+                              <Button
+                                variant={task.completed ? "outline" : "default"}
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newStatus = task.completed ? 'pending' : 'completed';
+                                  updateTaskStatus(task.id, newStatus);
+                                }}
+                              >
+                                {task.completed ? (
+                                  <>
+                                    <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    Mark Incomplete
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Mark Complete
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Responsibilities/Description */}
                           {task.description && (
-                            <p className="text-sm text-muted-foreground mb-3">{task.description}</p>
-                          )}
-                          {task.due_date && (
-                            <p className="text-sm text-muted-foreground">
-                              Due: {new Date(task.due_date).toLocaleDateString()}
-                            </p>
-                          )}
-                          {/* Notes Preview */}
-                          {task.notes && (
-                            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-                              <div className="flex items-start space-x-1">
-                                <MessageCircle className="h-3 w-3 text-blue-500 mt-0.5 flex-shrink-0" />
-                                <p className="text-xs text-blue-700 dark:text-blue-300 line-clamp-2">{task.notes}</p>
+                            <div className="mb-6">
+                              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                                Responsibilities / Details
+                              </h3>
+                              <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+                                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                                  {task.description}
+                                </p>
                               </div>
                             </div>
                           )}
-                        </div>
-                        <div className="flex flex-col gap-2 items-end">
-                          <div className="flex gap-2">
-                            <Badge variant={getPriorityColor(task.priority)}>
-                              {task.priority}
-                            </Badge>
-                            <Badge variant={getStatusColor(task.status)}>
-                              {task.status.replace('_', ' ')}
-                            </Badge>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedTask(task);
-                                setIsNotesDialogOpen(true);
-                              }}
-                            >
-                              <MessageCircle className="h-3 w-3 mr-1" />
-                              Notes
-                            </Button>
-                            
-                            {/* Task Chat - only show if user ID is available */}
+
+                          {/* Attachments and Actions Section */}
+                          <div className="space-y-4">
+                            {/* Attachments */}
+                            {task.files && task.files.length > 0 && (
+                              <div>
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                                  Attachments
+                                </h3>
+                                <div className="flex flex-wrap gap-2">
+                                  {task.files.map((file, index) => (
+                                    <a
+                                      key={index}
+                                      href={file}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs px-3 py-1 bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100"
+                                    >
+                                      Attachment {index + 1}
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Notes Section */}
+                            <div>
+                              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                                Notes
+                              </h3>
+                              <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                                <Textarea
+                                  placeholder="Add your notes here..."
+                                  value={task.notes || ''}
+                                  readOnly
+                                  className="min-h-24 mb-2 bg-white dark:bg-gray-800"
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedTask(task);
+                                    setIsNotesDialogOpen(true);
+                                  }}
+                                >
+                                  <Save className="h-4 w-4 mr-1" />
+                                  Add Note
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Communication Section */}
                             {user?.id && (
-                              <TaskChat
-                                taskId={task.id}
-                                taskTitle={task.title}
-                                assignedUsers={[{
-                                  user_id: user.id,
-                                  full_name: user.user_metadata?.full_name || null,
-                                  email: user.email || ''
-                                }]}
-                                isAdmin={false}
-                              />
-                            )}
-                            
-                            {task.status === 'pending' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => updateTaskStatus(task.id, 'in_progress')}
-                              >
-                                Start
-                              </Button>
-                            )}
-                            {task.status === 'in_progress' && (
-                              <Button
-                                size="sm"
-                                onClick={() => updateTaskStatus(task.id, 'completed')}
-                              >
-                                Complete
-                              </Button>
-                            )}
-                            {task.status === 'completed' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => updateTaskStatus(task.id, 'in_progress')}
-                              >
-                                Reopen
-                              </Button>
+                              <div>
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                                  Communication
+                                </h3>
+                                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                                  <TaskChat
+                                    taskId={task.id}
+                                    taskTitle={task.title}
+                                    assignedUsers={[{
+                                      user_id: user.id,
+                                      full_name: user.user_metadata?.full_name || null,
+                                      email: user.email || ''
+                                    }]}
+                                    isAdmin={false}
+                                  />
+                                </div>
+                              </div>
                             )}
                           </div>
                         </div>
-                      </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
