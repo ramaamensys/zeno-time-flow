@@ -344,58 +344,58 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
                     </div>
                   </div>
                 ) : (
-                  notes.map((note) => (
-                    <div key={note.id} className="border rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                            note.is_admin_author 
-                              ? 'bg-gradient-to-br from-purple-500 to-pink-600 text-white'
-                              : 'bg-gradient-to-br from-blue-500 to-teal-600 text-white'
-                          }`}>
-                            {getInitials(note.author_name || 'U')}
-                          </div>
-                          <span className="text-sm font-medium">{note.author_name}</span>
-                          {note.is_admin_author && <Badge variant="outline" className="text-xs">Admin</Badge>}
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(note.created_at), 'MMM dd, HH:mm')}
-                        </span>
-                      </div>
-                      
-                      <div className="text-sm whitespace-pre-wrap">
-                        {note.note_text.split('\n\n📍').map((part, index) => {
-                          if (index === 0) {
-                            return <div key={index}>{part}</div>;
-                          }
-                          return (
-                            <div key={index} className="mt-3 pt-2 border-t border-gray-200">
-                              <div className="flex items-start gap-1 text-xs text-gray-600">
-                                <span className="text-base">📍</span>
-                                <span className="flex-1">{part}</span>
-                              </div>
+                  notes.map((note) => {
+                    const noteTextParts = note.note_text.split('\n\n📍');
+                    const mainText = noteTextParts[0];
+                    const locationText = noteTextParts[1] || null;
+                    
+                    return (
+                      <div key={note.id} className="border rounded-lg p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center space-x-2">
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                              note.is_admin_author 
+                                ? 'bg-gradient-to-br from-purple-500 to-pink-600 text-white'
+                                : 'bg-gradient-to-br from-blue-500 to-teal-600 text-white'
+                            }`}>
+                              {getInitials(note.author_name || 'U')}
                             </div>
-                          );
-                        })}
-                      </div>
-                      
-                      {note.files && note.files.length > 0 && (
-                        <div className="mt-2 space-y-1">
-                          {note.files.map((fileUrl, index) => (
-                            <a
-                              key={index}
-                              href={fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="block text-xs text-blue-600 hover:text-blue-800 underline bg-blue-50 rounded px-2 py-1"
-                            >
-                              📎 {fileUrl.split('/').pop() || 'View attachment'}
-                            </a>
-                          ))}
+                            <span className="text-sm font-medium">{note.author_name}</span>
+                            {note.is_admin_author && <Badge variant="outline" className="text-xs">Admin</Badge>}
+                          </div>
+                          <div className="flex flex-col items-end text-xs text-muted-foreground">
+                            <span>{format(new Date(note.created_at), 'MMM dd, yyyy HH:mm')}</span>
+                            {locationText && (
+                              <span className="flex items-center gap-1 mt-0.5">
+                                <span>📍</span>
+                                <span className="max-w-[200px] truncate" title={locationText}>{locationText}</span>
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  ))
+                        
+                        <div className="text-sm whitespace-pre-wrap">
+                          {mainText}
+                        </div>
+                        
+                        {note.files && note.files.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {note.files.map((fileUrl, index) => (
+                              <a
+                                key={index}
+                                href={fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block text-xs text-blue-600 hover:text-blue-800 underline bg-blue-50 rounded px-2 py-1"
+                              >
+                                📎 {fileUrl.split('/').pop() || 'View attachment'}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </ScrollArea>
