@@ -1,4 +1,5 @@
 import { useState } from "react";
+import * as React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -309,118 +310,213 @@ export const TemplateCard = ({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {tasks.slice(0, 5).map((task) => {
+                  {tasks.map((task) => {
                     const assignedUser = assignedUsers.find(u => u.user_id === task.user_id);
+                    const [isTaskExpanded, setIsTaskExpanded] = React.useState(false);
+                    
                     return (
-                      <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center space-x-3 flex-1 min-w-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onToggleTaskComplete?.(task.id, task.completed)}
-                            className="h-6 w-6 p-0 shrink-0"
+                      <Card key={task.id} className="hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                        <CardContent className="p-3">
+                          {/* Collapsed View */}
+                          <div 
+                            className="flex items-center justify-between cursor-pointer"
+                            onClick={() => setIsTaskExpanded(!isTaskExpanded)}
                           >
-                            {task.completed || task.status === 'completed' ? (
-                              <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                                <div className="w-2 h-2 bg-white rounded-full" />
+                            <div className="flex items-center space-x-3 flex-1">
+                              {onToggleTaskComplete && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleTaskComplete(task.id, task.completed);
+                                  }}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  {task.completed || task.status === 'completed' ? (
+                                    <CheckSquare className="h-5 w-5 text-green-600" />
+                                  ) : (
+                                    <div className="h-5 w-5 border-2 border-gray-300 rounded" />
+                                  )}
+                                </Button>
+                              )}
+                              
+                              <div className="flex-1 min-w-0">
+                                <h3 className={`text-sm font-semibold truncate ${
+                                  task.completed || task.status === 'completed' ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
+                                }`}>
+                                  {task.title}
+                                </h3>
+                                <div className="flex items-center space-x-2 mt-1 text-xs text-gray-500">
+                                  <span>Created {format(new Date(task.created_at), 'MMM dd, yyyy')}</span>
+                                  {assignedUser && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{assignedUser.full_name}</span>
+                                    </>
+                                  )}
+                                </div>
                               </div>
-                            ) : (
-                              <div className="w-4 h-4 border-2 border-gray-400 rounded-full" />
-                            )}
-                          </Button>
-                          <div className="flex-1 min-w-0">
-                            <p className={`font-medium text-sm truncate ${
-                              task.completed || task.status === 'completed' ? 'line-through text-gray-500' : ''
-                            }`}>
-                              {task.title}
-                            </p>
-                            {task.description && (
-                              <p className="text-xs text-gray-500 mt-1 truncate">{task.description}</p>
-                            )}
-                            {assignedUser && (
-                              <div className="flex items-center text-xs text-gray-500 mt-1">
-                                <Users className="h-3 w-3 mr-1" />
-                                {assignedUser.full_name}
+                              
+                              <div className="flex items-center space-x-2">
+                                <Badge 
+                                  variant={task.priority === 'high' ? 'destructive' : task.priority === 'medium' ? 'default' : 'secondary'} 
+                                  className="text-xs"
+                                >
+                                  {task.priority}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  <BookOpen className="h-3 w-3 mr-1" />
+                                  Template
+                                </Badge>
                               </div>
-                            )}
+                              
+                              {isTaskExpanded ? (
+                                <ChevronRight className="h-4 w-4 rotate-90 transition-transform" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 transition-transform" />
+                              )}
+                            </div>
                           </div>
-                        </div>
-                         <div className="flex items-center space-x-2 shrink-0">
-                           <Badge 
-                             variant={task.priority === 'high' ? 'destructive' : task.priority === 'medium' ? 'default' : 'secondary'} 
-                             className="text-xs"
-                           >
-                             {task.priority}
-                           </Badge>
-                           <Badge 
-                             variant={task.completed || task.status === 'completed' ? 'default' : 'outline'} 
-                             className="text-xs"
-                           >
-                             {task.completed || task.status === 'completed' ? 'Completed' : 'Pending'}
-                           </Badge>
-                           
-                            {isAdmin && (
-                              <>
-                                 {/* Notes Button */}
-                                 <TaskNotes
-                                   taskId={task.id}
-                                   taskTitle={task.title}
-                                   assignedUsers={assignedUsers}
-                                   isAdmin={isAdmin}
-                                 />
-                                 
-                                 {/* Chat Button */}
-                                 <TaskChat
-                                   taskId={task.id}
-                                   taskTitle={task.title}
-                                   assignedUsers={assignedUsers}
-                                   isAdmin={isAdmin}
-                                 />
+
+                          {/* Expanded View */}
+                          {isTaskExpanded && (
+                            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                              {/* Header with Actions */}
+                              <div className="flex items-start justify-between mb-4">
+                                <div className="flex-1">
+                                  <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                                    {task.title}
+                                  </h2>
+                                  <div className="flex items-center space-x-2">
+                                    <Badge variant={task.priority === 'high' ? 'destructive' : task.priority === 'medium' ? 'default' : 'secondary'}>
+                                      {task.priority}
+                                    </Badge>
+                                    {(task.completed || task.status === 'completed') && (
+                                      <Badge variant="default" className="bg-green-100 text-green-800">
+                                        <CheckSquare className="mr-1 h-3 w-3" />
+                                        Completed
+                                      </Badge>
+                                    )}
+                                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                                      <BookOpen className="mr-1 h-3 w-3" />
+                                      Template Task
+                                    </Badge>
+                                  </div>
+                                </div>
                                 
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                      <Settings className="h-3 w-3" />
+                                {/* Top Right Actions */}
+                                <div className="flex items-center space-x-2">
+                                  {onToggleTaskComplete && (
+                                    <Button
+                                      variant={(task.completed || task.status === 'completed') ? "outline" : "default"}
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onToggleTaskComplete(task.id, task.completed);
+                                      }}
+                                    >
+                                      {(task.completed || task.status === 'completed') ? (
+                                        <>
+                                          <X className="mr-1 h-4 w-4" />
+                                          Mark Incomplete
+                                        </>
+                                      ) : (
+                                        <>
+                                          <CheckSquare className="mr-1 h-4 w-4" />
+                                          Mark Complete
+                                        </>
+                                      )}
                                     </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuItem 
-                                      onClick={() => onEditTask?.(task)}
-                                      className="cursor-pointer"
+                                  )}
+                                  {isAdmin && onEditTask && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => onEditTask(task)}
                                     >
-                                      Edit Task
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem 
-                                      onClick={() => onToggleTaskComplete?.(task.id, task.completed)}
-                                      className="cursor-pointer"
+                                      <Edit className="mr-1 h-4 w-4" />
+                                      Edit
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Responsibilities/Description */}
+                              {task.description && (
+                                <div className="mb-4">
+                                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                                    Responsibilities / Details
+                                  </h3>
+                                  <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg">
+                                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                                      {task.description}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Actions Section */}
+                              <div className="space-y-4">
+                                {/* Notes Section */}
+                                {isAdmin && (
+                                  <div>
+                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                                      Notes
+                                    </h3>
+                                    <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                                      <TaskNotes
+                                        taskId={task.id}
+                                        taskTitle={task.title}
+                                        assignedUsers={assignedUser ? [{
+                                          user_id: assignedUser.user_id,
+                                          full_name: assignedUser.full_name,
+                                          email: assignedUser.email
+                                        }] : []}
+                                        isAdmin={isAdmin}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Communication Section */}
+                                {isAdmin && (
+                                  <div>
+                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                                      Communication
+                                    </h3>
+                                    <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                                      <TaskChat
+                                        taskId={task.id}
+                                        taskTitle={task.title}
+                                        assignedUsers={assignedUsers}
+                                        isAdmin={isAdmin}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Delete Button - At Bottom for Admins */}
+                                {isAdmin && onDeleteTask && (
+                                  <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => onDeleteTask(task.id)}
+                                      className="w-full"
                                     >
-                                      Mark as {task.completed || task.status === 'completed' ? 'Pending' : 'Completed'}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem 
-                                      onClick={() => onReassignTask?.(task)}
-                                      className="cursor-pointer"
-                                    >
-                                      Reassign Task
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem 
-                                      onClick={() => onDeleteTask?.(task.id)}
-                                      className="cursor-pointer text-red-600"
-                                    >
+                                      <Trash2 className="mr-1 h-4 w-4" />
                                       Delete Task
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </>
-                            )}
-                         </div>
-                      </div>
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
                     );
                   })}
-                  {tasks.length > 5 && (
-                    <div className="text-center py-2">
-                      <span className="text-sm text-gray-500">+{tasks.length - 5} more tasks...</span>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
