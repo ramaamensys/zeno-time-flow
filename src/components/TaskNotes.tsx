@@ -152,6 +152,7 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
+          const accuracy = position.coords.accuracy;
           
           try {
             const response = await fetch(
@@ -185,6 +186,11 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
         },
         (error) => {
           reject(new Error('Unable to retrieve location'));
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 300000, // Cache for 5 minutes
+          timeout: 10000
         }
       );
     });
