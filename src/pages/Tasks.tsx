@@ -759,43 +759,39 @@ const Tasks = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-primary/5 animate-fade-in">
-      {/* Modern Hero Header */}
+      {/* Compact Header */}
       <div className="relative overflow-hidden bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-border/50 backdrop-blur-sm">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-emerald-600/10 animate-pulse opacity-30"></div>
-        <div className="relative px-6 py-12">
-          <div className="flex justify-between items-start">
-            <div className="space-y-4 animate-fade-in">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 backdrop-blur-sm border border-primary/20 shadow-lg">
-                  <Target className="w-8 h-8 text-primary" />
-                </div>
-                <div>
-                  <h1 className="text-4xl font-bold bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent">
-                    Tasks
-                  </h1>
-                  <p className="text-lg text-muted-foreground/80 font-medium">
-                    Manage your tasks and events in one place
-                  </p>
-                </div>
+        <div className="relative px-6 py-6">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 backdrop-blur-sm border border-primary/20">
+                <Target className="w-5 h-5 text-primary" />
               </div>
-              
-              {/* Quick Stats - removed per user request */}
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent">
+                  Tasks
+                </h1>
+                <p className="text-sm text-muted-foreground/80">
+                  Manage your tasks and events in one place
+                </p>
+              </div>
             </div>
             
-            <div className="flex gap-3 animate-scale-in">
+            <div className="flex gap-2">
               <Button 
                 variant="outline"
+                size="sm"
                 onClick={handleManualRefresh}
                 disabled={isRefreshing}
-                className="bg-background/80 backdrop-blur-sm border-border/50 hover:bg-background/90 hover:scale-105 transition-all duration-300 shadow-lg"
+                className="bg-background/80 backdrop-blur-sm border-border/50"
               >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-gradient-to-r from-primary via-primary/90 to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 border-0">
-                    <Plus className="mr-2 h-4 w-4" />
+                  <Button size="sm" className="bg-gradient-to-r from-primary to-primary/80">
+                    <Plus className="mr-1 h-4 w-4" />
                     New Task
                   </Button>
                 </DialogTrigger>
@@ -910,33 +906,17 @@ const Tasks = () => {
       </div>
 
       {/* Main Content */}
-      <div className="px-6 space-y-8">
-        {/* Modern Interactive Filters */}
-        <Card className="border-0 shadow-2xl bg-gradient-to-br from-card/80 via-card to-card/90 backdrop-blur-sm animate-scale-in">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <CardTitle className="text-xl flex items-center gap-3 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                  <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20">
-                    <Filter className="h-5 w-5 text-primary" />
-                  </div>
-                  <Zap className="h-4 w-4 text-amber-500 animate-pulse" />
-                  Filters
-                </CardTitle>
-                <div className="text-sm text-muted-foreground mt-2 flex items-center flex-wrap gap-1">
-                  <span>Showing:</span>
-                  <Badge variant="secondary">{filters.status === 'pending' ? 'Pending Tasks' : filters.status === 'completed' ? 'Completed Tasks' : 'All Tasks'}</Badge>
-                  {filters.dateRange !== 'all' && (
-                    <Badge variant="secondary">
-                      {filters.dateRange === 'today' ? 'Today' : filters.dateRange === 'week' ? 'This Week' : 'This Month'}
-                    </Badge>
-                  )}
-                </div>
-              </div>
+      <div className="px-6 space-y-6">
+        {/* Compact Filters */}
+        <Card className="border shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Filters:</span>
                 {(filters.status !== 'pending' || filters.dateRange !== 'today' || filters.taskType !== 'all' || filters.priority !== 'all' || filters.teamMember !== 'all') && (
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={() => setFilters({
                       teamMember: "all",
@@ -945,27 +925,17 @@ const Tasks = () => {
                       taskType: "all",
                       status: "all",
                     })}
-                    className="gap-2"
+                    className="h-7 px-2"
                   >
-                    <X className="h-3 w-3" />
-                    Clear Filters
+                    <X className="h-3 w-3 mr-1" />
+                    Clear
                   </Button>
                 )}
-                <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-                  Smart Filtering
-                </Badge>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="grid gap-2">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <List className="w-4 h-4 text-primary" />
-                  Task Type
-                </Label>
+              
+              <div className="flex items-center gap-2 flex-wrap flex-1 justify-end">
                 <Select value={filters.taskType} onValueChange={(value) => setFilters({ ...filters, taskType: value })}>
-                  <SelectTrigger className="bg-background/50 backdrop-blur-sm border-border/50 hover:border-primary/50 transition-colors">
+                  <SelectTrigger className="h-8 w-32 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -975,17 +945,11 @@ const Tasks = () => {
                     <SelectItem value="template">Template</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
 
-              {isAdminUser && (
-                <div className="grid gap-2">
-                  <Label className="text-sm font-medium flex items-center gap-2">
-                    <User className="w-4 h-4 text-primary" />
-                    Team Member
-                  </Label>
+                {isAdminUser && (
                   <Select value={filters.teamMember} onValueChange={(value) => setFilters({ ...filters, teamMember: value })}>
-                    <SelectTrigger className="bg-background/50 backdrop-blur-sm border-border/50 hover:border-primary/50 transition-colors">
-                      <SelectValue />
+                    <SelectTrigger className="h-8 w-32 text-xs">
+                      <SelectValue placeholder="Team Member" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Members</SelectItem>
@@ -996,16 +960,10 @@ const Tasks = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-              )}
+                )}
 
-              <div className="grid gap-2">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <Flag className="w-4 h-4 text-primary" />
-                  Priority
-                </Label>
                 <Select value={filters.priority} onValueChange={(value) => setFilters({ ...filters, priority: value })}>
-                  <SelectTrigger className="bg-background/50 backdrop-blur-sm border-border/50 hover:border-primary/50 transition-colors">
+                  <SelectTrigger className="h-8 w-32 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1015,15 +973,9 @@ const Tasks = () => {
                     <SelectItem value="high">High</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
 
-              <div className="grid gap-2">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-primary" />
-                  Date Range
-                </Label>
                 <Select value={filters.dateRange} onValueChange={(value) => setFilters({ ...filters, dateRange: value })}>
-                  <SelectTrigger className="bg-background/50 backdrop-blur-sm border-border/50 hover:border-primary/50 transition-colors">
+                  <SelectTrigger className="h-8 w-32 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1033,15 +985,9 @@ const Tasks = () => {
                     <SelectItem value="month">This Month</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
 
-              <div className="grid gap-2">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <CheckSquare className="w-4 h-4 text-primary" />
-                  Status
-                </Label>
                 <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
-                  <SelectTrigger className="bg-background/50 backdrop-blur-sm border-border/50 hover:border-primary/50 transition-colors">
+                  <SelectTrigger className="h-8 w-32 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

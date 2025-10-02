@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Send, Paperclip, X } from "lucide-react";
+import { FileText, Send, Paperclip, X, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -32,9 +32,11 @@ interface TaskNotesProps {
     email: string;
   }>;
   isAdmin: boolean;
+  currentUserId?: string;
+  taskUserId?: string;
 }
 
-export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskNotesProps) => {
+export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUserId, taskUserId }: TaskNotesProps) => {
   const { user } = useAuth();
   const [notes, setNotes] = useState<TaskNote[]>([]);
   const [newNote, setNewNote] = useState("");
@@ -43,6 +45,7 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskNot
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTrackingLocation, setIsTrackingLocation] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getInitials = (name: string) => {
@@ -125,7 +128,26 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskNot
     setIsLoading(false);
   };
 
-  const addNote = async () => {
+  const getLocation = (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported by your browser'));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          resolve(`${latitude},${longitude}`);
+        },
+        (error) => {
+          reject(new Error('Unable to retrieve location'));
+        }
+      );
+    });
+  };
+
+  const addNote = async (withLocation: boolean = false) => {
     if (!newNote.trim() || !user) return;
 
     setIsSaving(true);
@@ -134,6 +156,17 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskNot
       if (!targetUserId) {
         toast.error('Please select a user');
         return;
+      }
+
+      let location = null;
+      if (withLocation) {
+        setIsTrackingLocation(true);
+        try {
+          location = await getLocation();
+        } catch (error: any) {
+          toast.error('Failed to get location. Note will be added without location.');
+        }
+        setIsTrackingLocation(false);
       }
 
       // Upload files first
@@ -158,6 +191,13 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskNot
         fileUrls.push(publicUrl);
       }
 
+      // Append location and timestamp to note if location tracking was used
+      let noteText = newNote.trim();
+      if (location) {
+        const timestamp = format(new Date(), 'MMM dd, yyyy h:mm a');
+        noteText += `\n\n📍 Location: ${location}\n🕒 Time: ${timestamp}`;
+      }
+
       // Create the note
       const { error } = await supabase
         .from('task_notes')
@@ -165,7 +205,7 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskNot
           task_id: taskId,
           user_id: targetUserId,
           author_id: user.id,
-          note_text: newNote.trim(),
+          note_text: noteText,
           files: fileUrls
         });
 
@@ -177,7 +217,7 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskNot
         fileInputRef.current.value = '';
       }
       await fetchNotes();
-      toast.success('Note added successfully');
+      toast.success(location ? 'Note added with location!' : 'Note added successfully');
     } catch (error) {
       console.error('Error adding note:', error);
       toast.error('Failed to add note');
@@ -348,14 +388,32 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin }: TaskNot
                     variant="outline"
                     size="sm" 
                     onClick={() => fileInputRef.current?.click()}
+                    title="Attach files"
                   >
                     <Paperclip className="h-4 w-4" />
                   </Button>
+
+                  {/* Show location button only for assigned user (non-admin) */}
+                  {currentUserId && taskUserId === currentUserId && !isAdmin && (
+                    <Button 
+                      variant="outline"
+                      size="sm" 
+                      onClick={() => addNote(true)}
+                      disabled={!newNote.trim() || isSaving || isTrackingLocation}
+                      title="Add note with location"
+                    >
+                      {isTrackingLocation ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+                      ) : (
+                        <MapPin className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
                 </div>
                 
                 <Button 
                   size="sm" 
-                  onClick={addNote}
+                  onClick={() => addNote(false)}
                   disabled={!newNote.trim() || isSaving || (isAdmin && !selectedUser)}
                 >
                   <Send className="h-4 w-4 mr-1" />

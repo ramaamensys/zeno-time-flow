@@ -510,44 +510,7 @@ export const AdminTaskCard = ({
                 </div>
               )}
 
-              {/* Start Work Button */}
-              {currentUser && task.user_id === currentUser.id && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                    Work Session
-                  </h3>
-                  <Button
-                    variant={activeWorkSession ? "destructive" : "default"}
-                    size="sm"
-                    onClick={activeWorkSession ? handleStopWork : handleStartWork}
-                    disabled={isStartingWork}
-                    className="w-full sm:w-auto"
-                  >
-                    {isStartingWork ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                    ) : activeWorkSession ? (
-                      <>
-                        <StopCircle className="mr-2 h-4 w-4" />
-                        Stop Work
-                        <MapPin className="ml-2 h-4 w-4" />
-                      </>
-                    ) : (
-                      <>
-                        <PlayCircle className="mr-2 h-4 w-4" />
-                        Start Work (Track Location)
-                      </>
-                    )}
-                  </Button>
-                  {activeWorkSession && (
-                    <p className="text-xs text-gray-500 mt-2 flex items-center">
-                      <Clock className="h-3 w-3 mr-1" />
-                      Working since {format(new Date(activeWorkSession.start_time), 'h:mm a')}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Notes Section */}
+              {/* Notes Section with Location Tracking */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
                   Notes
@@ -562,6 +525,8 @@ export const AdminTaskCard = ({
                       email: task.profiles.email
                     }] : []}
                     isAdmin={isAdmin}
+                    currentUserId={currentUser?.id}
+                    taskUserId={task.user_id}
                   />
                 </div>
               </div>
