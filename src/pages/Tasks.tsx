@@ -923,14 +923,15 @@ const Tasks = () => {
                   <Zap className="h-4 w-4 text-amber-500 animate-pulse" />
                   Filters
                 </CardTitle>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Showing: <Badge variant="secondary" className="ml-1">{filters.status === 'pending' ? 'Pending Tasks' : filters.status === 'completed' ? 'Completed Tasks' : 'All Tasks'}</Badge>
+                <div className="text-sm text-muted-foreground mt-2 flex items-center flex-wrap gap-1">
+                  <span>Showing:</span>
+                  <Badge variant="secondary">{filters.status === 'pending' ? 'Pending Tasks' : filters.status === 'completed' ? 'Completed Tasks' : 'All Tasks'}</Badge>
                   {filters.dateRange !== 'all' && (
-                    <Badge variant="secondary" className="ml-1">
+                    <Badge variant="secondary">
                       {filters.dateRange === 'today' ? 'Today' : filters.dateRange === 'week' ? 'This Week' : 'This Month'}
                     </Badge>
                   )}
-                </p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {(filters.status !== 'pending' || filters.dateRange !== 'today' || filters.taskType !== 'all' || filters.priority !== 'all' || filters.teamMember !== 'all') && (
