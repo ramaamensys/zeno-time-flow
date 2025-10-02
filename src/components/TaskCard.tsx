@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { FileUpload } from "@/components/ui/file-upload";
-import { CheckSquare, Clock, Flag, MessageCircle, User, Edit, Trash2, Calendar, Save, BookOpen, PlayCircle, StopCircle, MapPin } from "lucide-react";
+import { CheckSquare, Clock, Flag, MessageCircle, User, Edit, Trash2, Calendar, Save, BookOpen, PlayCircle, StopCircle, MapPin, ChevronDown, ChevronRight, X, Check } from "lucide-react";
 import { TaskChat } from "@/components/TaskChat";
 import { TaskNotes } from "@/components/TaskNotes";
 import { format } from "date-fns";
@@ -59,12 +59,6 @@ const getPriorityColor = (priority: string) => {
   }
 };
 
-const getStatusIcon = (status: string, completed: boolean) => {
-  if (completed || status === 'completed') return CheckSquare;
-  if (status === 'in_progress') return Clock;
-  return Flag;
-};
-
 export const TaskCard = ({
   task,
   user,
@@ -76,6 +70,7 @@ export const TaskCard = ({
   onDeleteTask,
   onAssignTask,
 }: TaskCardProps) => {
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
   const [notes, setNotes] = useState(task.notes || "");
   const [files, setFiles] = useState<string[]>(task.files || []);
@@ -119,7 +114,6 @@ export const TaskCard = ({
   const isAdminAssignedTask = currentUser && task.created_by && task.created_by !== task.user_id;
   const shouldShowChat = isAdminAssignedTask && !isTemplateTask;
 
-  const StatusIcon = getStatusIcon(task.status, task.completed);
   const isCompleted = task.completed || task.status === 'completed';
 
   const handleSaveNotes = async () => {
@@ -273,276 +267,255 @@ export const TaskCard = ({
   return (
     <Card className="group hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
       <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-3 flex-1">
-            {/* Task Status Indicator */}
-            <div className="mt-1">
-              {canToggleComplete && onToggleComplete ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onToggleComplete(task.id, isCompleted)}
-                  className="h-6 w-6 p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  {isCompleted ? (
-                    <CheckSquare className="h-5 w-5 text-green-600" />
-                  ) : (
-                    <div className="h-5 w-5 border-2 border-gray-300 rounded transition-colors group-hover:border-blue-500" />
-                  )}
-                </Button>
-              ) : (
-                <div className={`w-3 h-3 rounded-full mt-2 ${
-                  isCompleted ? 'bg-green-500' : 
-                  task.status === 'in_progress' ? 'bg-yellow-500' : 
-                  'bg-gray-400'
-                }`} />
+        {/* Collapsed View */}
+        <div 
+          className="flex items-center justify-between cursor-pointer"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center space-x-3 flex-1">
+            {canToggleComplete && onToggleComplete ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleComplete(task.id, isCompleted);
+                }}
+                className="h-6 w-6 p-0"
+              >
+                {isCompleted ? (
+                  <CheckSquare className="h-5 w-5 text-green-600" />
+                ) : (
+                  <div className="h-5 w-5 border-2 border-gray-300 rounded" />
+                )}
+              </Button>
+            ) : (
+              <div className={`w-3 h-3 rounded-full mt-2 ${
+                isCompleted ? 'bg-green-500' : 
+                task.status === 'in_progress' ? 'bg-yellow-500' : 
+                'bg-gray-400'
+              }`} />
+            )}
+            
+            <div className="flex-1">
+              <h3 className={`text-base font-semibold ${
+                isCompleted ? 'line-through text-gray-500' : 'text-gray-900 dark:text-white'
+              }`}>
+                {task.title}
+              </h3>
+              <div className="flex items-center space-x-2 mt-1 text-xs text-gray-500">
+                <span>Created {format(new Date(task.created_at), 'MMM dd, yyyy')}</span>
+                {user && (
+                  <>
+                    <span>•</span>
+                    <span>by {user.full_name || user.email}</span>
+                  </>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Badge variant={getPriorityColor(task.priority)} className="text-xs">
+                {task.priority}
+              </Badge>
+              {isTemplateTask && (
+                <Badge variant="outline" className="text-xs">
+                  <BookOpen className="h-3 w-3 mr-1" />
+                  Template
+                </Badge>
+              )}
+              {!isTemplateTask && isAdminAssignedTask && (
+                <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">
+                  <User className="h-3 w-3 mr-1" />
+                  Admin
+                </Badge>
               )}
             </div>
+            
+            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </div>
+        </div>
 
-            {/* Task Content */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between mb-2">
-                <h4 className={`font-semibold text-sm ${
-                  isCompleted ? 'line-through text-gray-500 dark:text-gray-400' : 
-                  'text-gray-900 dark:text-white'
-                }`}>
+        {/* Expanded View */}
+        {isExpanded && (
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            {/* Header with Actions */}
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
                   {task.title}
-                </h4>
-                <div className="flex items-center space-x-1 ml-2">
-                  <Badge variant={getPriorityColor(task.priority)} className="text-xs">
+                </h2>
+                <div className="flex items-center space-x-2">
+                  <Badge variant={getPriorityColor(task.priority)}>
                     {task.priority}
                   </Badge>
+                  {isCompleted && (
+                    <Badge variant="default" className="bg-green-100 text-green-800">
+                      <CheckSquare className="mr-1 h-3 w-3" />
+                      Completed
+                    </Badge>
+                  )}
                   {isTemplateTask && (
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
                       <BookOpen className="mr-1 h-3 w-3" />
-                      Template
+                      Template Task
                     </Badge>
                   )}
                   {!isTemplateTask && isAdminAssignedTask && (
-                    <Badge variant="outline" className="bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200">
+                    <Badge variant="outline" className="bg-purple-50 text-purple-700">
                       <User className="mr-1 h-3 w-3" />
                       Admin Assigned
                     </Badge>
                   )}
-                  {!isTemplateTask && isSelfCreatedTask && !isAdminAssignedTask && (
-                    <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300 border-green-200">
-                      <User className="mr-1 h-3 w-3" />
-                      Personal Task
-                    </Badge>
-                  )}
                 </div>
               </div>
+              
+              {/* Top Right Actions */}
+              <div className="flex items-center space-x-2">
+                {canToggleComplete && onToggleComplete && (
+                  <Button
+                    variant={isCompleted ? "outline" : "default"}
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleComplete(task.id, isCompleted);
+                    }}
+                  >
+                    {isCompleted ? (
+                      <>
+                        <X className="mr-1 h-4 w-4" />
+                        Mark Incomplete
+                      </>
+                    ) : (
+                      <>
+                        <Check className="mr-1 h-4 w-4" />
+                        Mark Complete
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
 
-              {task.description && (
-                <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
-                  {task.description}
-                </p>
-              )}
-
-              {/* Task Meta Information */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-                  {user && (
-                    <div className="flex items-center space-x-1">
-                      <Avatar className="h-5 w-5">
-                        <AvatarFallback className="text-xs bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                          {getInitials(user.full_name || user.email)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span>{user.full_name || user.email.split('@')[0]}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center space-x-1">
-                    <Calendar className="h-3 w-3" />
-                    <span>Created {format(new Date(task.created_at), 'MMM dd')}</span>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex items-center space-x-1">
-                  {/* Work Session Tracking - Only for users working on tasks */}
-                  {isUserTask && (
-                    <Button
-                      variant={activeWorkSession ? "destructive" : "default"}
-                      size="sm"
-                      onClick={activeWorkSession ? handleStopWork : handleStartWork}
-                      disabled={isStartingWork}
-                      className="h-6 text-xs px-2"
-                    >
-                      {isStartingWork ? (
-                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
-                      ) : activeWorkSession ? (
-                        <>
-                          <StopCircle className="h-3 w-3 mr-1" />
-                          Stop
-                        </>
-                      ) : (
-                        <>
-                          <PlayCircle className="h-3 w-3 mr-1" />
-                          Start
-                        </>
-                      )}
-                    </Button>
-                  )}
-                  {/* Notes Dialog - Only for users with their own tasks or admins */}
-                  {(isUserTask || isAdmin) && (
-                    <Dialog open={isNotesDialogOpen} onOpenChange={setIsNotesDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <MessageCircle className={`h-3 w-3 ${task.notes || files.length > 0 ? 'text-blue-500' : 'text-gray-400'}`} />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle className="flex items-center space-x-2">
-                            <MessageCircle className="h-5 w-5" />
-                            <span>Task Notes & Files</span>
-                          </DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div>
-                            <h4 className="font-medium mb-2">{task.title}</h4>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">{task.description}</p>
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium mb-2 block">Progress Notes</label>
-                            <Textarea
-                              placeholder={canEditTask ? "Add your progress notes, challenges, or thoughts about this task..." : "View progress notes..."}
-                              value={notes}
-                              onChange={(e) => setNotes(e.target.value)}
-                              className="min-h-24"
-                              disabled={!canEditTask}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium mb-2 block">Attachments</label>
-                            <FileUpload
-                              onFileUpload={handleFileUpload}
-                              onFileRemove={handleFileRemove}
-                              files={files}
-                              disabled={!canEditTask}
-                              maxFiles={5}
-                            />
-                          </div>
-                          {canEditTask && (
-                            <div className="flex justify-end space-x-2">
-                              <Button variant="outline" onClick={() => setIsNotesDialogOpen(false)}>
-                                Cancel
-                              </Button>
-                              <Button onClick={handleSaveNotes} disabled={isSavingNotes}>
-                                {isSavingNotes ? (
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-1" />
-                                ) : (
-                                  <Save className="h-4 w-4 mr-1" />
-                                )}
-                                Save Notes
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-
-                  {/* Chat and Notes - Only for template tasks or admin viewing tasks */}
-                  {shouldShowChat && (
-                    <>
-                      {/* TaskNotes Component */}
-                      <TaskNotes
-                        taskId={task.id}
-                        taskTitle={task.title}
-                        assignedUsers={isAdmin && user ? [{
-                          user_id: task.user_id,
-                          full_name: user.full_name,
-                          email: user.email
-                        }] : []}
-                        isAdmin={isAdmin}
-                      />
-                      
-                      {/* TaskChat Component */}
-                      <TaskChat
-                        taskId={task.id}
-                        taskTitle={task.title}
-                        assignedUsers={isAdmin && user ? [{
-                          user_id: task.user_id,
-                          full_name: user.full_name,
-                          email: user.email
-                        }] : []}
-                        isAdmin={isAdmin}
-                      />
-                    </>
-                  )}
-
-                  {/* Admin Actions - Only show for non-template tasks or admins */}
-                  {isAdmin && (
-                    <>
-                      {onEditTask && !isTemplateTask && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onEditTask(task.id)}
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Edit className="h-3 w-3 text-gray-400 hover:text-blue-500" />
-                        </Button>
-                      )}
-                      
-                      {onAssignTask && !isTemplateTask && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onAssignTask(task.id)}
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <User className="h-3 w-3 text-gray-400 hover:text-green-500" />
-                        </Button>
-                      )}
-                      
-                      {onDeleteTask && !isTemplateTask && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onDeleteTask(task.id)}
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 className="h-3 w-3 text-gray-400 hover:text-red-500" />
-                        </Button>
-                      )}
-                    </>
-                  )}
+            {/* Responsibilities/Description */}
+            {task.description && (
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                  Responsibilities / Details
+                </h3>
+                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                    {task.description}
+                  </p>
                 </div>
               </div>
+            )}
 
-              {/* Active Work Session Indicator */}
-              {activeWorkSession && (
-                <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Clock className="h-3 w-3 text-green-600 animate-pulse" />
-                      <span className="text-xs text-green-700 dark:text-green-300 font-medium">
-                        Working since {format(new Date(activeWorkSession.start_time), 'h:mm a')}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <MapPin className="h-3 w-3 text-green-600" />
-                      <span className="text-xs text-green-600">Location tracked</span>
-                    </div>
+            {/* Attachments and Actions Section */}
+            <div className="space-y-4">
+              {/* Attachments */}
+              {files.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                    Attachments
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {files.map((file, index) => (
+                      <a
+                        key={index}
+                        href={file}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs px-3 py-1 bg-blue-50 text-blue-700 rounded-full hover:bg-blue-100"
+                      >
+                        Attachment {index + 1}
+                      </a>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* Notes Preview */}
-              {task.notes && (
-                <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-                  <div className="flex items-start space-x-1">
-                    <MessageCircle className="h-3 w-3 text-blue-500 mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-blue-700 dark:text-blue-300 line-clamp-2">{task.notes}</p>
+              {/* Start Work Button - Only for users working on tasks */}
+              {isUserTask && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                    Work Session
+                  </h3>
+                  <Button
+                    variant={activeWorkSession ? "destructive" : "default"}
+                    size="sm"
+                    onClick={activeWorkSession ? handleStopWork : handleStartWork}
+                    disabled={isStartingWork}
+                    className="w-full sm:w-auto"
+                  >
+                    {isStartingWork ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                    ) : activeWorkSession ? (
+                      <>
+                        <StopCircle className="mr-2 h-4 w-4" />
+                        Stop Work
+                        <MapPin className="ml-2 h-4 w-4" />
+                      </>
+                    ) : (
+                      <>
+                        <PlayCircle className="mr-2 h-4 w-4" />
+                        Start Work (Track Location)
+                      </>
+                    )}
+                  </Button>
+                  {activeWorkSession && (
+                    <p className="text-xs text-gray-500 mt-2 flex items-center">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Working since {format(new Date(activeWorkSession.start_time), 'h:mm a')}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Notes Section */}
+              {(isUserTask || isAdmin) && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                    Notes
+                  </h3>
+                  <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <TaskNotes
+                      taskId={task.id}
+                      taskTitle={task.title}
+                      assignedUsers={isAdmin && user ? [{
+                        user_id: task.user_id,
+                        full_name: user.full_name,
+                        email: user.email
+                      }] : []}
+                      isAdmin={isAdmin}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Chat Section - Only for admin-assigned tasks */}
+              {shouldShowChat && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                    Communication
+                  </h3>
+                  <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <TaskChat
+                      taskId={task.id}
+                      taskTitle={task.title}
+                      assignedUsers={isAdmin && user ? [{
+                        user_id: task.user_id,
+                        full_name: user.full_name,
+                        email: user.email
+                      }] : []}
+                      isAdmin={isAdmin}
+                    />
                   </div>
                 </div>
               )}
             </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );
