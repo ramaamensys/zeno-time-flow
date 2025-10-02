@@ -45,7 +45,22 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [locationEnabled, setLocationEnabled] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Check location tracking status
+  useEffect(() => {
+    const checkLocationStatus = () => {
+      const enabled = localStorage.getItem('locationEnabled') === 'true';
+      setLocationEnabled(enabled);
+    };
+    
+    checkLocationStatus();
+    
+    // Listen for changes
+    const interval = setInterval(checkLocationStatus, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const getInitials = (name: string) => {
     return name
@@ -127,6 +142,54 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
     setIsLoading(false);
   };
 
+  const getLocation = (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported by your browser'));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+              {
+                headers: {
+                  'User-Agent': 'ZenoTimeFlow/1.0'
+                }
+              }
+            );
+            
+            if (!response.ok) {
+              throw new Error('Geocoding failed');
+            }
+            
+            const data = await response.json();
+            const address = data.address;
+            
+            const parts = [];
+            if (address.road) parts.push(address.road);
+            if (address.neighbourhood || address.suburb) parts.push(address.neighbourhood || address.suburb);
+            if (address.city || address.town || address.village) parts.push(address.city || address.town || address.village);
+            if (address.state) parts.push(address.state);
+            
+            const readableAddress = parts.length > 0 ? parts.join(', ') : `${latitude}, ${longitude}`;
+            resolve(readableAddress);
+          } catch (error) {
+            console.error('Geocoding error:', error);
+            resolve(`${latitude}, ${longitude}`);
+          }
+        },
+        (error) => {
+          reject(new Error('Unable to retrieve location'));
+        }
+      );
+    });
+  };
+
   const addNote = async () => {
     if (!user) return;
     if (!newNote.trim()) return;
@@ -137,6 +200,16 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
       if (!targetUserId) {
         toast.error('Please select a user');
         return;
+      }
+
+      // Get location if enabled
+      let location = null;
+      if (locationEnabled) {
+        try {
+          location = await getLocation();
+        } catch (error: any) {
+          console.error('Failed to get location:', error);
+        }
       }
 
       // Upload files first
@@ -161,6 +234,12 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
         fileUrls.push(publicUrl);
       }
 
+      // Append location to note if available
+      let noteText = newNote.trim();
+      if (location) {
+        noteText += `\n\n📍 ${location}`;
+      }
+
       // Create the note
       const { error } = await supabase
         .from('task_notes')
@@ -168,7 +247,7 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
           task_id: taskId,
           user_id: targetUserId,
           author_id: user.id,
-          note_text: newNote.trim(),
+          note_text: noteText,
           files: fileUrls
         });
 
@@ -278,7 +357,21 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
                         </span>
                       </div>
                       
-                      <div className="text-sm whitespace-pre-wrap">{note.note_text}</div>
+                      <div className="text-sm whitespace-pre-wrap">
+                        {note.note_text.split('\n\n📍').map((part, index) => {
+                          if (index === 0) {
+                            return <div key={index}>{part}</div>;
+                          }
+                          return (
+                            <div key={index} className="mt-3 pt-2 border-t border-gray-200">
+                              <div className="flex items-start gap-1 text-xs text-gray-600">
+                                <span className="text-base">📍</span>
+                                <span className="flex-1">{part}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                       
                       {note.files && note.files.length > 0 && (
                         <div className="mt-2 space-y-1">
