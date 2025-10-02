@@ -148,7 +148,51 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
   };
 
   const addNote = async (withLocation: boolean = false) => {
-    if (!newNote.trim() || !user) return;
+    if (!user) return;
+
+    // If just tracking location without notes, handle separately
+    if (withLocation && !newNote.trim()) {
+      setIsTrackingLocation(true);
+      try {
+        const targetUserId = isAdmin ? selectedUser : user.id;
+        if (!targetUserId) {
+          toast.error('Please select a user');
+          setIsTrackingLocation(false);
+          return;
+        }
+
+        const location = await getLocation();
+        const timestamp = format(new Date(), 'MMM dd, yyyy h:mm a');
+        const noteText = `📍 Location: ${location}\n🕒 Time: ${timestamp}`;
+
+        const { error } = await supabase
+          .from('task_notes')
+          .insert({
+            task_id: taskId,
+            user_id: targetUserId,
+            author_id: user.id,
+            note_text: noteText,
+            files: []
+          });
+
+        if (error) throw error;
+
+        await fetchNotes();
+        toast.success('Location logged successfully!');
+      } catch (error: any) {
+        console.error('Error logging location:', error);
+        if (error.message.includes('Geolocation')) {
+          toast.error('Please allow location access to track your location');
+        } else {
+          toast.error('Failed to log location');
+        }
+      }
+      setIsTrackingLocation(false);
+      return;
+    }
+
+    // Regular note adding with optional location
+    if (!newNote.trim()) return;
 
     setIsSaving(true);
     try {
@@ -402,7 +446,7 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
                       variant="outline"
                       size="sm" 
                       onClick={() => addNote(true)}
-                      disabled={!newNote.trim() || isSaving || isTrackingLocation}
+                      disabled={isSaving || isTrackingLocation || (isAdmin && !selectedUser)}
                       title="Allow Location - Track where you're working"
                       className="gap-1"
                     >
