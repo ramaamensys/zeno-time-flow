@@ -56,7 +56,7 @@ const LearningTemplates = () => {
   const [templateTasks, setTemplateTasks] = useState<TemplateTask[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [expandedTemplates, setExpandedTemplates] = useState(new Set<string>());
 
   // Dialog states
@@ -582,7 +582,7 @@ const LearningTemplates = () => {
     });
   };
 
-  if (isLoading) {
+  if (isLoading || isAdmin === null) {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
