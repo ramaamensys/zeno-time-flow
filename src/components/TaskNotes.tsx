@@ -393,19 +393,23 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
                     <Paperclip className="h-4 w-4" />
                   </Button>
 
-                  {/* Show location button only for assigned user (non-admin) */}
-                  {currentUserId && taskUserId === currentUserId && !isAdmin && (
+                  {/* Show location button for non-admin users */}
+                  {!isAdmin && (
                     <Button 
                       variant="outline"
                       size="sm" 
                       onClick={() => addNote(true)}
                       disabled={!newNote.trim() || isSaving || isTrackingLocation}
-                      title="Add note with location"
+                      title="Allow Location - Track where you're working"
+                      className="gap-1"
                     >
                       {isTrackingLocation ? (
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
                       ) : (
-                        <MapPin className="h-4 w-4" />
+                        <>
+                          <MapPin className="h-4 w-4" />
+                          <span className="text-xs">Allow Location</span>
+                        </>
                       )}
                     </Button>
                   )}
