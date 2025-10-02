@@ -136,9 +136,41 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
       }
 
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           const { latitude, longitude } = position.coords;
-          resolve(`${latitude},${longitude}`);
+          
+          try {
+            // Use reverse geocoding to get readable address
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+              {
+                headers: {
+                  'User-Agent': 'ZenoTimeFlow/1.0'
+                }
+              }
+            );
+            
+            if (!response.ok) {
+              throw new Error('Geocoding failed');
+            }
+            
+            const data = await response.json();
+            const address = data.address;
+            
+            // Build readable address
+            const parts = [];
+            if (address.road) parts.push(address.road);
+            if (address.neighbourhood || address.suburb) parts.push(address.neighbourhood || address.suburb);
+            if (address.city || address.town || address.village) parts.push(address.city || address.town || address.village);
+            if (address.state) parts.push(address.state);
+            
+            const readableAddress = parts.length > 0 ? parts.join(', ') : `${latitude}, ${longitude}`;
+            resolve(readableAddress);
+          } catch (error) {
+            // Fallback to coordinates if geocoding fails
+            console.error('Geocoding error:', error);
+            resolve(`${latitude}, ${longitude}`);
+          }
         },
         (error) => {
           reject(new Error('Unable to retrieve location'));
