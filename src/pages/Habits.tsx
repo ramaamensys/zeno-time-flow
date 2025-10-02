@@ -508,17 +508,17 @@ const Habits = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4">
+      <div className="max-w-7xl mx-auto space-y-4">
         {/* Header with modern gradient */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-8 border border-border/50">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4 border border-border/50">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-50"></div>
           <div className="relative flex items-center justify-between">
-            <div className="space-y-2">
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+            <div className="space-y-1">
+              <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
                 Daily Routines
               </h1>
-              <p className="text-lg text-muted-foreground">Fuel your daily motivation and build powerful routines</p>
+              <p className="text-sm text-muted-foreground">Fuel your daily motivation and build powerful routines</p>
               {selectedUserId && userRole && (userRole === 'manager' || userRole === 'super_admin') && (
                 <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
                   <Users className="w-4 h-4 mr-2 text-primary" />
@@ -531,44 +531,41 @@ const Habits = () => {
             {(!selectedUserId || selectedUserId === user?.id) && (
               <Dialog open={isAddingHabit} onOpenChange={setIsAddingHabit}>
                 <DialogTrigger asChild>
-                  <Button className="group relative overflow-hidden px-6 py-3 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105">
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <Plus className="w-5 h-5 mr-2 relative z-10" />
-                    <span className="relative z-10 font-medium">New Habit</span>
+                  <Button size="default" className="group relative overflow-hidden bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-300">
+                    <Plus className="w-4 h-4 mr-2" />
+                    <span className="font-medium">New Habit</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-md">
                   <DialogHeader>
-                    <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+                    <DialogTitle className="text-xl font-bold">
                       Create New Habit
                     </DialogTitle>
                   </DialogHeader>
-                  <div className="space-y-6 py-4">
-                    <div className="space-y-2">
+                  <div className="space-y-4 py-2">
+                    <div className="space-y-1">
                       <Label htmlFor="title" className="text-sm font-medium">Title</Label>
                       <Input
                         id="title"
                         value={newHabit.title}
                         onChange={(e) => setNewHabit({ ...newHabit, title: e.target.value })}
                         placeholder="e.g., Morning Exercise"
-                        className="h-12 border-2 focus:border-primary/50 transition-colors"
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       <Label htmlFor="description" className="text-sm font-medium">Description (optional)</Label>
                       <Input
                         id="description"
                         value={newHabit.description}
                         onChange={(e) => setNewHabit({ ...newHabit, description: e.target.value })}
                         placeholder="e.g., 30 minutes of cardio"
-                        className="h-12 border-2 focus:border-primary/50 transition-colors"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
                         <Label htmlFor="category" className="text-sm font-medium">Category</Label>
                         <Select value={newHabit.category} onValueChange={(value) => setNewHabit({ ...newHabit, category: value })}>
-                          <SelectTrigger className="h-12 border-2">
+                          <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -578,10 +575,10 @@ const Habits = () => {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-1">
                         <Label htmlFor="frequency" className="text-sm font-medium">Frequency</Label>
                         <Select value={newHabit.frequency} onValueChange={(value: any) => setNewHabit({ ...newHabit, frequency: value })}>
-                          <SelectTrigger className="h-12 border-2">
+                          <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -591,47 +588,45 @@ const Habits = () => {
                         </Select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
                         <Label htmlFor="start-date" className="text-sm font-medium">Start Date</Label>
                         <Input
                           id="start-date"
                           type="date"
                           value={newHabit.start_date}
                           onChange={(e) => setNewHabit({ ...newHabit, start_date: e.target.value })}
-                          className="h-12 border-2 focus:border-primary/50 transition-colors"
                         />
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-1">
                         <Label htmlFor="end-date" className="text-sm font-medium">End Date (optional)</Label>
                         <Input
                           id="end-date"
                           type="date"
                           value={newHabit.end_date}
                           onChange={(e) => setNewHabit({ ...newHabit, end_date: e.target.value })}
-                          className="h-12 border-2 focus:border-primary/50 transition-colors"
                           min={newHabit.start_date}
                         />
                       </div>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       <Label htmlFor="notes" className="text-sm font-medium">Notes (optional)</Label>
                       <Textarea
                         id="notes"
                         value={newHabit.notes}
                         onChange={(e) => setNewHabit({ ...newHabit, notes: e.target.value })}
                         placeholder="Any additional notes about this habit..."
-                        rows={3}
-                        className="border-2 focus:border-primary/50 transition-colors resize-none"
+                        rows={2}
+                        className="resize-none"
                       />
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <Label className="text-sm font-medium">Color</Label>
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-wrap gap-2">
                         {colors.map(color => (
                           <button
                             key={color}
-                            className={`w-10 h-10 rounded-full border-3 transition-all duration-200 hover:scale-110 ${
+                            className={`w-8 h-8 rounded-full border-2 transition-all duration-200 hover:scale-110 ${
                               newHabit.color === color 
                                 ? 'border-foreground shadow-lg scale-110' 
                                 : 'border-border/30 hover:border-border/60'
@@ -644,7 +639,7 @@ const Habits = () => {
                     </div>
                     <Button 
                       onClick={createHabit} 
-                      className="w-full h-12 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-300 shadow-lg hover:shadow-xl font-medium text-base"
+                      className="w-full"
                     >
                       Create Habit
                     </Button>
@@ -659,36 +654,34 @@ const Habits = () => {
         <Dialog open={isEditingHabit} onOpenChange={setIsEditingHabit}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+              <DialogTitle className="text-xl font-bold">
                 Edit Habit
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-6 py-4">
-              <div className="space-y-2">
+            <div className="space-y-4 py-2">
+              <div className="space-y-1">
                 <Label htmlFor="edit-title" className="text-sm font-medium">Title</Label>
                 <Input
                   id="edit-title"
                   value={editHabitForm.title}
                   onChange={(e) => setEditHabitForm({ ...editHabitForm, title: e.target.value })}
                   placeholder="e.g., Morning Exercise"
-                  className="h-12 border-2 focus:border-primary/50 transition-colors"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Label htmlFor="edit-description" className="text-sm font-medium">Description (optional)</Label>
                 <Input
                   id="edit-description"
                   value={editHabitForm.description}
                   onChange={(e) => setEditHabitForm({ ...editHabitForm, description: e.target.value })}
                   placeholder="e.g., 30 minutes of cardio"
-                  className="h-12 border-2 focus:border-primary/50 transition-colors"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
                   <Label htmlFor="edit-category" className="text-sm font-medium">Category</Label>
                   <Select value={editHabitForm.category} onValueChange={(value) => setEditHabitForm({ ...editHabitForm, category: value })}>
-                    <SelectTrigger className="h-12 border-2">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -698,10 +691,10 @@ const Habits = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <Label htmlFor="edit-frequency" className="text-sm font-medium">Frequency</Label>
                   <Select value={editHabitForm.frequency} onValueChange={(value: any) => setEditHabitForm({ ...editHabitForm, frequency: value })}>
-                    <SelectTrigger className="h-12 border-2">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -711,36 +704,34 @@ const Habits = () => {
                   </Select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
                   <Label htmlFor="edit-start-date" className="text-sm font-medium">Start Date</Label>
                   <Input
                     id="edit-start-date"
                     type="date"
                     value={editHabitForm.start_date}
                     onChange={(e) => setEditHabitForm({ ...editHabitForm, start_date: e.target.value })}
-                    className="h-12 border-2 focus:border-primary/50 transition-colors"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <Label htmlFor="edit-end-date" className="text-sm font-medium">End Date (optional)</Label>
                   <Input
                     id="edit-end-date"
                     type="date"
                     value={editHabitForm.end_date}
                     onChange={(e) => setEditHabitForm({ ...editHabitForm, end_date: e.target.value })}
-                    className="h-12 border-2 focus:border-primary/50 transition-colors"
                     min={editHabitForm.start_date}
                   />
                 </div>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <Label className="text-sm font-medium">Color</Label>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2">
                   {colors.map(color => (
                     <button
                       key={color}
-                      className={`w-10 h-10 rounded-full border-3 transition-all duration-200 hover:scale-110 ${
+                      className={`w-8 h-8 rounded-full border-2 transition-all duration-200 hover:scale-110 ${
                         editHabitForm.color === color 
                           ? 'border-foreground shadow-lg scale-110' 
                           : 'border-border/30 hover:border-border/60'
@@ -753,7 +744,7 @@ const Habits = () => {
               </div>
               <Button 
                 onClick={updateHabit} 
-                className="w-full h-12 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-300 shadow-lg hover:shadow-xl font-medium text-base"
+                className="w-full"
               >
                 Update Habit
               </Button>
@@ -767,21 +758,21 @@ const Habits = () => {
             const isCompleted = getHabitCompletion(habit.id, format(new Date(), 'yyyy-MM-dd'));
             
             return (
-              <Card key={habit.id} className="p-6">
+              <Card key={habit.id} className="p-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
                     <div 
-                      className="w-4 h-4 rounded-full"
+                      className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: habit.color }}
                     />
                     <div className={isCompleted ? 'line-through opacity-60' : ''}>
-                      <h3 className="text-lg font-medium">{habit.title}</h3>
+                      <h3 className="text-base font-medium">{habit.title}</h3>
                       {habit.description && (
-                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                        <p className="text-sm text-muted-foreground mt-0.5">
                           {habit.description}
                         </p>
                       )}
-                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                         <span>Created {format(new Date(habit.created_at), 'MMM dd, yyyy')}</span>
                         {habit.start_date && (
                           <span>Start: {habit.start_date}</span>
