@@ -4,10 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { FileUpload } from "@/components/ui/file-upload";
 import { TaskChat } from "@/components/TaskChat";
 import { TaskNotes } from "@/components/TaskNotes";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { CheckSquare, Flag, User, Edit, Plus, Calendar, ChevronDown, ChevronRight, X, Check, BookOpen, MessageCircle, Save, Trash2, PlayCircle, StopCircle, MapPin, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -135,6 +137,10 @@ export const AdminTaskCard = ({
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeWorkSession, setActiveWorkSession] = useState<any>(null);
   const [isStartingWork, setIsStartingWork] = useState(false);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [assignToUserId, setAssignToUserId] = useState<string>("");
+  const [availableUsers, setAvailableUsers] = useState<Array<{user_id: string, full_name: string | null, email: string}>>([]);
+  const [isAssigning, setIsAssigning] = useState(false);
 
   // Get current user and active work session
   useEffect(() => {
@@ -160,6 +166,22 @@ export const AdminTaskCard = ({
     };
     getCurrentUser();
   }, [task.id]);
+
+  // Fetch available users for assignment
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!isAdmin) return;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email');
+      
+      if (!error && data) {
+        setAvailableUsers(data);
+      }
+    };
+    fetchUsers();
+  }, [isAdmin]);
   
   const isCompleted = task.completed || false;
   const hasSubTasks = task.sub_tasks && task.sub_tasks.length > 0;
@@ -309,6 +331,34 @@ export const AdminTaskCard = ({
     }
   };
 
+  const handleAssignTask = async () => {
+    if (!assignToUserId) {
+      toast.error('Please select a user');
+      return;
+    }
+
+    setIsAssigning(true);
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .update({ user_id: assignToUserId })
+        .eq('id', task.id);
+
+      if (error) throw error;
+
+      toast.success('Task assigned successfully!');
+      setIsAssignDialogOpen(false);
+      setAssignToUserId("");
+      // Refresh the page or trigger a refresh callback
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error assigning task:', error);
+      toast.error('Failed to assign task');
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   const getIndentClass = (level: number) => {
     switch(level) {
       case 1: return 'ml-4';
@@ -425,6 +475,63 @@ export const AdminTaskCard = ({
               <div className="flex items-center space-x-2">
                 {isAdmin && !isTemplateTask && (
                   <>
+                    <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <User className="h-4 w-4 mr-1" />
+                          Assign
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent onClick={(e) => e.stopPropagation()}>
+                        <DialogHeader>
+                          <DialogTitle>Assign Task to User</DialogTitle>
+                          <DialogDescription>
+                            Select a user to assign this task to
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label>Current Assignment</Label>
+                            <div className="p-2 bg-muted rounded-md text-sm">
+                              {task.profiles?.full_name || task.profiles?.email || 'Unassigned'}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Assign to User</Label>
+                            <Select value={assignToUserId} onValueChange={setAssignToUserId}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a user..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableUsers.map((user) => (
+                                  <SelectItem key={user.user_id} value={user.user_id}>
+                                    {user.full_name || user.email}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setIsAssignDialogOpen(false);
+                              setAssignToUserId("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                          <Button onClick={handleAssignTask} disabled={isAssigning || !assignToUserId}>
+                            {isAssigning ? 'Assigning...' : 'Assign Task'}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                     <Button
                       variant="outline"
                       size="sm"
