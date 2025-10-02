@@ -91,9 +91,9 @@ const Tasks = () => {
   const [filters, setFilters] = useState({
     teamMember: "all",
     priority: "all",
-    dateRange: "all",
+    dateRange: "today", // Default to today's tasks
     taskType: "all",
-    status: "all",
+    status: "pending", // Default to pending tasks only
   });
 
   // Helper variable for admin permissions - manager is the main admin for calendar
@@ -915,16 +915,45 @@ const Tasks = () => {
         <Card className="border-0 shadow-2xl bg-gradient-to-br from-card/80 via-card to-card/90 backdrop-blur-sm animate-scale-in">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xl flex items-center gap-3 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20">
-                  <Filter className="h-5 w-5 text-primary" />
-                </div>
-                <Zap className="h-4 w-4 text-amber-500 animate-pulse" />
-                Filters
-              </CardTitle>
-              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-                Smart Filtering
-              </Badge>
+              <div className="flex-1">
+                <CardTitle className="text-xl flex items-center gap-3 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                  <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20">
+                    <Filter className="h-5 w-5 text-primary" />
+                  </div>
+                  <Zap className="h-4 w-4 text-amber-500 animate-pulse" />
+                  Filters
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Showing: <Badge variant="secondary" className="ml-1">{filters.status === 'pending' ? 'Pending Tasks' : filters.status === 'completed' ? 'Completed Tasks' : 'All Tasks'}</Badge>
+                  {filters.dateRange !== 'all' && (
+                    <Badge variant="secondary" className="ml-1">
+                      {filters.dateRange === 'today' ? 'Today' : filters.dateRange === 'week' ? 'This Week' : 'This Month'}
+                    </Badge>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {(filters.status !== 'pending' || filters.dateRange !== 'today' || filters.taskType !== 'all' || filters.priority !== 'all' || filters.teamMember !== 'all') && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFilters({
+                      teamMember: "all",
+                      priority: "all",
+                      dateRange: "all",
+                      taskType: "all",
+                      status: "all",
+                    })}
+                    className="gap-2"
+                  >
+                    <X className="h-3 w-3" />
+                    Clear Filters
+                  </Button>
+                )}
+                <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                  Smart Filtering
+                </Badge>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -1088,29 +1117,41 @@ const Tasks = () => {
                 </div>
               ) : templatesWithTasks.length > 0 ? (
                 <div className="space-y-6">
-                  {templatesWithTasks.map(({ template, tasks }) => (
-                    <div key={template.id} className="p-6 rounded-2xl bg-gradient-to-r from-background/50 to-background/30 border border-border/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <h3 className="text-lg font-semibold">{template.name}</h3>
-                          <p className="text-sm text-muted-foreground">{template.description}</p>
-                          <Badge variant="outline" className="mt-2 bg-primary/10 text-primary border-primary/20">
-                            {template.technology}
-                          </Badge>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-primary">
-                            {tasks.filter(task => task.status === 'completed').length}/{tasks.length}
+                  {templatesWithTasks.map(({ template, tasks }) => {
+                    // Filter to show only pending tasks by default
+                    const pendingTasks = tasks.filter(task => task.status !== 'completed');
+                    const completedCount = tasks.filter(task => task.status === 'completed').length;
+                    
+                    // Only show template if it has pending tasks
+                    if (pendingTasks.length === 0) return null;
+                    
+                    return (
+                      <div key={template.id} className="p-6 rounded-2xl bg-gradient-to-r from-background/50 to-background/30 border border-border/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <h3 className="text-lg font-semibold">{template.name}</h3>
+                            <p className="text-sm text-muted-foreground">{template.description}</p>
+                            <Badge variant="outline" className="mt-2 bg-primary/10 text-primary border-primary/20">
+                              {template.technology}
+                            </Badge>
                           </div>
-                          <div className="text-sm text-muted-foreground">Tasks Completed</div>
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-primary">
+                              {completedCount}/{tasks.length}
+                            </div>
+                            <div className="text-sm text-muted-foreground">Tasks Completed</div>
+                            <div className="text-xs text-muted-foreground/70 mt-1">
+                              {pendingTasks.length} pending
+                            </div>
+                          </div>
                         </div>
+                        <Progress 
+                          value={tasks.length > 0 ? (completedCount / tasks.length) * 100 : 0} 
+                          className="h-2 bg-muted/50"
+                        />
                       </div>
-                      <Progress 
-                        value={tasks.length > 0 ? (tasks.filter(task => task.status === 'completed').length / tasks.length) * 100 : 0} 
-                        className="h-2 bg-muted/50"
-                      />
-                    </div>
-                  ))}
+                     );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8">
