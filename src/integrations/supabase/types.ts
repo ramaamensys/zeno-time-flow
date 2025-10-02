@@ -556,6 +556,30 @@ export type Database = {
         }
         Relationships: []
       }
+      location_logs: {
+        Row: {
+          coordinates: Json | null
+          created_at: string
+          id: string
+          location_address: string
+          user_id: string
+        }
+        Insert: {
+          coordinates?: Json | null
+          created_at?: string
+          id?: string
+          location_address: string
+          user_id: string
+        }
+        Update: {
+          coordinates?: Json | null
+          created_at?: string
+          id?: string
+          location_address?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

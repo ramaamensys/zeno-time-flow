@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Send, Paperclip, X, MapPin } from "lucide-react";
+import { FileText, Send, Paperclip, X } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -45,7 +45,6 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isTrackingLocation, setIsTrackingLocation] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getInitials = (name: string) => {
@@ -128,102 +127,8 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
     setIsLoading(false);
   };
 
-  const getLocation = (): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation is not supported by your browser'));
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          
-          try {
-            // Use reverse geocoding to get readable address
-            const response = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
-              {
-                headers: {
-                  'User-Agent': 'ZenoTimeFlow/1.0'
-                }
-              }
-            );
-            
-            if (!response.ok) {
-              throw new Error('Geocoding failed');
-            }
-            
-            const data = await response.json();
-            const address = data.address;
-            
-            // Build readable address
-            const parts = [];
-            if (address.road) parts.push(address.road);
-            if (address.neighbourhood || address.suburb) parts.push(address.neighbourhood || address.suburb);
-            if (address.city || address.town || address.village) parts.push(address.city || address.town || address.village);
-            if (address.state) parts.push(address.state);
-            
-            const readableAddress = parts.length > 0 ? parts.join(', ') : `${latitude}, ${longitude}`;
-            resolve(readableAddress);
-          } catch (error) {
-            // Fallback to coordinates if geocoding fails
-            console.error('Geocoding error:', error);
-            resolve(`${latitude}, ${longitude}`);
-          }
-        },
-        (error) => {
-          reject(new Error('Unable to retrieve location'));
-        }
-      );
-    });
-  };
-
-  const addNote = async (withLocation: boolean = false) => {
+  const addNote = async () => {
     if (!user) return;
-
-    // If just tracking location without notes, handle separately
-    if (withLocation && !newNote.trim()) {
-      setIsTrackingLocation(true);
-      try {
-        const targetUserId = isAdmin ? selectedUser : user.id;
-        if (!targetUserId) {
-          toast.error('Please select a user');
-          setIsTrackingLocation(false);
-          return;
-        }
-
-        const location = await getLocation();
-        const timestamp = format(new Date(), 'MMM dd, yyyy h:mm a');
-        const noteText = `📍 Location: ${location}\n🕒 Time: ${timestamp}`;
-
-        const { error } = await supabase
-          .from('task_notes')
-          .insert({
-            task_id: taskId,
-            user_id: targetUserId,
-            author_id: user.id,
-            note_text: noteText,
-            files: []
-          });
-
-        if (error) throw error;
-
-        await fetchNotes();
-        toast.success('Location logged successfully!');
-      } catch (error: any) {
-        console.error('Error logging location:', error);
-        if (error.message.includes('Geolocation')) {
-          toast.error('Please allow location access to track your location');
-        } else {
-          toast.error('Failed to log location');
-        }
-      }
-      setIsTrackingLocation(false);
-      return;
-    }
-
-    // Regular note adding with optional location
     if (!newNote.trim()) return;
 
     setIsSaving(true);
@@ -232,17 +137,6 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
       if (!targetUserId) {
         toast.error('Please select a user');
         return;
-      }
-
-      let location = null;
-      if (withLocation) {
-        setIsTrackingLocation(true);
-        try {
-          location = await getLocation();
-        } catch (error: any) {
-          toast.error('Failed to get location. Note will be added without location.');
-        }
-        setIsTrackingLocation(false);
       }
 
       // Upload files first
@@ -267,13 +161,6 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
         fileUrls.push(publicUrl);
       }
 
-      // Append location and timestamp to note if location tracking was used
-      let noteText = newNote.trim();
-      if (location) {
-        const timestamp = format(new Date(), 'MMM dd, yyyy h:mm a');
-        noteText += `\n\n📍 Location: ${location}\n🕒 Time: ${timestamp}`;
-      }
-
       // Create the note
       const { error } = await supabase
         .from('task_notes')
@@ -281,7 +168,7 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
           task_id: taskId,
           user_id: targetUserId,
           author_id: user.id,
-          note_text: noteText,
+          note_text: newNote.trim(),
           files: fileUrls
         });
 
@@ -293,7 +180,7 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
         fileInputRef.current.value = '';
       }
       await fetchNotes();
-      toast.success(location ? 'Note added with location!' : 'Note added successfully');
+      toast.success('Note added successfully');
     } catch (error) {
       console.error('Error adding note:', error);
       toast.error('Failed to add note');
@@ -468,35 +355,11 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
                   >
                     <Paperclip className="h-4 w-4" />
                   </Button>
-
-                  {/* Show location button: 
-                      - For regular users (non-admin) always
-                      - For admins/managers only when adding notes to their own tasks
-                  */}
-                  {(!isAdmin || (isAdmin && selectedUser === user?.id)) && (
-                    <Button 
-                      variant="outline"
-                      size="sm" 
-                      onClick={() => addNote(true)}
-                      disabled={isSaving || isTrackingLocation || (isAdmin && !selectedUser)}
-                      title="Allow Location - Track where you're working"
-                      className="gap-1"
-                    >
-                      {isTrackingLocation ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
-                      ) : (
-                        <>
-                          <MapPin className="h-4 w-4" />
-                          <span className="text-xs">Allow Location</span>
-                        </>
-                      )}
-                    </Button>
-                  )}
                 </div>
                 
                 <Button 
                   size="sm" 
-                  onClick={() => addNote(false)}
+                  onClick={() => addNote()}
                   disabled={!newNote.trim() || isSaving || (isAdmin && !selectedUser)}
                 >
                   <Send className="h-4 w-4 mr-1" />

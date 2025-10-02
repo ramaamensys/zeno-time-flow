@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CalendarHeader } from "@/components/calendar/CalendarHeader";
@@ -15,6 +16,8 @@ import { WeekView } from "@/components/calendar/WeekView";
 import { DayView } from "@/components/calendar/DayView";
 import DailyQuote from "@/components/DailyQuote";
 import { format } from "date-fns";
+import { MapPin } from "lucide-react";
+import { toast as sonnerToast } from "sonner";
 
 interface CalendarEvent {
   id: string;
@@ -67,6 +70,7 @@ const Calendar = () => {
     event_type: "other",
     priority: "medium",
   });
+  const [isTrackingLocation, setIsTrackingLocation] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -440,6 +444,94 @@ const Calendar = () => {
     setIsSubEventDialogOpen(true);
   };
 
+  const getLocation = (): Promise<{ address: string; coordinates: { lat: number; lng: number } }> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported by your browser'));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          
+          try {
+            // Use reverse geocoding to get readable address
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+              {
+                headers: {
+                  'User-Agent': 'ZenoTimeFlow/1.0'
+                }
+              }
+            );
+            
+            if (!response.ok) {
+              throw new Error('Geocoding failed');
+            }
+            
+            const data = await response.json();
+            const address = data.address;
+            
+            // Build readable address
+            const parts = [];
+            if (address.road) parts.push(address.road);
+            if (address.neighbourhood || address.suburb) parts.push(address.neighbourhood || address.suburb);
+            if (address.city || address.town || address.village) parts.push(address.city || address.town || address.village);
+            if (address.state) parts.push(address.state);
+            
+            const readableAddress = parts.length > 0 ? parts.join(', ') : `${latitude}, ${longitude}`;
+            resolve({
+              address: readableAddress,
+              coordinates: { lat: latitude, lng: longitude }
+            });
+          } catch (error) {
+            // Fallback to coordinates if geocoding fails
+            console.error('Geocoding error:', error);
+            resolve({
+              address: `${latitude}, ${longitude}`,
+              coordinates: { lat: latitude, lng: longitude }
+            });
+          }
+        },
+        (error) => {
+          reject(new Error('Unable to retrieve location'));
+        }
+      );
+    });
+  };
+
+  const trackLocation = async () => {
+    if (!user) return;
+    
+    setIsTrackingLocation(true);
+    try {
+      const locationData = await getLocation();
+      
+      const { error } = await supabase
+        .from('location_logs')
+        .insert({
+          user_id: user.id,
+          location_address: locationData.address,
+          coordinates: locationData.coordinates
+        });
+
+      if (error) throw error;
+
+      sonnerToast.success('Location tracked successfully!', {
+        description: `📍 ${locationData.address}`
+      });
+    } catch (error: any) {
+      console.error('Error tracking location:', error);
+      if (error.message.includes('Geolocation')) {
+        sonnerToast.error('Please allow location access in your browser');
+      } else {
+        sonnerToast.error('Failed to track location');
+      }
+    }
+    setIsTrackingLocation(false);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -476,7 +568,39 @@ const Calendar = () => {
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-purple-400/10 to-pink-400/10 rounded-full blur-3xl pointer-events-none" />
       
       <div className="relative z-10 space-y-8 p-6">
-        <DailyQuote />
+        <div className="flex justify-between items-start gap-6">
+          <div className="flex-1">
+            <DailyQuote />
+          </div>
+          
+          {/* Location Tracking Card */}
+          <Card className="p-4 w-64 bg-white/80 backdrop-blur-sm shadow-lg">
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-gray-900">Location Tracking</h3>
+              <p className="text-xs text-gray-600">
+                Track your location to log where you're working
+              </p>
+              <Button 
+                onClick={trackLocation}
+                disabled={isTrackingLocation}
+                className="w-full"
+                size="sm"
+              >
+                {isTrackingLocation ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                    Tracking...
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Track Location
+                  </>
+                )}
+              </Button>
+            </div>
+          </Card>
+        </div>
         
         <CalendarHeader
           currentDate={currentDate}
