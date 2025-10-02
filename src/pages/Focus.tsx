@@ -412,38 +412,38 @@ const Focus = () => {
       <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-indigo-400/10 to-purple-400/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-blue-400/10 to-cyan-400/10 rounded-full blur-3xl pointer-events-none" />
       
-      <div className="relative z-10 space-y-8 p-6">
-        {/* Header Section */}
-        <div className="text-center">
-          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 bg-clip-text text-transparent mb-4">
+      <div className="relative z-10 space-y-6 p-6">
+        {/* Compact Header */}
+        <div className="text-center py-4">
+          <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
             Focus Hours
           </h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          <p className="text-sm text-gray-600">
             Track your focus work time and efficiency
           </p>
           {selectedUserId && userRole && (userRole === 'manager' || userRole === 'super_admin') && (
-            <p className="text-sm text-purple-600 mt-2 font-medium">
+            <p className="text-xs text-purple-600 mt-1 font-medium">
               Viewing focus hours for: {users.find(u => u.id === selectedUserId)?.full_name}
             </p>
           )}
         </div>
 
         {/* Focus Timer Card */}
-        <Card className="border-0 shadow-2xl bg-white/90 backdrop-blur-sm overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white pb-8">
-            <CardTitle className="flex items-center justify-center gap-3 text-2xl font-bold">
-              <Timer className="h-7 w-7" />
+        <Card className="border shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white pb-4">
+            <CardTitle className="flex items-center justify-center gap-2 text-lg font-bold">
+              <Timer className="h-5 w-5" />
               Focus Timer
             </CardTitle>
-            <CardDescription className="text-indigo-100 text-center text-lg">
+            <CardDescription className="text-indigo-100 text-center text-sm">
               Begin a focus session to track your efficiency
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-8 py-8">
+          <CardContent className="space-y-6 py-6">
             <div className="text-center">
               {/* Timer Display */}
-              <div className="relative mb-8">
-                <div className="text-7xl md:text-8xl font-mono font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-6 tracking-tight">
+              <div className="relative mb-6">
+                <div className="text-6xl md:text-7xl font-mono font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-4 tracking-tight">
                   {formatTime(seconds)}
                 </div>
                 {currentSession && (
@@ -455,17 +455,17 @@ const Focus = () => {
               
               {/* Interruptions Counter */}
               {currentSession && (
-                <div className="flex items-center justify-center gap-6 mb-8">
-                  <div className="bg-gradient-to-r from-orange-100 to-red-100 px-6 py-3 rounded-2xl border border-orange-200">
-                    <span className="text-orange-700 font-semibold">
+                <div className="flex items-center justify-center gap-4 mb-6">
+                  <div className="bg-gradient-to-r from-orange-100 to-red-100 px-4 py-2 rounded-xl border border-orange-200">
+                    <span className="text-orange-700 font-semibold text-sm">
                       Interruptions: {interruptions}
                     </span>
                   </div>
                   <Button
                     variant="outline"
-                    size="lg"
+                    size="sm"
                     onClick={addInterruption}
-                    className="border-orange-300 text-orange-600 hover:bg-orange-50 rounded-xl h-12 px-6"
+                    className="border-orange-300 text-orange-600 hover:bg-orange-50 rounded-lg h-9 px-4"
                   >
                     +1 Interruption
                   </Button>
@@ -473,15 +473,15 @@ const Focus = () => {
               )}
 
               {/* Control Buttons */}
-              <div className="flex items-center justify-center gap-4 flex-wrap">
+              <div className="flex items-center justify-center gap-3 flex-wrap">
                 {!currentSession && (!selectedUserId || selectedUserId === user?.id) ? (
                   <>
                     <Button 
                       onClick={() => startSession()} 
-                      size="lg"
-                      className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 h-14 px-8 text-lg font-semibold rounded-2xl"
+                      size="default"
+                      className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                     >
-                      <Play className="mr-3 h-5 w-5" />
+                      <Play className="mr-2 h-4 w-4" />
                       Begin Productive Session
                     </Button>
                     
@@ -489,10 +489,10 @@ const Focus = () => {
                       <DialogTrigger asChild>
                         <Button 
                           variant="outline"
-                          size="lg"
-                          className="border-2 border-indigo-300 text-indigo-600 hover:bg-indigo-50 h-14 px-8 text-lg font-semibold rounded-2xl"
+                          size="default"
+                          className="border-2 border-indigo-300 text-indigo-600 hover:bg-indigo-50"
                         >
-                          <Target className="mr-3 h-5 w-5" />
+                          <Target className="mr-2 h-4 w-4" />
                           Focus on Task
                         </Button>
                       </DialogTrigger>
@@ -541,10 +541,10 @@ const Focus = () => {
                       <DialogTrigger asChild>
                         <Button 
                           variant="outline"
-                          size="lg"
-                          className="border-2 border-green-300 text-green-600 hover:bg-green-50 h-14 px-8 text-lg font-semibold rounded-2xl"
+                          size="default"
+                          className="border-2 border-green-300 text-green-600 hover:bg-green-50"
                         >
-                          <Calendar className="mr-3 h-5 w-5" />
+                          <Calendar className="mr-2 h-4 w-4" />
                           Plan Session
                         </Button>
                       </DialogTrigger>
@@ -637,29 +637,29 @@ const Focus = () => {
                       <Button 
                         onClick={pauseSession} 
                         variant="outline" 
-                        size="lg"
-                        className="border-2 border-orange-300 text-orange-600 hover:bg-orange-50 h-14 px-8 text-lg font-semibold rounded-2xl"
+                        size="default"
+                        className="border-2 border-orange-300 text-orange-600 hover:bg-orange-50"
                       >
-                        <Pause className="mr-3 h-5 w-5" />
+                        <Pause className="mr-2 h-4 w-4" />
                         Pause
                       </Button>
                     ) : (
                       <Button 
                         onClick={resumeSession} 
-                        size="lg"
-                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 h-14 px-8 text-lg font-semibold rounded-2xl"
+                        size="default"
+                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
                       >
-                        <Play className="mr-3 h-5 w-5" />
+                        <Play className="mr-2 h-4 w-4" />
                         Resume
                       </Button>
                     )}
                     <Button 
                       onClick={stopSession} 
                       variant="destructive" 
-                      size="lg"
-                      className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 shadow-lg hover:shadow-xl transition-all duration-300 h-14 px-8 text-lg font-semibold rounded-2xl"
+                      size="default"
+                      className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 shadow-lg hover:shadow-xl transition-all duration-300"
                     >
-                      <Square className="mr-3 h-5 w-5" />
+                      <Square className="mr-2 h-4 w-4" />
                       Stop Session
                     </Button>
                   </>
@@ -692,20 +692,18 @@ const Focus = () => {
           </CardContent>
         </Card>
 
-        {/* Filter Controls */}
-        <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
-            <CardTitle className="flex items-center justify-center gap-3 text-xl font-bold">
-              <Filter className="h-6 w-6" />
-              Filter Sessions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-center gap-6 flex-wrap">
-              <div className="flex items-center gap-3">
-                <Label className="text-sm font-medium">Period:</Label>
+        {/* Compact Filter Controls */}
+        <Card className="border shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Filters:</span>
+              </div>
+              
+              <div className="flex items-center gap-2 flex-wrap">
                 <Select value={filterPeriod} onValueChange={setFilterPeriod}>
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-32 h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-background border shadow-lg z-50">
@@ -715,11 +713,9 @@ const Focus = () => {
                     <SelectItem value="all">All Time</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="flex items-center gap-3">
-                <Label className="text-sm font-medium">Type:</Label>
+                
                 <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger className="w-40">
+                  <SelectTrigger className="w-32 h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-background border shadow-lg z-50">
@@ -735,13 +731,13 @@ const Focus = () => {
         </Card>
 
         {/* Recent Sessions Card */}
-        <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white">
-            <CardTitle className="flex items-center justify-center gap-3 text-2xl font-bold">
-              <Brain className="h-7 w-7" />
+        <Card className="border shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white pb-3">
+            <CardTitle className="flex items-center justify-center gap-2 text-lg font-bold">
+              <Brain className="h-5 w-5" />
               Focus Sessions
             </CardTitle>
-            <CardDescription className="text-purple-100 text-center text-lg">
+            <CardDescription className="text-purple-100 text-center text-sm">
               Your focus session history and planned sessions
             </CardDescription>
           </CardHeader>
