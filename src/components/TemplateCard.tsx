@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Users, Plus, Settings, BookOpen, TrendingUp, Calendar, ChevronRight, MessageCircle, CheckSquare, X, Edit, Trash2 } from "lucide-react";
+import { Users, Plus, Settings, BookOpen, TrendingUp, Calendar, ChevronRight, MessageCircle, CheckSquare, X, Edit, Trash2, Search, UserPlus } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { TaskChat } from "@/components/TaskChat";
 import { TaskNotes } from "@/components/TaskNotes";
@@ -15,6 +15,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { FileUpload } from "@/components/ui/file-upload";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface LearningTemplate {
   id: string;
@@ -116,6 +119,34 @@ export const TemplateCard = ({
   const progress = getProgress(tasks);
   const completedTasks = tasks.filter(task => task.completed || task.status === 'completed').length;
   
+  // State for multi-select user assignment dialog
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  // Filter unassigned users based on search
+  const filteredUnassignedUsers = unassignedUsers.filter(user => 
+    user.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  const handleAssignUsers = () => {
+    selectedUserIds.forEach(userId => {
+      onAssignUser(userId);
+    });
+    setSelectedUserIds([]);
+    setSearchQuery("");
+    setIsAssignDialogOpen(false);
+  };
+  
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUserIds(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+  
   return (
     <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
       <CardHeader className="pb-4">
@@ -150,41 +181,123 @@ export const TemplateCard = ({
           <div className="flex items-center space-x-2">
             {isAdmin && (
               <>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="shadow-sm">
-                      <Plus className="h-4 w-4 mr-1" />
-                      Assign User
+                <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="shadow-sm bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 border-blue-200"
+                    >
+                      <UserPlus className="h-4 w-4 mr-1" />
+                      Assign Users
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    {unassignedUsers.length > 0 ? (
-                      unassignedUsers.map((member) => (
-                        <DropdownMenuItem
-                          key={member.user_id}
-                          onClick={() => onAssignUser(member.user_id)}
-                          className="cursor-pointer"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="text-xs">
-                                {getInitials(member.full_name || member.email)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <div className="font-medium">{member.full_name}</div>
-                              <div className="text-xs text-gray-500">{member.email}</div>
-                            </div>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[500px] max-h-[80vh]">
+                    <DialogHeader>
+                      <DialogTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                        Assign Users to {template.name}
+                      </DialogTitle>
+                    </DialogHeader>
+                    
+                    <div className="space-y-4">
+                      {/* Search Input */}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search users..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-9 bg-background"
+                        />
+                      </div>
+                      
+                      {/* Selected Count */}
+                      {selectedUserIds.length > 0 && (
+                        <div className="flex items-center justify-between px-3 py-2 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                            {selectedUserIds.length} user{selectedUserIds.length !== 1 ? 's' : ''} selected
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedUserIds([])}
+                            className="h-7 text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {/* Users List */}
+                      <ScrollArea className="h-[320px] pr-4">
+                        {filteredUnassignedUsers.length > 0 ? (
+                          <div className="space-y-2">
+                            {filteredUnassignedUsers.map((member) => (
+                              <div
+                                key={member.user_id}
+                                onClick={() => toggleUserSelection(member.user_id)}
+                                className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:bg-accent hover:border-primary/50 cursor-pointer transition-all duration-200 group"
+                              >
+                                <Checkbox
+                                  checked={selectedUserIds.includes(member.user_id)}
+                                  onCheckedChange={() => toggleUserSelection(member.user_id)}
+                                  className="border-2"
+                                />
+                                <Avatar className="h-10 w-10 ring-2 ring-background group-hover:ring-primary/20">
+                                  <AvatarFallback className="text-sm font-semibold bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                                    {getInitials(member.full_name || member.email)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-sm truncate group-hover:text-primary transition-colors">
+                                    {member.full_name || 'No name'}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground truncate">
+                                    {member.email}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        </DropdownMenuItem>
-                      ))
-                    ) : (
-                      <DropdownMenuItem disabled>
-                        All users assigned
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-12 text-center">
+                            <Users className="h-12 w-12 text-muted-foreground/50 mb-3" />
+                            <p className="text-sm font-medium text-muted-foreground">
+                              {searchQuery ? 'No users found' : 'All users are already assigned'}
+                            </p>
+                            {searchQuery && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Try a different search term
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </ScrollArea>
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-end space-x-2 pt-4 border-t">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsAssignDialogOpen(false);
+                          setSelectedUserIds([]);
+                          setSearchQuery("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleAssignUsers}
+                        disabled={selectedUserIds.length === 0}
+                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                      >
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Assign {selectedUserIds.length > 0 ? `(${selectedUserIds.length})` : ''}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
