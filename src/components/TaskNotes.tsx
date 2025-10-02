@@ -393,8 +393,11 @@ export const TaskNotes = ({ taskId, taskTitle, assignedUsers, isAdmin, currentUs
                     <Paperclip className="h-4 w-4" />
                   </Button>
 
-                  {/* Show location button for non-admin users */}
-                  {!isAdmin && (
+                  {/* Show location button: 
+                      - For regular users (non-admin) always
+                      - For admins/managers only when adding notes to their own tasks
+                  */}
+                  {(!isAdmin || (isAdmin && selectedUser === user?.id)) && (
                     <Button 
                       variant="outline"
                       size="sm" 
