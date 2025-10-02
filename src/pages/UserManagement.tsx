@@ -1136,9 +1136,22 @@ export default function UserManagement() {
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="operations_manager">Operations Manager</SelectItem>
-                        <SelectItem value="admin">Company Manager</SelectItem>
-                        <SelectItem value="employee">Employee</SelectItem>
+                        {(() => {
+                          const selectedCompany = companies.find(c => c.id === assignmentData.company_id);
+                          const isITCompany = selectedCompany?.field_type === 'IT';
+                          
+                          return (
+                            <>
+                              {!isITCompany && (
+                                <SelectItem value="operations_manager">Operations Manager</SelectItem>
+                              )}
+                              {isITCompany && (
+                                <SelectItem value="admin">Company Manager</SelectItem>
+                              )}
+                              <SelectItem value="employee">Employee</SelectItem>
+                            </>
+                          );
+                        })()}
                       </SelectContent>
                     </Select>
                   </div>
