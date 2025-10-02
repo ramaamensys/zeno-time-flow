@@ -1050,6 +1050,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_company_manager_for_employee: {
+        Args: { _employee_user_id: string; _manager_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role:

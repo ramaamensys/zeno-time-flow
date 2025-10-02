@@ -303,14 +303,44 @@ const Tasks = () => {
   const fetchTeamMembers = async () => {
     if (userRole !== 'super_admin' && userRole !== 'manager') return;
     
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("user_id, full_name, email");
+    if (userRole === 'super_admin') {
+      // Super admins can see all users
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, email");
 
-    if (error) {
-      console.error("Error fetching team members:", error);
-    } else {
-      setTeamMembers(data || []);
+      if (error) {
+        console.error("Error fetching team members:", error);
+      } else {
+        setTeamMembers(data || []);
+      }
+    } else if (userRole === 'manager') {
+      // IT Company managers see their company employees
+      const { data: employees, error: employeesError } = await supabase
+        .from("employees")
+        .select(`
+          user_id,
+          first_name,
+          last_name,
+          email,
+          company_id,
+          companies!inner(company_manager_id)
+        `)
+        .eq('companies.company_manager_id', user?.id);
+
+      if (employeesError) {
+        console.error("Error fetching company employees:", employeesError);
+        setTeamMembers([]);
+      } else {
+        // Transform employee data to match TeamMember interface
+        const teamMembersData = employees?.map(emp => ({
+          user_id: emp.user_id || '',
+          full_name: `${emp.first_name} ${emp.last_name}`.trim(),
+          email: emp.email
+        })).filter(member => member.user_id) || [];
+        
+        setTeamMembers(teamMembersData);
+      }
     }
   };
 
