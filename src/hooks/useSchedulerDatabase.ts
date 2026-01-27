@@ -2,6 +2,20 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+export interface Organization {
+  id: string;
+  name: string;
+  color?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  operations_manager_id?: string;
+  organization_manager_id?: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Company {
   id: string;
   name: string;
@@ -13,6 +27,7 @@ export interface Company {
   field_type?: 'IT' | 'Non-IT';
   operations_manager_id?: string;
   company_manager_id?: string;
+  organization_id?: string;
   created_by?: string;
   created_at: string;
   updated_at: string;
@@ -56,6 +71,101 @@ export interface Shift {
   status: string;
   hourly_rate?: number;
   created_at: string;
+}
+
+export function useOrganizations() {
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchOrganizations = async () => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('organizations')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setOrganizations(data || []);
+    } catch (error) {
+      console.error('Error fetching organizations:', error);
+      toast.error('Failed to fetch organizations');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createOrganization = async (orgData: Omit<Organization, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('organizations')
+        .insert([orgData])
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setOrganizations(prev => [data, ...prev]);
+      toast.success('Organization created successfully');
+      return data;
+    } catch (error) {
+      console.error('Error creating organization:', error);
+      toast.error('Failed to create organization');
+      throw error;
+    }
+  };
+
+  const updateOrganization = async (id: string, updates: Partial<Organization>) => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('organizations')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setOrganizations(prev => prev.map(o => o.id === id ? data : o));
+      toast.success('Organization updated successfully');
+      return data;
+    } catch (error) {
+      console.error('Error updating organization:', error);
+      toast.error('Failed to update organization');
+      throw error;
+    }
+  };
+
+  const deleteOrganization = async (id: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('organizations')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      setOrganizations(prev => prev.filter(o => o.id !== id));
+      toast.success('Organization deleted successfully');
+    } catch (error) {
+      console.error('Error deleting organization:', error);
+      toast.error('Failed to delete organization');
+      throw error;
+    }
+  };
+
+  useEffect(() => {
+    fetchOrganizations();
+  }, []);
+
+  return {
+    organizations,
+    loading,
+    createOrganization,
+    updateOrganization,
+    deleteOrganization,
+    refetch: fetchOrganizations,
+    fetchOrganizations
+  };
 }
 
 export function useCompanies() {

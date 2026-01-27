@@ -1,26 +1,33 @@
 import { useState, useEffect } from "react";
-import { Plus, Building, UserCheck, Settings, Edit, Eye } from "lucide-react";
+import { Plus, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
-import { useCompanies } from "@/hooks/useSchedulerDatabase";
+import { useCompanies, useOrganizations } from "@/hooks/useSchedulerDatabase";
 import { supabase } from "@/integrations/supabase/client";
 import CreateCompanyModal from "@/components/scheduler/CreateCompanyModal";
 import EditCompanyModal from "@/components/scheduler/EditCompanyModal";
 import CompanyDetailModal from "@/components/scheduler/CompanyDetailModal";
 import AssignManagerModal from "@/components/scheduler/AssignManagerModal";
+import CreateOrganizationModal from "@/components/scheduler/CreateOrganizationModal";
+import EditOrganizationModal from "@/components/scheduler/EditOrganizationModal";
+import OrganizationCard from "@/components/scheduler/OrganizationCard";
 import { toast } from "sonner";
 
 export default function Companies() {
   const { user } = useAuth();
-  const { companies, loading, fetchCompanies } = useCompanies();
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
+  const { companies, loading: companiesLoading, fetchCompanies } = useCompanies();
+  const { organizations, loading: orgsLoading, fetchOrganizations } = useOrganizations();
+  
+  const [showCreateCompanyModal, setShowCreateCompanyModal] = useState(false);
+  const [showEditCompanyModal, setShowEditCompanyModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showCreateOrgModal, setShowCreateOrgModal] = useState(false);
+  const [showEditOrgModal, setShowEditOrgModal] = useState(false);
+  
   const [selectedCompany, setSelectedCompany] = useState<any>(null);
+  const [selectedOrganization, setSelectedOrganization] = useState<any>(null);
+  const [selectedOrgIdForCompany, setSelectedOrgIdForCompany] = useState<string>("");
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,24 +58,41 @@ export default function Companies() {
     fetchUserRole();
   }, [user]);
 
+  const canCreateOrganization = userRole === 'super_admin' || userRole === 'operations_manager';
   const canCreateCompany = userRole === 'super_admin' || userRole === 'operations_manager';
-  const canAssignManager = userRole === 'super_admin' || userRole === 'operations_manager';
   const canEditCompany = userRole === 'super_admin' || userRole === 'operations_manager';
 
-  const handleAssignManager = (company: any) => {
-    setSelectedCompany(company);
-    setShowAssignModal(true);
+  const handleEditOrganization = (org: any) => {
+    setSelectedOrganization(org);
+    setShowEditOrgModal(true);
+  };
+
+  const handleCreateCompany = (orgId: string) => {
+    setSelectedOrgIdForCompany(orgId);
+    setShowCreateCompanyModal(true);
   };
 
   const handleEditCompany = (company: any) => {
     setSelectedCompany(company);
-    setShowEditModal(true);
+    setShowEditCompanyModal(true);
   };
 
   const handleViewCompany = (company: any) => {
     setSelectedCompany(company);
     setShowDetailModal(true);
   };
+
+  const handleAssignManager = (company: any) => {
+    setSelectedCompany(company);
+    setShowAssignModal(true);
+  };
+
+  const handleRefresh = () => {
+    fetchCompanies();
+    fetchOrganizations();
+  };
+
+  const loading = companiesLoading || orgsLoading;
 
   if (loading) {
     return (
@@ -84,164 +108,86 @@ export default function Companies() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-              Company Management
+              Organization Management
             </h1>
             <p className="text-muted-foreground mt-2">
-              Manage companies, assign managers, and organize your workforce
+              Manage organizations, companies, and assign managers
             </p>
           </div>
           
-          {canCreateCompany && (
+          {canCreateOrganization && (
             <Button 
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => setShowCreateOrgModal(true)}
               className="bg-primary hover:bg-primary/90"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Create Company
+              Create Organization
             </Button>
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {companies.map((company) => (
-            <Card key={company.id} className="group hover:shadow-xl transition-all duration-300 border border-border/50 hover:border-primary/30 bg-gradient-to-br from-card to-card/95">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start space-x-3 flex-1 min-w-0">
-                    <div 
-                      className="w-14 h-14 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
-                      style={{ backgroundColor: company.color || '#3b82f6' }}
-                    >
-                      <Building className="w-7 h-7 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <Button
-                        variant="ghost"
-                        className="p-0 h-auto font-semibold text-lg text-left hover:text-primary transition-colors w-full justify-start"
-                        onClick={() => handleViewCompany(company)}
-                        title={company.name}
-                      >
-                        <span className="truncate block max-w-full">{company.name}</span>
-                      </Button>
-                      <CardDescription className="text-sm mt-1 truncate">{company.type}</CardDescription>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge 
-                          variant={company.field_type === 'IT' ? 'default' : 'secondary'}
-                          className="text-xs"
-                        >
-                          {company.field_type}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-70 hover:opacity-100">
-                          <Settings className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-background border shadow-lg">
-                        <DropdownMenuItem onClick={() => handleViewCompany(company)}>
-                          <Eye className="w-4 h-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
-                        {canEditCompany && (
-                          <DropdownMenuItem onClick={() => handleEditCompany(company)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit Company
-                          </DropdownMenuItem>
-                        )}
-                        {canAssignManager && (
-                          <DropdownMenuItem onClick={() => handleAssignManager(company)}>
-                            <UserCheck className="w-4 h-4 mr-2" />
-                            Assign Managers
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="pt-0 space-y-4">
-                <div className="space-y-2 text-sm">
-                  {company.address && (
-                    <p className="flex items-start gap-2">
-                      <span className="font-medium text-muted-foreground min-w-0 flex-shrink-0">Address:</span> 
-                      <span className="text-foreground">{company.address}</span>
-                    </p>
-                  )}
-                  {company.phone && (
-                    <p className="flex items-center gap-2">
-                      <span className="font-medium text-muted-foreground">Phone:</span> 
-                      <span className="text-foreground">{company.phone}</span>
-                    </p>
-                  )}
-                  {company.email && (
-                    <p className="flex items-center gap-2">
-                      <span className="font-medium text-muted-foreground">Email:</span> 
-                      <span className="text-foreground">{company.email}</span>
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-2 pt-2">
-                  {company.operations_manager_id && (
-                    <Badge variant="outline" className="text-xs bg-green-50 border-green-200 text-green-700">
-                      <UserCheck className="w-3 h-3 mr-1" />
-                      Ops Manager
-                    </Badge>
-                  )}
-                  {company.company_manager_id && (
-                    <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200 text-blue-700">
-                      <UserCheck className="w-3 h-3 mr-1" />
-                      Company Manager
-                    </Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+        <div className="space-y-6">
+          {organizations.map((org) => (
+            <OrganizationCard
+              key={org.id}
+              organization={org}
+              companies={companies}
+              canEdit={canEditCompany}
+              canCreateCompany={canCreateCompany}
+              onEditOrganization={handleEditOrganization}
+              onCreateCompany={handleCreateCompany}
+              onEditCompany={handleEditCompany}
+              onViewCompany={handleViewCompany}
+              onAssignManager={handleAssignManager}
+            />
           ))}
         </div>
 
-        {companies.length === 0 && (
+        {organizations.length === 0 && (
           <div className="text-center py-12">
-            <Building className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No companies found</h3>
+            <Building2 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">No organizations found</h3>
             <p className="text-muted-foreground mb-6">
-              {canCreateCompany 
-                ? "Create your first company to get started" 
-                : "No companies have been created yet"
+              {canCreateOrganization 
+                ? "Create your first organization to get started" 
+                : "No organizations have been created yet"
               }
             </p>
-            {canCreateCompany && (
-              <Button onClick={() => setShowCreateModal(true)}>
+            {canCreateOrganization && (
+              <Button onClick={() => setShowCreateOrgModal(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Create Company
+                Create Organization
               </Button>
             )}
           </div>
         )}
       </div>
 
+      <CreateOrganizationModal 
+        open={showCreateOrgModal} 
+        onOpenChange={setShowCreateOrgModal}
+        onSuccess={handleRefresh}
+      />
+
+      <EditOrganizationModal 
+        open={showEditOrgModal} 
+        onOpenChange={setShowEditOrgModal}
+        organization={selectedOrganization}
+        onSuccess={handleRefresh}
+      />
+
       <CreateCompanyModal 
-        open={showCreateModal} 
-        onOpenChange={setShowCreateModal}
-        onSuccess={() => {
-          fetchCompanies();
-          toast.success("Company created successfully!");
-        }}
+        open={showCreateCompanyModal} 
+        onOpenChange={setShowCreateCompanyModal}
+        organizationId={selectedOrgIdForCompany}
+        onSuccess={handleRefresh}
       />
 
       <EditCompanyModal 
-        open={showEditModal} 
-        onOpenChange={setShowEditModal}
+        open={showEditCompanyModal} 
+        onOpenChange={setShowEditCompanyModal}
         company={selectedCompany}
-        onSuccess={() => {
-          fetchCompanies();
-          toast.success("Company updated successfully!");
-        }}
+        onSuccess={handleRefresh}
       />
 
       <CompanyDetailModal 
@@ -254,10 +200,7 @@ export default function Companies() {
         open={showAssignModal} 
         onOpenChange={setShowAssignModal}
         company={selectedCompany}
-        onSuccess={() => {
-          fetchCompanies();
-          toast.success("Manager assigned successfully!");
-        }}
+        onSuccess={handleRefresh}
       />
     </div>
   );

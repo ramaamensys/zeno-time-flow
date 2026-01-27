@@ -4,14 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCompanies } from "@/hooks/useSchedulerDatabase";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-interface CreateCompanyModalProps {
+interface CreateOrganizationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  organizationId?: string;
   onSuccess?: () => void;
 }
 
@@ -21,41 +19,24 @@ interface Profile {
   email: string;
 }
 
-const COMPANY_TYPES = [
-  { value: "motel", label: "Motel" },
-  { value: "gas_station", label: "Gas Station" },
-  { value: "restaurant", label: "Restaurant" },
-  { value: "retail", label: "Retail Store" },
-  { value: "office", label: "Office" },
-  { value: "warehouse", label: "Warehouse" },
-  { value: "other", label: "Other" }
-];
-
-export default function CreateCompanyModal({ open, onOpenChange, organizationId, onSuccess }: CreateCompanyModalProps) {
-  const { createCompany } = useCompanies();
+export default function CreateOrganizationModal({ open, onOpenChange, onSuccess }: CreateOrganizationModalProps) {
   const [loading, setLoading] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<Profile[]>([]);
   const [formData, setFormData] = useState({
     name: "",
-    type: "motel",
-    field_type: "IT" as "IT" | "Non-IT",
-    color: "#3b82f6",
+    color: "#6366f1",
     address: "",
     phone: "",
     email: "",
     operations_manager_id: "",
-    company_manager_id: "",
-    organization_id: organizationId || ""
+    organization_manager_id: ""
   });
 
   useEffect(() => {
     if (open) {
       fetchAvailableUsers();
-      if (organizationId) {
-        setFormData(prev => ({ ...prev, organization_id: organizationId }));
-      }
     }
-  }, [open, organizationId]);
+  }, [open]);
 
   const fetchAvailableUsers = async () => {
     try {
@@ -76,69 +57,42 @@ export default function CreateCompanyModal({ open, onOpenChange, organizationId,
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.type) {
+    if (!formData.name) {
+      toast.error("Organization name is required");
       return;
     }
 
     setLoading(true);
     try {
-      // Create the company
-      const companyData = {
-        name: formData.name,
-        type: formData.type,
-        field_type: formData.field_type,
-        color: formData.color,
-        address: formData.address,
-        phone: formData.phone,
-        email: formData.email,
-        operations_manager_id: (formData.operations_manager_id && formData.operations_manager_id !== "none") ? formData.operations_manager_id : null,
-        company_manager_id: (formData.company_manager_id && formData.company_manager_id !== "none") ? formData.company_manager_id : null,
-        organization_id: formData.organization_id || null
-      };
+      const { error } = await supabase
+        .from('organizations')
+        .insert({
+          name: formData.name,
+          color: formData.color,
+          address: formData.address || null,
+          phone: formData.phone || null,
+          email: formData.email || null,
+          operations_manager_id: (formData.operations_manager_id && formData.operations_manager_id !== "none") ? formData.operations_manager_id : null,
+          organization_manager_id: (formData.organization_manager_id && formData.organization_manager_id !== "none") ? formData.organization_manager_id : null
+        });
 
-      await createCompany(companyData);
-
-      // Assign roles to the selected managers
-      if (formData.operations_manager_id && formData.operations_manager_id !== "none") {
-        const appType = formData.field_type === 'IT' ? 'calendar' : 'scheduler';
-        await supabase
-          .from('user_roles')
-          .upsert({ 
-            user_id: formData.operations_manager_id, 
-            role: 'operations_manager',
-            app_type: appType
-          });
-      }
-
-      if (formData.company_manager_id && formData.company_manager_id !== "none") {
-        const appType = formData.field_type === 'IT' ? 'calendar' : 'scheduler';
-        await supabase
-          .from('user_roles')
-          .upsert({ 
-            user_id: formData.company_manager_id, 
-            role: 'admin',
-            app_type: appType
-          });
-      }
+      if (error) throw error;
 
       onOpenChange(false);
       onSuccess?.();
       setFormData({
         name: "",
-        type: "motel",
-        field_type: "IT" as "IT" | "Non-IT",
-        color: "#3b82f6",
+        color: "#6366f1",
         address: "",
         phone: "",
         email: "",
         operations_manager_id: "",
-        company_manager_id: "",
-        organization_id: organizationId || ""
+        organization_manager_id: ""
       });
-      toast.success('Company created successfully!');
+      toast.success('Organization created successfully!');
     } catch (error) {
-      console.error('Failed to create company:', error);
-      toast.error('Failed to create company');
+      console.error('Failed to create organization:', error);
+      toast.error('Failed to create organization');
     } finally {
       setLoading(false);
     }
@@ -148,54 +102,19 @@ export default function CreateCompanyModal({ open, onOpenChange, organizationId,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Create New Company</DialogTitle>
+          <DialogTitle>Create New Organization</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Company Name *</Label>
+            <Label htmlFor="name">Organization Name *</Label>
             <Input
               id="name"
               value={formData.name}
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="Enter company name"
+              placeholder="Enter organization name"
               required
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="field-type">Field Type *</Label>
-            <Select
-              value={formData.field_type}
-              onValueChange={(value: "IT" | "Non-IT") => setFormData(prev => ({ ...prev, field_type: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select field type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="IT">IT</SelectItem>
-                <SelectItem value="Non-IT">Non-IT</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="type">Business Type *</Label>
-            <Select
-              value={formData.type}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select business type" />
-              </SelectTrigger>
-              <SelectContent>
-                {COMPANY_TYPES.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="space-y-2">
@@ -211,7 +130,7 @@ export default function CreateCompanyModal({ open, onOpenChange, organizationId,
               <Input
                 value={formData.color}
                 onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
-                placeholder="#3b82f6"
+                placeholder="#6366f1"
                 className="flex-1"
               />
             </div>
@@ -223,7 +142,7 @@ export default function CreateCompanyModal({ open, onOpenChange, organizationId,
               id="address"
               value={formData.address}
               onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-              placeholder="Enter company address"
+              placeholder="Enter organization address"
             />
           </div>
 
@@ -245,7 +164,7 @@ export default function CreateCompanyModal({ open, onOpenChange, organizationId,
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="contact@company.com"
+                placeholder="contact@organization.com"
               />
             </div>
           </div>
@@ -272,16 +191,16 @@ export default function CreateCompanyModal({ open, onOpenChange, organizationId,
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="company-manager">Company Manager</Label>
+              <Label htmlFor="organization-manager">Organization Manager</Label>
               <Select
-                value={formData.company_manager_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, company_manager_id: value }))}
+                value={formData.organization_manager_id}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, organization_manager_id: value }))}
               >
                 <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Select company manager" />
+                  <SelectValue placeholder="Select organization manager" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="none">No company manager</SelectItem>
+                  <SelectItem value="none">No organization manager</SelectItem>
                   {availableUsers.map((user) => (
                     <SelectItem key={user.user_id} value={user.user_id}>
                       {user.full_name} ({user.email})
@@ -301,8 +220,8 @@ export default function CreateCompanyModal({ open, onOpenChange, organizationId,
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !formData.name || !formData.type}>
-              {loading ? "Creating..." : "Create Company"}
+            <Button type="submit" disabled={loading || !formData.name}>
+              {loading ? "Creating..." : "Create Organization"}
             </Button>
           </div>
         </form>
