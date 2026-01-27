@@ -20,9 +20,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCompanies, useDepartments, useEmployees } from "@/hooks/useSchedulerDatabase";
+import { useCompanies, useDepartments, useEmployees, Employee } from "@/hooks/useSchedulerDatabase";
 import CreateCompanyModal from "@/components/scheduler/CreateCompanyModal";
 import CreateEmployeeModal from "@/components/scheduler/CreateEmployeeModal";
+import EditEmployeeModal from "@/components/scheduler/EditEmployeeModal";
 
 export default function SchedulerEmployees() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -30,6 +31,8 @@ export default function SchedulerEmployees() {
   const [selectedCompany, setSelectedCompany] = useState<string>("");
   const [showCreateCompany, setShowCreateCompany] = useState(false);
   const [showCreateEmployee, setShowCreateEmployee] = useState(false);
+  const [showEditEmployee, setShowEditEmployee] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
   // Database hooks
   const { companies, loading: companiesLoading } = useCompanies();
@@ -278,7 +281,10 @@ export default function SchedulerEmployees() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedEmployee(employee);
+                              setShowEditEmployee(true);
+                            }}>
                               <Edit className="h-4 w-4 mr-2" />
                               Edit Employee
                             </DropdownMenuItem>
@@ -310,6 +316,13 @@ export default function SchedulerEmployees() {
       <CreateEmployeeModal 
         open={showCreateEmployee} 
         onOpenChange={setShowCreateEmployee}
+        companyId={selectedCompany}
+      />
+
+      <EditEmployeeModal
+        open={showEditEmployee}
+        onOpenChange={setShowEditEmployee}
+        employee={selectedEmployee}
         companyId={selectedCompany}
       />
     </div>
