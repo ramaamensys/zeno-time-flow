@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useCompanies, useDepartments, useEmployees, useShifts, Shift } from "@/hooks/useSchedulerDatabase";
+import { useCompanies, useDepartments, useEmployees, useShifts, Shift, Employee } from "@/hooks/useSchedulerDatabase";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import CreateCompanyModal from "@/components/scheduler/CreateCompanyModal";
@@ -14,6 +14,7 @@ import CreateShiftModal from "@/components/scheduler/CreateShiftModal";
 import EditShiftModal from "@/components/scheduler/EditShiftModal";
 import CreateEmployeeModal from "@/components/scheduler/CreateEmployeeModal";
 import SlotEditModal from "@/components/scheduler/SlotEditModal";
+import EditEmployeeModal from "@/components/scheduler/EditEmployeeModal";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -33,6 +34,8 @@ export default function SchedulerSchedule() {
   const [showCreateCompany, setShowCreateCompany] = useState(false);
   const [showCreateShift, setShowCreateShift] = useState(false);
   const [showCreateEmployee, setShowCreateEmployee] = useState(false);
+  const [showEditEmployee, setShowEditEmployee] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showEditShift, setShowEditShift] = useState(false);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [preSelectedDate, setPreSelectedDate] = useState<Date | undefined>();
@@ -291,6 +294,16 @@ export default function SchedulerSchedule() {
   };
 
   const isLoading = companiesLoading || departmentsLoading || shiftsLoading;
+
+  const handleOpenEditEmployee = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setShowEditEmployee(true);
+  };
+
+  const handleEditEmployeeOpenChange = (open: boolean) => {
+    setShowEditEmployee(open);
+    if (!open) setSelectedEmployee(null);
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -741,7 +754,7 @@ export default function SchedulerSchedule() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleOpenEditEmployee(employee)}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Edit Employee
                                 </DropdownMenuItem>
@@ -856,6 +869,13 @@ export default function SchedulerSchedule() {
       <CreateEmployeeModal 
         open={showCreateEmployee} 
         onOpenChange={setShowCreateEmployee}
+        companyId={selectedCompany}
+      />
+
+      <EditEmployeeModal
+        open={showEditEmployee}
+        onOpenChange={handleEditEmployeeOpenChange}
+        employee={selectedEmployee}
         companyId={selectedCompany}
       />
       
