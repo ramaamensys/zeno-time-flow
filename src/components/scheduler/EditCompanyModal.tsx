@@ -28,7 +28,6 @@ export default function EditCompanyModal({
   const [formData, setFormData] = useState({
     name: "",
     type: "",
-    field_type: "IT" as "IT" | "Non-IT",
     color: "",
     address: "",
     phone: "",
@@ -37,10 +36,10 @@ export default function EditCompanyModal({
 
   const businessTypes = [
     "Corporation", "LLC", "Partnership", "Sole Proprietorship", 
-    "Non-Profit", "Startup", "Government", "Other"
+    "Non-Profit", "Startup", "Government", "Motel", "Gas Station", 
+    "Restaurant", "Retail Store", "Warehouse", "Other"
   ];
 
-  const fieldTypes = ["IT", "Non-IT"] as const;
   const colors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#f97316"];
 
   useEffect(() => {
@@ -48,7 +47,6 @@ export default function EditCompanyModal({
       setFormData({
         name: company.name || "",
         type: company.type || "",
-        field_type: company.field_type || "IT" as "IT" | "Non-IT",
         color: company.color || "#3b82f6",
         address: company.address || "",
         phone: company.phone || "",
@@ -61,7 +59,7 @@ export default function EditCompanyModal({
     e.preventDefault();
     if (!company) return;
 
-    if (!formData.name.trim() || !formData.type || !formData.field_type) {
+    if (!formData.name.trim() || !formData.type) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -69,13 +67,7 @@ export default function EditCompanyModal({
     setLoading(true);
 
     try {
-      // Filter out empty values and ensure field_type is valid
-      const updateData = {
-        ...formData,
-        field_type: formData.field_type as "IT" | "Non-IT"
-      };
-      
-      await updateCompany(company.id, updateData);
+      await updateCompany(company.id, formData);
       onSuccess();
       onOpenChange(false);
       toast.success("Company updated successfully!");
@@ -108,7 +100,6 @@ export default function EditCompanyModal({
     setFormData({
       name: "",
       type: "",
-      field_type: "IT" as "IT" | "Non-IT",
       color: "#3b82f6",
       address: "",
       phone: "",
@@ -144,26 +135,7 @@ export default function EditCompanyModal({
               />
             </div>
 
-            <div>
-              <Label htmlFor="field_type">Field Type *</Label>
-              <Select
-                value={formData.field_type}
-                onValueChange={(value: "IT" | "Non-IT") => setFormData({ ...formData, field_type: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select field" />
-                </SelectTrigger>
-                <SelectContent>
-                  {fieldTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
+            <div className="col-span-2">
               <Label htmlFor="type">Business Type *</Label>
               <Select
                 value={formData.type}

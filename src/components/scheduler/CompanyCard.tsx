@@ -8,12 +8,10 @@ interface Company {
   id: string;
   name: string;
   type: string;
-  field_type?: string | null;
   color?: string | null;
   address?: string | null;
   phone?: string | null;
   email?: string | null;
-  operations_manager_id?: string | null;
   company_manager_id?: string | null;
 }
 
@@ -80,20 +78,12 @@ export default function CompanyCard({ company, canEdit, onEdit, onView, onAssign
       
       <CardContent className="pt-0">
         <div className="flex flex-wrap gap-1.5">
-          <Badge 
-            variant={company.field_type === 'IT' ? 'default' : 'secondary'}
-            className="text-xs"
-          >
-            {company.field_type || 'Non-IT'}
+          <Badge variant="secondary" className="text-xs">
+            {company.type}
           </Badge>
-          {company.operations_manager_id && (
-            <Badge variant="outline" className="text-xs bg-green-50 border-green-200 text-green-700">
-              Ops
-            </Badge>
-          )}
           {company.company_manager_id && (
             <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200 text-blue-700">
-              Mgr
+              Manager Assigned
             </Badge>
           )}
         </div>

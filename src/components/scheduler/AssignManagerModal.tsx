@@ -28,56 +28,26 @@ export default function AssignManagerModal({
 }: AssignManagerModalProps) {
   const [loading, setLoading] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<Profile[]>([]);
-  const [availableOpsManagers, setAvailableOpsManagers] = useState<Profile[]>([]);
-  const [operationsManager, setOperationsManager] = useState("");
   const [companyManager, setCompanyManager] = useState("");
 
   useEffect(() => {
     if (open && company) {
       fetchAvailableUsers();
-      setOperationsManager(company.operations_manager_id || "");
       setCompanyManager(company.company_manager_id || "");
     }
   }, [open, company]);
 
   const fetchAvailableUsers = async () => {
     try {
-      // Fetch all active users
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, full_name, email')
         .neq('user_id', company?.created_by || '')
-        .neq('status', 'deleted') // Exclude deleted users
-        .eq('status', 'active') // Only show active users
+        .neq('status', 'deleted')
+        .eq('status', 'active')
         .order('full_name');
 
-      if (!profiles) {
-        setAvailableUsers([]);
-        setAvailableOpsManagers([]);
-        return;
-      }
-
-      // Set all users for company manager dropdown
-      setAvailableUsers(profiles);
-
-      // For operations manager dropdown, filter by company field_type
-      const expectedAppType = company?.field_type === 'IT' ? 'calendar' : 'scheduler';
-      
-      // Get operations managers with matching app_type
-      const { data: operationsManagers } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'operations_manager')
-        .eq('app_type', expectedAppType);
-
-      const operationsManagerIds = new Set(operationsManagers?.map(om => om.user_id) || []);
-
-      // Filter profiles to only show matching operations managers
-      const filteredOpsManagers = profiles.filter(profile => 
-        operationsManagerIds.has(profile.user_id)
-      );
-
-      setAvailableOpsManagers(filteredOpsManagers);
+      setAvailableUsers(profiles || []);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error('Failed to load available users');
@@ -93,34 +63,17 @@ export default function AssignManagerModal({
     try {
       const updates: any = {};
       
-      if (operationsManager !== company.operations_manager_id) {
-        updates.operations_manager_id = (operationsManager && operationsManager !== "none") ? operationsManager : null;
-        
-        // Assign operations_manager role with proper app_type based on company field_type
-        if (operationsManager && operationsManager !== "none") {
-          const appType = company.field_type === 'IT' ? 'calendar' : 'scheduler';
-          await supabase
-            .from('user_roles')
-            .upsert({ 
-              user_id: operationsManager, 
-              role: 'operations_manager',
-              app_type: appType
-            });
-        }
-      }
-      
       if (companyManager !== company.company_manager_id) {
         updates.company_manager_id = (companyManager && companyManager !== "none") ? companyManager : null;
         
-        // Assign admin role for company manager with proper app_type
+        // Assign manager role for company manager
         if (companyManager && companyManager !== "none") {
-          const appType = company.field_type === 'IT' ? 'calendar' : 'scheduler';
           await supabase
             .from('user_roles')
             .upsert({ 
               user_id: companyManager, 
-              role: 'admin',
-              app_type: appType
+              role: 'manager',
+              app_type: 'scheduler'
             });
         }
       }
@@ -136,17 +89,16 @@ export default function AssignManagerModal({
 
       onSuccess();
       onOpenChange(false);
-      toast.success('Managers assigned successfully!');
+      toast.success('Manager assigned successfully!');
     } catch (error) {
-      console.error('Error assigning managers:', error);
-      toast.error('Failed to assign managers');
+      console.error('Error assigning manager:', error);
+      toast.error('Failed to assign manager');
     } finally {
       setLoading(false);
     }
   };
 
   const resetForm = () => {
-    setOperationsManager("");
     setCompanyManager("");
   };
 
@@ -161,40 +113,12 @@ export default function AssignManagerModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserCheck className="w-5 h-5" />
-            Assign Managers - {company.name}
+            Assign Manager - {company.name}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="operations-manager" className="flex items-center gap-2">
-                <User className="w-4 h-4" />
-                Operations Manager ({company.field_type} only)
-              </Label>
-              <Select
-                value={operationsManager}
-                onValueChange={setOperationsManager}
-              >
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Select operations manager" />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="none">No operations manager</SelectItem>
-                  {availableOpsManagers.map((user) => (
-                    <SelectItem key={user.user_id} value={user.user_id}>
-                      {user.full_name} ({user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {availableOpsManagers.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No {company.field_type} operations managers found. Create one in User Management first.
-                </p>
-              )}
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="company-manager" className="flex items-center gap-2">
                 <User className="w-4 h-4" />
@@ -216,6 +140,9 @@ export default function AssignManagerModal({
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-sm text-muted-foreground">
+                The company manager will have full admin access to all operations within this company.
+              </p>
             </div>
           </div>
 
@@ -229,7 +156,7 @@ export default function AssignManagerModal({
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Assigning..." : "Assign Managers"}
+              {loading ? "Assigning..." : "Assign Manager"}
             </Button>
           </div>
         </form>
