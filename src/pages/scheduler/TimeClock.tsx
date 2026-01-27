@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { Clock, Play, Square, Calendar, Download, Filter, Users } from "lucide-react";
+import { Clock, Play, Square, Calendar, Download, Filter, Users, MapPin, Coffee, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -15,6 +16,9 @@ import {
 } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import AdminHoursReport from "@/components/scheduler/AdminHoursReport";
+import AdminTasksOverview from "@/components/scheduler/AdminTasksOverview";
 
 export default function SchedulerTimeClock() {
   const [selectedPeriod, setSelectedPeriod] = useState<string>("today");
@@ -25,6 +29,7 @@ export default function SchedulerTimeClock() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
+  const [clockingIn, setClockingIn] = useState<string | null>(null);
 
   useEffect(() => {
     loadCompanies();
@@ -46,7 +51,6 @@ export default function SchedulerTimeClock() {
       
       setCompanies(data || []);
       
-      // Auto-select first company if available
       if (data && data.length > 0 && !selectedCompany) {
         setSelectedCompany(data[0].id);
       }
@@ -66,8 +70,6 @@ export default function SchedulerTimeClock() {
         .order('name');
       
       setLocations(data || []);
-      
-      // Reset location selection when company changes
       setSelectedLocation("all");
     } catch (error) {
       console.error('Error loading locations:', error);
@@ -93,7 +95,6 @@ export default function SchedulerTimeClock() {
         .eq('employees.company_id', selectedCompany)
         .order('created_at', { ascending: false });
 
-      // Filter by location if selected
       if (selectedLocation && selectedLocation !== "all") {
         timeQuery = timeQuery.eq('employees.department_id', selectedLocation);
       }
@@ -104,10 +105,8 @@ export default function SchedulerTimeClock() {
         .from('employees')
         .select('id, first_name, last_name, status, company_id, department_id')
         .eq('status', 'active')
-        .eq('company_id', selectedCompany)
-        .limit(5);
+        .eq('company_id', selectedCompany);
 
-      // Filter employees by location if selected
       if (selectedLocation && selectedLocation !== "all") {
         employeesQuery = employeesQuery.eq('department_id', selectedLocation);
       }
@@ -123,23 +122,118 @@ export default function SchedulerTimeClock() {
     }
   };
 
+  // Get current location
+  const getCurrentLocation = (): Promise<{ lat: number; lng: number }> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation not supported'));
+        return;
+      }
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        (error) => reject(error),
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    });
+  };
+
+  // Clock in employee
+  const handleClockIn = async (employeeId: string) => {
+    setClockingIn(employeeId);
+    
+    try {
+      let location = null;
+      try {
+        location = await getCurrentLocation();
+        toast.success('Location captured');
+      } catch (locError) {
+        console.warn('Could not get location:', locError);
+        toast.warning('Clocking in without location');
+      }
+      
+      const { data, error } = await supabase
+        .from('time_clock')
+        .insert([{
+          employee_id: employeeId,
+          clock_in: new Date().toISOString(),
+        }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      toast.success('Clocked in successfully');
+      loadTimeClockData();
+    } catch (error) {
+      console.error('Error clocking in:', error);
+      toast.error('Failed to clock in');
+    } finally {
+      setClockingIn(null);
+    }
+  };
+
+  // Clock out employee
+  const handleClockOut = async (entryId: string, clockInTime: string) => {
+    try {
+      let location = null;
+      try {
+        location = await getCurrentLocation();
+        toast.success('Location captured');
+      } catch (locError) {
+        console.warn('Could not get location:', locError);
+      }
+      
+      const clockOutTime = new Date();
+      const clockIn = new Date(clockInTime);
+      
+      // Calculate total hours
+      const totalMinutes = (clockOutTime.getTime() - clockIn.getTime()) / (1000 * 60);
+      const totalHours = Math.round((totalMinutes / 60) * 100) / 100;
+      const overtimeHours = totalHours > 8 ? Math.round((totalHours - 8) * 100) / 100 : 0;
+      
+      const { error } = await supabase
+        .from('time_clock')
+        .update({
+          clock_out: clockOutTime.toISOString(),
+          total_hours: totalHours,
+          overtime_hours: overtimeHours,
+        })
+        .eq('id', entryId);
+      
+      if (error) throw error;
+      
+      toast.success(`Clocked out. Total: ${totalHours.toFixed(2)} hours`);
+      loadTimeClockData();
+    } catch (error) {
+      console.error('Error clocking out:', error);
+      toast.error('Failed to clock out');
+    }
+  };
+
   const activeEmployees = timeEntries.filter(entry => entry.clock_out === null);
   const totalHours = timeEntries.reduce((sum, entry) => sum + (entry.total_hours || 0), 0);
   const avgHours = timeEntries.length > 0 ? totalHours / timeEntries.length : 0;
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'default';
-      case 'completed': return 'secondary';
-      case 'break': return 'outline';
-      default: return 'secondary';
-    }
-  };
+  const overtimeHours = timeEntries.reduce((sum, entry) => sum + (entry.overtime_hours || 0), 0);
 
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return `${hours}h ${mins}m`;
+  };
+
+  // Check if employee is already clocked in
+  const isEmployeeClockedIn = (employeeId: string) => {
+    return activeEmployees.some(e => e.employee_id === employeeId);
+  };
+
+  const getActiveEntry = (employeeId: string) => {
+    return activeEmployees.find(e => e.employee_id === employeeId);
   };
 
   return (
@@ -150,16 +244,6 @@ export default function SchedulerTimeClock() {
           <p className="text-muted-foreground">
             Track employee time and manage attendance
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
-          </Button>
-          <Button variant="outline">
-            <Calendar className="h-4 w-4 mr-2" />
-            Payroll Export
-          </Button>
         </div>
       </div>
 
@@ -226,268 +310,311 @@ export default function SchedulerTimeClock() {
           </p>
         </div>
       ) : (
-        <>
-          <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Currently Clocked In</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {loading ? <Skeleton className="h-8 w-12" /> : activeEmployees.length}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Hours Today</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-16" /> : totalHours.toFixed(1)}
-            </div>
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="clock" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="clock" className="gap-2">
+              <Clock className="h-4 w-4" />
+              Time Clock
+            </TabsTrigger>
+            <TabsTrigger value="hours" className="gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              Hours Report
+            </TabsTrigger>
+            <TabsTrigger value="tasks" className="gap-2">
+              <Calendar className="h-4 w-4" />
+              Tasks Overview
+            </TabsTrigger>
+          </TabsList>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Average Hours</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loading ? <Skeleton className="h-8 w-16" /> : avgHours.toFixed(1)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Overtime Hours</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600">
-              {loading ? <Skeleton className="h-8 w-12" /> : "0"}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Currently Active
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-3">
-                {Array(2).fill(0).map((_, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-10 w-10 rounded-full" />
-                      <div>
-                        <Skeleton className="h-4 w-24 mb-1" />
-                        <Skeleton className="h-3 w-20" />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Skeleton className="h-6 w-16" />
-                      <Skeleton className="h-8 w-20" />
-                    </div>
+          <TabsContent value="clock" className="space-y-6">
+            {/* Stats Cards */}
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Currently Clocked In</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">
+                    {loading ? <Skeleton className="h-8 w-12" /> : activeEmployees.length}
                   </div>
-                ))}
-              </div>
-            ) : activeEmployees.length > 0 ? (
-              <div className="space-y-3">
-                {activeEmployees.map((entry) => (
-                  <div key={entry.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback>
-                          {`${entry.employees?.first_name?.[0] || ''}${entry.employees?.last_name?.[0] || ''}`}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">
-                          {`${entry.employees?.first_name || ''} ${entry.employees?.last_name || ''}`}
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Hours Today</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {loading ? <Skeleton className="h-8 w-16" /> : totalHours.toFixed(1)}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Average Hours</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {loading ? <Skeleton className="h-8 w-16" /> : avgHours.toFixed(1)}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Overtime Hours</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-amber-600">
+                    {loading ? <Skeleton className="h-8 w-12" /> : overtimeHours.toFixed(1)}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Currently Active */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Currently Active
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="space-y-3">
+                      {Array(2).fill(0).map((_, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <Skeleton className="h-10 w-10 rounded-full" />
+                            <div>
+                              <Skeleton className="h-4 w-24 mb-1" />
+                              <Skeleton className="h-3 w-20" />
+                            </div>
+                          </div>
+                          <Skeleton className="h-8 w-20" />
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          Clocked in at {entry.clock_in ? new Date(entry.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                      ))}
+                    </div>
+                  ) : activeEmployees.length > 0 ? (
+                    <div className="space-y-3">
+                      {activeEmployees.map((entry) => (
+                        <div key={entry.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarFallback>
+                                {`${entry.employees?.first_name?.[0] || ''}${entry.employees?.last_name?.[0] || ''}`}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium">
+                                {`${entry.employees?.first_name || ''} ${entry.employees?.last_name || ''}`}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                Clocked in at {entry.clock_in ? new Date(entry.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="default">
+                              <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                              Active
+                            </Badge>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleClockOut(entry.id, entry.clock_in)}
+                              className="gap-1"
+                            >
+                              <Square className="h-4 w-4" />
+                              Clock Out
+                              <MapPin className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
-                      </div>
+                      ))}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="default">
-                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                        Active
-                      </Badge>
-                      <Button size="sm" variant="outline">
-                        <Square className="h-4 w-4 mr-1" />
-                        Clock Out
-                      </Button>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No employees currently clocked in</p>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No employees currently clocked in</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  )}
+                </CardContent>
+              </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Clock In</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-3">
-                {Array(3).fill(0).map((_, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-10 w-10 rounded-full" />
-                      <Skeleton className="h-4 w-24" />
+              {/* Quick Clock In */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Play className="h-5 w-5" />
+                    Quick Clock In
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="space-y-3">
+                      {Array(3).fill(0).map((_, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <Skeleton className="h-10 w-10 rounded-full" />
+                            <Skeleton className="h-4 w-24" />
+                          </div>
+                          <Skeleton className="h-8 w-20" />
+                        </div>
+                      ))}
                     </div>
-                    <Skeleton className="h-8 w-20" />
-                  </div>
-                ))}
-              </div>
-            ) : employees.length > 0 ? (
-              <div className="space-y-3">
-                {employees.map((employee) => (
-                  <div key={employee.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback>
-                          {`${employee.first_name?.[0] || ''}${employee.last_name?.[0] || ''}`}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="font-medium">
-                        {`${employee.first_name || ''} ${employee.last_name || ''}`}
-                      </div>
+                  ) : employees.length > 0 ? (
+                    <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                      {employees.map((employee) => {
+                        const isClockedIn = isEmployeeClockedIn(employee.id);
+                        const activeEntry = getActiveEntry(employee.id);
+                        
+                        return (
+                          <div key={employee.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <Avatar>
+                                <AvatarFallback>
+                                  {`${employee.first_name?.[0] || ''}${employee.last_name?.[0] || ''}`}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="font-medium">
+                                {`${employee.first_name || ''} ${employee.last_name || ''}`}
+                              </div>
+                            </div>
+                            {isClockedIn ? (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => activeEntry && handleClockOut(activeEntry.id, activeEntry.clock_in)}
+                                className="gap-1"
+                              >
+                                <Square className="h-4 w-4" />
+                                Clock Out
+                              </Button>
+                            ) : (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleClockIn(employee.id)}
+                                disabled={clockingIn === employee.id}
+                                className="gap-1"
+                              >
+                                <Play className="h-4 w-4" />
+                                {clockingIn === employee.id ? 'Clocking...' : 'Clock In'}
+                                <MapPin className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                    <Button size="sm" variant="outline">
-                      <Play className="h-4 w-4 mr-1" />
-                      Clock In
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No active employees available</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No active employees available</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>
-                Time Entries
-                {selectedLocation && selectedLocation !== "all" && (
-                  <span className="text-sm font-normal text-muted-foreground ml-2">
-                    - {locations.find(l => l.id === selectedLocation)?.name}
-                  </span>
+            {/* Time Entries Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Time Entries</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="space-y-2">
+                    {Array(3).fill(0).map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Employee</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Clock In</TableHead>
+                        <TableHead>Clock Out</TableHead>
+                        <TableHead>Break</TableHead>
+                        <TableHead>Total Hours</TableHead>
+                        <TableHead>Overtime</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {timeEntries.length > 0 ? timeEntries.map((entry) => {
+                        let breakMin = 0;
+                        if (entry.break_start && entry.break_end) {
+                          breakMin = Math.floor((new Date(entry.break_end).getTime() - new Date(entry.break_start).getTime()) / (1000 * 60));
+                        }
+                        
+                        return (
+                          <TableRow key={entry.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarFallback>
+                                    {`${entry.employees?.first_name?.[0] || ''}${entry.employees?.last_name?.[0] || ''}`}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="font-medium">
+                                  {`${entry.employees?.first_name || ''} ${entry.employees?.last_name || ''}`}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>{entry.clock_in ? new Date(entry.clock_in).toLocaleDateString() : '-'}</TableCell>
+                            <TableCell>
+                              {entry.clock_in ? new Date(entry.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {entry.clock_out ? new Date(entry.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            </TableCell>
+                            <TableCell>{breakMin > 0 ? `${breakMin}m` : '-'}</TableCell>
+                            <TableCell className="font-medium">
+                              {entry.total_hours ? `${entry.total_hours.toFixed(1)}h` : "-"}
+                            </TableCell>
+                            <TableCell>
+                              {entry.overtime_hours && entry.overtime_hours > 0 ? (
+                                <span className="text-amber-600 font-medium">{entry.overtime_hours.toFixed(1)}h</span>
+                              ) : '-'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={entry.clock_out ? 'secondary' : 'default'}>
+                                {entry.clock_out ? 'Completed' : 'Active'}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }) : (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8">
+                            <Clock className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                            <p className="text-muted-foreground">No time entries found</p>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 )}
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Filter
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-2">
-              {Array(3).fill(0).map((_, i) => (
-                <div key={i} className="flex items-center space-x-3">
-                  <Skeleton className="h-8 w-8 rounded-full" />
-                  <div className="flex-1">
-                    <Skeleton className="h-4 w-24 mb-1" />
-                  </div>
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-4 w-12" />
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-6 w-16" />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Clock In</TableHead>
-                  <TableHead>Clock Out</TableHead>
-                  <TableHead>Break Duration</TableHead>
-                  <TableHead>Total Hours</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {timeEntries.length > 0 ? timeEntries.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback>
-                            {`${entry.employees?.first_name?.[0] || ''}${entry.employees?.last_name?.[0] || ''}`}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="font-medium">
-                          {`${entry.employees?.first_name || ''} ${entry.employees?.last_name || ''}`}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{entry.created_at ? new Date(entry.created_at).toLocaleDateString() : '-'}</TableCell>
-                    <TableCell>
-                      {entry.clock_in ? new Date(entry.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {entry.clock_out ? new Date(entry.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
-                    </TableCell>
-                    <TableCell>{formatDuration(entry.break_end && entry.break_start ? 
-                      Math.floor((new Date(entry.break_end).getTime() - new Date(entry.break_start).getTime()) / (1000 * 60)) : 0)}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {entry.total_hours > 0 ? `${entry.total_hours.toFixed(1)}h` : "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={entry.clock_out ? 'secondary' : 'default'}>
-                        {entry.clock_out ? 'completed' : 'active'}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                )) : (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
-                      <div className="flex flex-col items-center gap-2">
-                        <Clock className="h-8 w-8 text-muted-foreground" />
-                        <p className="text-muted-foreground">No time entries found</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-        </>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="hours">
+            <AdminHoursReport companyId={selectedCompany} />
+          </TabsContent>
+
+          <TabsContent value="tasks">
+            <AdminTasksOverview companyId={selectedCompany} />
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );
