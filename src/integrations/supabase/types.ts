@@ -201,6 +201,7 @@ export type Database = {
           id: string
           name: string
           operations_manager_id: string | null
+          organization_id: string | null
           phone: string | null
           type: string
           updated_at: string
@@ -216,6 +217,7 @@ export type Database = {
           id?: string
           name: string
           operations_manager_id?: string | null
+          organization_id?: string | null
           phone?: string | null
           type: string
           updated_at?: string
@@ -231,11 +233,20 @@ export type Database = {
           id?: string
           name?: string
           operations_manager_id?: string | null
+          organization_id?: string | null
           phone?: string | null
           type?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "companies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       departments: {
         Row: {
@@ -577,6 +588,48 @@ export type Database = {
           id?: string
           location_address?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      organizations: {
+        Row: {
+          address: string | null
+          color: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          name: string
+          operations_manager_id: string | null
+          organization_manager_id: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          operations_manager_id?: string | null
+          organization_manager_id?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          operations_manager_id?: string | null
+          organization_manager_id?: string | null
+          phone?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
