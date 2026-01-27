@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEmployees, useDepartments, Employee } from "@/hooks/useSchedulerDatabase";
+import { Trash2 } from "lucide-react";
 
 interface EditEmployeeModalProps {
   open: boolean;
@@ -15,9 +16,10 @@ interface EditEmployeeModalProps {
 }
 
 export default function EditEmployeeModal({ open, onOpenChange, employee, companyId }: EditEmployeeModalProps) {
-  const { updateEmployee } = useEmployees(companyId);
+  const { updateEmployee, deleteEmployee } = useEmployees(companyId);
   const { departments } = useDepartments(companyId);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   
   const [formData, setFormData] = useState({
     first_name: "",
@@ -83,6 +85,25 @@ export default function EditEmployeeModal({ open, onOpenChange, employee, compan
       console.error('Failed to update employee:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!employee) return;
+    
+    const fullName = `${employee.first_name} ${employee.last_name}`;
+    if (!confirm(`Are you sure you want to delete ${fullName}? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await deleteEmployee(employee.id);
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Failed to delete employee:', error);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -251,21 +272,32 @@ export default function EditEmployeeModal({ open, onOpenChange, employee, compan
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-between pt-4">
             <Button
               type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={loading || deleting}
             >
-              Cancel
+              <Trash2 className="h-4 w-4 mr-2" />
+              {deleting ? "Deleting..." : "Delete"}
             </Button>
-            <Button 
-              type="submit" 
-              disabled={loading || !formData.first_name || !formData.last_name || !formData.email}
-            >
-              {loading ? "Saving..." : "Save Changes"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={loading || deleting}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={loading || deleting || !formData.first_name || !formData.last_name || !formData.email}
+              >
+                {loading ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>
