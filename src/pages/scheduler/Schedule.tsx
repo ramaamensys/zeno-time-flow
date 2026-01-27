@@ -53,6 +53,8 @@ export default function SchedulerSchedule() {
   const { employees, loading: employeesLoading } = useEmployees(selectedCompany);
   const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift } = useShifts(selectedCompany, getWeekStart(selectedWeek));
 
+  const [employeeRecord, setEmployeeRecord] = useState<{ id: string; company_id: string } | null>(null);
+  
   // Fetch user role for access control
   useEffect(() => {
     const fetchUserRole = async () => {
@@ -71,8 +73,25 @@ export default function SchedulerSchedule() {
           setUserRole('operations_manager');
         } else if (roles.includes('manager')) {
           setUserRole('manager');
+        } else if (roles.includes('employee')) {
+          setUserRole('employee');
         } else {
           setUserRole('user');
+        }
+      }
+      
+      // Also check if user is an employee
+      const { data: empData } = await supabase
+        .from('employees')
+        .select('id, company_id')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (empData) {
+        setEmployeeRecord(empData);
+        // Auto-select employee's company
+        if (!selectedCompany) {
+          setSelectedCompany(empData.company_id);
         }
       }
     };
@@ -95,12 +114,23 @@ export default function SchedulerSchedule() {
       return company.company_manager_id === user?.id;
     }
     
+    // Employees can see their company's schedule
+    if (userRole === 'employee' && employeeRecord) {
+      return company.id === employeeRecord.company_id;
+    }
+    
     // Regular users can't access scheduling
     return false;
   });
 
-  // Further filter to only show Non-IT companies for scheduling
-  const nonITCompanies = availableCompanies.filter(company => company.field_type === "Non-IT");
+  // Check if user can manage shifts (admins only)
+  const canManageShifts = userRole === 'super_admin' || userRole === 'operations_manager' || userRole === 'manager';
+  const isEmployeeView = userRole === 'employee';
+
+  // Further filter to only show Non-IT companies for scheduling (admins) or employee's company (employees)
+  const nonITCompanies = isEmployeeView 
+    ? availableCompanies 
+    : availableCompanies.filter(company => company.field_type === "Non-IT");
 
   // Don't auto-select company - let user choose
   // useEffect(() => {
@@ -330,17 +360,23 @@ export default function SchedulerSchedule() {
       }} />
       <div className="flex items-center justify-between no-print">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Schedule Management</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {isEmployeeView ? 'Team Schedule' : 'Schedule Management'}
+          </h1>
           <p className="text-muted-foreground">
-            Manage employee schedules and shift assignments
+            {isEmployeeView 
+              ? 'View your team\'s schedule and shifts'
+              : 'Manage employee schedules and shift assignments'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={() => setShowCreateShift(true)} disabled={!selectedCompany}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Shift
-          </Button>
-        </div>
+        {canManageShifts && (
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setShowCreateShift(true)} disabled={!selectedCompany}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Shift
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between no-print">
@@ -432,23 +468,25 @@ export default function SchedulerSchedule() {
       </div>
 
       {/* Main Layout: Schedule Grid + Employee Sidebar */}
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-        {/* Schedule Grid - Takes 3/4 of the space */}
-        <div className="xl:col-span-3 print-schedule">
+      <div className={`grid grid-cols-1 ${canManageShifts ? 'xl:grid-cols-4' : ''} gap-6`}>
+        {/* Schedule Grid - Takes 3/4 of the space for admins, full width for employees */}
+        <div className={`${canManageShifts ? 'xl:col-span-3' : ''} print-schedule`}>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>Weekly Schedule</span>
                 <div className="flex gap-2">
-                  <Button 
-                    variant={isEditMode ? "default" : "outline"} 
-                    size="sm"
-                    onClick={() => setIsEditMode(!isEditMode)}
-                    disabled={!selectedCompany}
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    {isEditMode ? "Exit Edit" : "Edit Schedule"}
-                  </Button>
+                  {canManageShifts && (
+                    <Button 
+                      variant={isEditMode ? "default" : "outline"} 
+                      size="sm"
+                      onClick={() => setIsEditMode(!isEditMode)}
+                      disabled={!selectedCompany}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      {isEditMode ? "Exit Edit" : "Edit Schedule"}
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" onClick={printSchedule} disabled={!selectedCompany}>
                     <Printer className="h-4 w-4 mr-1" />
                     Print
@@ -528,7 +566,8 @@ export default function SchedulerSchedule() {
                     <div className="font-medium text-sm p-3 border rounded bg-muted/50 relative group">
                       <div>{slot.name}</div>
                       <div className="text-xs text-muted-foreground">{slot.time}</div>
-                      {/* Slot edit button */}
+                      {/* Slot edit button - only for admins */}
+                      {canManageShifts && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button 
@@ -556,6 +595,7 @@ export default function SchedulerSchedule() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      )}
                     </div>
                     
                     {days.map((_, dayIndex) => {
@@ -566,24 +606,29 @@ export default function SchedulerSchedule() {
                         <div 
                           key={dayIndex} 
                           className={`min-h-[100px] border rounded p-2 space-y-1 transition-colors ${
-                            isDropTarget ? 'border-primary/50 bg-primary/5' : ''
+                            isDropTarget && canManageShifts ? 'border-primary/50 bg-primary/5' : ''
                           }`}
-                          onDragOver={handleDragOver}
-                          onDrop={(e) => handleDrop(e, dayIndex, slot.id)}
+                          onDragOver={canManageShifts ? handleDragOver : undefined}
+                          onDrop={canManageShifts ? (e) => handleDrop(e, dayIndex, slot.id) : undefined}
                         >
                           {dayShifts.map((shift) => {
                             const employeeName = getEmployeeName(shift.employee_id);
                             const startTime = new Date(shift.start_time);
                             const endTime = new Date(shift.end_time);
+                            const isMyShift = employeeRecord && shift.employee_id === employeeRecord.id;
                             
                             return (
                                 <div
                                   key={shift.id}
-                                  className="group relative flex items-center gap-2 p-2 rounded bg-primary/10 border border-primary/20 cursor-move hover:bg-primary/20"
-                                  onClick={() => handleEditShift(shift)}
-                                  draggable={true}
-                                  onDragStart={(e) => handleDragStart(e, shift.employee_id, shift)}
-                                  onDragEnd={handleDragEnd}
+                                  className={`group relative flex items-center gap-2 p-2 rounded border ${
+                                    isMyShift 
+                                      ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700' 
+                                      : 'bg-primary/10 border-primary/20'
+                                  } ${canManageShifts ? 'cursor-move hover:bg-primary/20' : 'cursor-default'}`}
+                                  onClick={canManageShifts ? () => handleEditShift(shift) : undefined}
+                                  draggable={canManageShifts}
+                                  onDragStart={canManageShifts ? (e) => handleDragStart(e, shift.employee_id, shift) : undefined}
+                                  onDragEnd={canManageShifts ? handleDragEnd : undefined}
                                 >
                                   <Avatar className="h-6 w-6">
                                     <AvatarFallback className="text-xs">
@@ -631,7 +676,7 @@ export default function SchedulerSchedule() {
                                 </div>
                             );
                           })}
-                          {dayShifts.length === 0 && (
+                          {dayShifts.length === 0 && canManageShifts && (
                             <div
                               className={`w-full h-full min-h-[60px] border-2 border-dashed rounded flex items-center justify-center transition-colors ${
                                 isDropTarget 
@@ -657,6 +702,11 @@ export default function SchedulerSchedule() {
                               )}
                             </div>
                           )}
+                          {dayShifts.length === 0 && !canManageShifts && (
+                            <div className="w-full h-full min-h-[60px] border-2 border-dashed rounded flex items-center justify-center text-muted-foreground/50">
+                              <span className="text-xs">No shifts</span>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -667,7 +717,8 @@ export default function SchedulerSchedule() {
           </Card>
         </div>
 
-        {/* Right Sidebar - Available Employees */}
+        {/* Right Sidebar - Available Employees (only for admins) */}
+        {canManageShifts && (
         <div className="xl:col-span-1 no-print">
           <Card className="sticky top-6">
             <CardHeader>
@@ -794,8 +845,8 @@ export default function SchedulerSchedule() {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
-
       {/* Schedule Summary */}
       <div className="mt-6">
         <Card>

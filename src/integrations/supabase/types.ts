@@ -1086,6 +1086,8 @@ export type Database = {
         | "super_admin"
         | "operations_manager"
         | "manager"
+        | "candidate"
+        | "employee"
       app_type: "calendar" | "scheduler"
     }
     CompositeTypes: {
@@ -1220,6 +1222,8 @@ export const Constants = {
         "super_admin",
         "operations_manager",
         "manager",
+        "candidate",
+        "employee",
       ],
       app_type: ["calendar", "scheduler"],
     },
