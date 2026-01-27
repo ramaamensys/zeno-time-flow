@@ -57,8 +57,7 @@ export default function UserManagement() {
     email: "",
     full_name: "",
     password: "",
-    role: "user" as "user" | "admin" | "super_admin" | "operations_manager" | "manager",
-    field_type: "IT" as "IT" | "Non-IT",
+    role: "employee" as "employee" | "manager" | "operations_manager" | "super_admin",
     manager_id: "none"
   });
   const [managers, setManagers] = useState<UserProfile[]>([]);
@@ -325,7 +324,7 @@ export default function UserManagement() {
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: 'user' | 'admin' | 'super_admin' | 'operations_manager' | 'manager') => {
+  const updateUserRole = async (userId: string, newRole: 'employee' | 'manager' | 'operations_manager' | 'super_admin') => {
     try {
       const { error } = await supabase
         .from('user_roles')
@@ -393,7 +392,7 @@ export default function UserManagement() {
             .insert({
               user_id: existingProfile.user_id,
               role: newUser.role,
-              app_type: newUser.field_type === "IT" ? "calendar" : "scheduler"
+              app_type: 'scheduler'
             });
 
           if (roleError) throw roleError;
@@ -420,7 +419,7 @@ export default function UserManagement() {
             full_name: newUser.full_name,
             role: newUser.role,
             password: newUser.password,
-            app_type: newUser.field_type === "IT" ? "calendar" : "scheduler",
+            app_type: 'scheduler',
             manager_id: newUser.manager_id && newUser.manager_id !== "none" ? newUser.manager_id : null
           }
         });
@@ -439,7 +438,7 @@ export default function UserManagement() {
       }
 
       // Clear the form and close dialog
-      setNewUser({ email: "", full_name: "", role: "user", password: "", field_type: "IT", manager_id: "none" });
+      setNewUser({ email: "", full_name: "", role: "employee", password: "", manager_id: "none" });
       setIsDialogOpen(false);
       
       // Reload users to show the updated user list
@@ -966,57 +965,18 @@ export default function UserManagement() {
                     <Label htmlFor="role" className="text-right">
                       Role
                     </Label>
-                    <Select value={newUser.role} onValueChange={(value: "user" | "admin" | "super_admin" | "operations_manager" | "manager") => setNewUser({ ...newUser, role: value })}>
+                    <Select value={newUser.role} onValueChange={(value: "employee" | "manager" | "operations_manager" | "super_admin") => setNewUser({ ...newUser, role: value })}>
                       <SelectTrigger className="col-span-3">
                         <SelectValue />
                       </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="user">User</SelectItem>
-                          {currentUserRole === 'super_admin' && <SelectItem value="manager">Manager</SelectItem>}
-                          {currentUserRole === 'super_admin' && <SelectItem value="operations_manager">Operations Manager</SelectItem>}
+                          <SelectItem value="employee">Employee</SelectItem>
+                          <SelectItem value="manager">Company Manager</SelectItem>
+                          <SelectItem value="operations_manager">Organization Manager</SelectItem>
                           {currentUserRole === 'super_admin' && <SelectItem value="super_admin">Super Admin</SelectItem>}
                         </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="field_type" className="text-right">
-                      Field
-                    </Label>
-                    <Select value={newUser.field_type} onValueChange={(value: "IT" | "Non-IT") => setNewUser({ ...newUser, field_type: value })}>
-                      <SelectTrigger className="col-span-3">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="IT">IT</SelectItem>
-                        <SelectItem value="Non-IT">Non-IT</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {newUser.role === "manager" && (
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="operations_manager" className="text-right">
-                        Operations Manager
-                      </Label>
-                      <Select 
-                        value={newUser.manager_id} 
-                        onValueChange={(value) => setNewUser({ ...newUser, manager_id: value })}
-                      >
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Select operations manager" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No Manager</SelectItem>
-                          {operationsManagers
-                            .filter(manager => manager.field_type === newUser.field_type)
-                            .map((manager) => (
-                            <SelectItem key={manager.user_id} value={manager.user_id}>
-                              {manager.full_name} ({manager.field_type})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
                 </div>
                 <DialogFooter>
                   <Button
