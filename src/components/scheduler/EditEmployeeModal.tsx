@@ -16,8 +16,10 @@ interface EditEmployeeModalProps {
 }
 
 export default function EditEmployeeModal({ open, onOpenChange, employee, companyId }: EditEmployeeModalProps) {
-  const { updateEmployee, deleteEmployee } = useEmployees(companyId);
-  const { departments } = useDepartments(companyId);
+  // Use employee's company_id if available, fallback to passed companyId
+  const effectiveCompanyId = employee?.company_id || companyId;
+  const { updateEmployee, deleteEmployee } = useEmployees(effectiveCompanyId);
+  const { departments } = useDepartments(effectiveCompanyId);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   
