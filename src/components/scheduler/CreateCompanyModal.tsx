@@ -38,12 +38,10 @@ export default function CreateCompanyModal({ open, onOpenChange, organizationId,
   const [formData, setFormData] = useState({
     name: "",
     type: "motel",
-    field_type: "IT" as "IT" | "Non-IT",
     color: "#3b82f6",
     address: "",
     phone: "",
     email: "",
-    operations_manager_id: "",
     company_manager_id: "",
     organization_id: organizationId || ""
   });
@@ -86,38 +84,24 @@ export default function CreateCompanyModal({ open, onOpenChange, organizationId,
       const companyData = {
         name: formData.name,
         type: formData.type,
-        field_type: formData.field_type,
         color: formData.color,
         address: formData.address,
         phone: formData.phone,
         email: formData.email,
-        operations_manager_id: (formData.operations_manager_id && formData.operations_manager_id !== "none") ? formData.operations_manager_id : null,
         company_manager_id: (formData.company_manager_id && formData.company_manager_id !== "none") ? formData.company_manager_id : null,
         organization_id: formData.organization_id || null
       };
 
       await createCompany(companyData);
 
-      // Assign roles to the selected managers
-      if (formData.operations_manager_id && formData.operations_manager_id !== "none") {
-        const appType = formData.field_type === 'IT' ? 'calendar' : 'scheduler';
-        await supabase
-          .from('user_roles')
-          .upsert({ 
-            user_id: formData.operations_manager_id, 
-            role: 'operations_manager',
-            app_type: appType
-          });
-      }
-
+      // Assign manager role to the selected company manager
       if (formData.company_manager_id && formData.company_manager_id !== "none") {
-        const appType = formData.field_type === 'IT' ? 'calendar' : 'scheduler';
         await supabase
           .from('user_roles')
           .upsert({ 
             user_id: formData.company_manager_id, 
-            role: 'admin',
-            app_type: appType
+            role: 'manager',
+            app_type: 'scheduler'
           });
       }
 
@@ -126,12 +110,10 @@ export default function CreateCompanyModal({ open, onOpenChange, organizationId,
       setFormData({
         name: "",
         type: "motel",
-        field_type: "IT" as "IT" | "Non-IT",
         color: "#3b82f6",
         address: "",
         phone: "",
         email: "",
-        operations_manager_id: "",
         company_manager_id: "",
         organization_id: organizationId || ""
       });
@@ -163,21 +145,6 @@ export default function CreateCompanyModal({ open, onOpenChange, organizationId,
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="field-type">Field Type *</Label>
-            <Select
-              value={formData.field_type}
-              onValueChange={(value: "IT" | "Non-IT") => setFormData(prev => ({ ...prev, field_type: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select field type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="IT">IT</SelectItem>
-                <SelectItem value="Non-IT">Non-IT</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="type">Business Type *</Label>
@@ -250,46 +217,24 @@ export default function CreateCompanyModal({ open, onOpenChange, organizationId,
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="operations-manager">Operations Manager</Label>
-              <Select
-                value={formData.operations_manager_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, operations_manager_id: value }))}
-              >
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Select operations manager" />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="none">No operations manager</SelectItem>
-                  {availableUsers.map((user) => (
-                    <SelectItem key={user.user_id} value={user.user_id}>
-                      {user.full_name} ({user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="company-manager">Company Manager</Label>
-              <Select
-                value={formData.company_manager_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, company_manager_id: value }))}
-              >
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Select company manager" />
-                </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
-                  <SelectItem value="none">No company manager</SelectItem>
-                  {availableUsers.map((user) => (
-                    <SelectItem key={user.user_id} value={user.user_id}>
-                      {user.full_name} ({user.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="company-manager">Company Manager</Label>
+            <Select
+              value={formData.company_manager_id}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, company_manager_id: value }))}
+            >
+              <SelectTrigger className="bg-background">
+                <SelectValue placeholder="Select company manager" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border shadow-lg z-50">
+                <SelectItem value="none">No company manager</SelectItem>
+                {availableUsers.map((user) => (
+                  <SelectItem key={user.user_id} value={user.user_id}>
+                    {user.full_name} ({user.email})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
