@@ -301,16 +301,26 @@ export function useEmployees(companyId?: string) {
   useEffect(() => {
     fetchEmployees();
     
-    // Set up real-time subscription for employees
+    // Set up real-time subscription for employees with unique channel name
+    const channelName = companyId ? `employees_changes_${companyId}` : 'employees_changes_all';
     const subscription = supabase
-      .channel('employees_changes')
+      .channel(channelName)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'employees',
-        filter: companyId ? `company_id=eq.${companyId}` : undefined
-      }, () => {
-        fetchEmployees();
+        // Note: Don't filter deletes - the row no longer exists so filter won't match
+        ...(companyId ? { filter: `company_id=eq.${companyId}` } : {})
+      }, (payload) => {
+        // For deletes, we need to handle them specially since the filter won't match
+        if (payload.eventType === 'DELETE') {
+          const deletedId = (payload.old as { id?: string })?.id;
+          if (deletedId) {
+            setEmployees(prev => prev.filter(e => e.id !== deletedId));
+          }
+        } else {
+          fetchEmployees();
+        }
       })
       .subscribe();
 

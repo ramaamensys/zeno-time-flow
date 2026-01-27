@@ -13,15 +13,28 @@ interface EditEmployeeModalProps {
   onOpenChange: (open: boolean) => void;
   employee: Employee | null;
   companyId: string;
+  onUpdate?: (id: string, updates: Partial<Employee>) => Promise<Employee>;
+  onDelete?: (id: string) => Promise<void>;
 }
 
-export default function EditEmployeeModal({ open, onOpenChange, employee, companyId }: EditEmployeeModalProps) {
+export default function EditEmployeeModal({ 
+  open, 
+  onOpenChange, 
+  employee, 
+  companyId,
+  onUpdate,
+  onDelete 
+}: EditEmployeeModalProps) {
   // Use employee's company_id if available, fallback to passed companyId
   const effectiveCompanyId = employee?.company_id || companyId;
-  const { updateEmployee, deleteEmployee } = useEmployees(effectiveCompanyId);
+  const { updateEmployee: hookUpdateEmployee, deleteEmployee: hookDeleteEmployee } = useEmployees(effectiveCompanyId);
   const { departments } = useDepartments(effectiveCompanyId);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  
+  // Use provided callbacks or fallback to hook functions
+  const updateEmployee = onUpdate || hookUpdateEmployee;
+  const deleteEmployee = onDelete || hookDeleteEmployee;
   
   const [formData, setFormData] = useState({
     first_name: "",
