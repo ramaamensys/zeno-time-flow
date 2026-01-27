@@ -54,7 +54,7 @@ export default function SchedulerUserManagement() {
     email: "",
     full_name: "",
     password: "",
-    role: "user" as "user" | "admin" | "super_admin"
+    role: "employee" as "employee" | "manager" | "operations_manager" | "super_admin"
   });
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -163,7 +163,7 @@ export default function SchedulerUserManagement() {
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: 'user' | 'admin' | 'super_admin') => {
+  const updateUserRole = async (userId: string, newRole: 'employee' | 'manager' | 'operations_manager' | 'super_admin') => {
     try {
       const { error } = await supabase
         .from('user_roles')
@@ -223,7 +223,7 @@ export default function SchedulerUserManagement() {
       });
 
       // Clear the form and close dialog
-      setNewUser({ email: "", full_name: "", role: "user", password: "" });
+      setNewUser({ email: "", full_name: "", role: "employee", password: "" });
       setIsDialogOpen(false);
       
       // Reload users to show the new user
@@ -524,13 +524,14 @@ export default function SchedulerUserManagement() {
                     <Label htmlFor="role" className="text-right">
                       Role
                     </Label>
-                    <Select value={newUser.role} onValueChange={(value: "user" | "admin" | "super_admin") => setNewUser({ ...newUser, role: value })}>
+                    <Select value={newUser.role} onValueChange={(value: "employee" | "manager" | "operations_manager" | "super_admin") => setNewUser({ ...newUser, role: value })}>
                       <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Select a role" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="user">User</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="employee">Employee</SelectItem>
+                        <SelectItem value="manager">Company Manager</SelectItem>
+                        <SelectItem value="operations_manager">Organization Manager</SelectItem>
                         <SelectItem value="super_admin">Super Admin</SelectItem>
                       </SelectContent>
                     </Select>
@@ -603,7 +604,7 @@ export default function SchedulerUserManagement() {
                       
                       <Select
                         value={user.role}
-                        onValueChange={(value: 'user' | 'admin' | 'super_admin') => 
+                        onValueChange={(value: 'employee' | 'manager' | 'operations_manager' | 'super_admin') => 
                           updateUserRole(user.user_id, value)
                         }
                       >
@@ -611,8 +612,9 @@ export default function SchedulerUserManagement() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="user">User</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="employee">Employee</SelectItem>
+                          <SelectItem value="manager">Company Manager</SelectItem>
+                          <SelectItem value="operations_manager">Organization Manager</SelectItem>
                           <SelectItem value="super_admin">Super Admin</SelectItem>
                         </SelectContent>
                       </Select>
