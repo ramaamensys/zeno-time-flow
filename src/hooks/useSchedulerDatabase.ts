@@ -276,13 +276,19 @@ export function useEmployees(companyId?: string) {
 
   const deleteEmployee = async (id: string) => {
     try {
-      const { error } = await (supabase as any)
+      // IMPORTANT: PostgREST can return 204 even when 0 rows are affected (e.g. RLS blocks visibility).
+      // Request the deleted row back so we can detect a no-op delete and show a real error.
+      const { data, error } = await (supabase as any)
         .from('employees')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select('id');
 
       if (error) throw error;
-      
+      if (!Array.isArray(data) || data.length === 0) {
+        throw new Error('Delete failed: not authorized or employee not found');
+      }
+
       setEmployees(prev => prev.filter(e => e.id !== id));
       toast.success('Employee deleted successfully');
     } catch (error) {
