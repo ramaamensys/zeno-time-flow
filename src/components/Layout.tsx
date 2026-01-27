@@ -2,9 +2,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { LogOut, MapPin } from "lucide-react";
+import { LogOut, MapPin, Bell } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { useShiftNotifications } from "@/hooks/useShiftNotifications";
+import { usePersistentTimeClock } from "@/hooks/usePersistentTimeClock";
+import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,9 +16,16 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [locationEnabled, setLocationEnabled] = useState(() => {
     return localStorage.getItem('locationEnabled') === 'true';
   });
+  
+  // Use shift notifications hook
+  const { upcomingShift } = useShiftNotifications();
+  
+  // Use persistent time clock
+  const { activeEntry, elapsedTimeFormatted } = usePersistentTimeClock();
 
   const toggleLocation = () => {
     const newState = !locationEnabled;
@@ -61,6 +72,31 @@ const Layout = ({ children }: LayoutProps) => {
               </div>
               
               <div className="flex items-center gap-4">
+                {/* Show active time clock indicator */}
+                {activeEntry && (
+                  <Badge 
+                    variant="default" 
+                    className="cursor-pointer gap-2 bg-green-600 hover:bg-green-700"
+                    onClick={() => navigate('/scheduler/my-dashboard')}
+                  >
+                    <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                    {elapsedTimeFormatted}
+                  </Badge>
+                )}
+                
+                {/* Show upcoming shift notification */}
+                {upcomingShift && !activeEntry && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-amber-600 border-amber-600 hover:bg-amber-50"
+                    onClick={() => navigate('/scheduler/my-dashboard')}
+                  >
+                    <Bell className="h-4 w-4" />
+                    Shift Soon
+                  </Button>
+                )}
+                
                 <span className="text-sm text-muted-foreground">
                   {user?.email}
                 </span>
