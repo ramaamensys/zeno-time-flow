@@ -50,7 +50,7 @@ export default function SchedulerSchedule() {
   // Database hooks
   const { companies, loading: companiesLoading } = useCompanies();
   const { departments, loading: departmentsLoading } = useDepartments(selectedCompany);
-  const { employees, loading: employeesLoading } = useEmployees(selectedCompany);
+  const { employees, loading: employeesLoading, updateEmployee, deleteEmployee } = useEmployees(selectedCompany);
   const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift } = useShifts(selectedCompany, getWeekStart(selectedWeek));
 
   const [employeeRecord, setEmployeeRecord] = useState<{ id: string; company_id: string } | null>(null);
@@ -928,6 +928,8 @@ export default function SchedulerSchedule() {
         onOpenChange={handleEditEmployeeOpenChange}
         employee={selectedEmployee}
         companyId={selectedCompany}
+        onUpdate={updateEmployee}
+        onDelete={deleteEmployee}
       />
       
       <SlotEditModal 

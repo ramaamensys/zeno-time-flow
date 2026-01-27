@@ -37,7 +37,7 @@ export default function SchedulerEmployees() {
   // Database hooks
   const { companies, loading: companiesLoading } = useCompanies();
   const { departments, loading: departmentsLoading } = useDepartments(selectedCompany);
-  const { employees, loading: employeesLoading, deleteEmployee } = useEmployees(selectedCompany);
+  const { employees, loading: employeesLoading, deleteEmployee, updateEmployee } = useEmployees(selectedCompany);
 
   // Set first company as default when companies load
   useEffect(() => {
@@ -324,6 +324,8 @@ export default function SchedulerEmployees() {
         onOpenChange={setShowEditEmployee}
         employee={selectedEmployee}
         companyId={selectedCompany}
+        onUpdate={updateEmployee}
+        onDelete={deleteEmployee}
       />
     </div>
   );
