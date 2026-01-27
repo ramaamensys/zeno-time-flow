@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Users, Plus, Edit, Trash2, Search, Filter, Mail, Building } from "lucide-react";
+import { Loader2, Users, Plus, Edit, Trash2, Search, Filter, Mail, Building, Building2 } from "lucide-react";
 
 interface UserProfile {
   id: string;
@@ -67,6 +67,7 @@ export default function UserManagement() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAssignCompanyDialogOpen, setIsAssignCompanyDialogOpen] = useState(false);
   const [companies, setCompanies] = useState<any[]>([]);
+  const [organizations, setOrganizations] = useState<any[]>([]);
   const [selectedUserForAssignment, setSelectedUserForAssignment] = useState<UserProfile | null>(null);
   
   // Multi-user assignment states
@@ -74,8 +75,9 @@ export default function UserManagement() {
   const [availableUsersForAssignment, setAvailableUsersForAssignment] = useState<UserProfile[]>([]);
   
   const [assignmentData, setAssignmentData] = useState({
+    organization_id: "",
     company_id: "",
-    role: "operations_manager" as "operations_manager" | "admin" | "employee"
+    role: "employee" as "employee" | "manager" | "operations_manager" | "super_admin"
   });
 
   useEffect(() => {
@@ -150,6 +152,7 @@ export default function UserManagement() {
   useEffect(() => {
     checkAuthorizationAndLoadUsers();
     loadCompanies();
+    loadOrganizations();
   }, [user]);
 
   const checkAuthorizationAndLoadUsers = async () => {
@@ -321,6 +324,20 @@ export default function UserManagement() {
       setCompanies(data || []);
     } catch (error) {
       console.error('Error loading companies:', error);
+    }
+  };
+
+  const loadOrganizations = async () => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('organizations')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setOrganizations(data || []);
+    } catch (error) {
+      console.error('Error loading organizations:', error);
     }
   };
 
@@ -650,7 +667,7 @@ export default function UserManagement() {
 
       // Process each selected user
       for (const userId of selectedUsersForAssignment) {
-        // For operations_manager role, update the company
+        // For operations_manager role, update the organization
         if (assignmentData.role === "operations_manager") {
           const { error: companyError } = await supabase
             .from('companies')
@@ -658,8 +675,8 @@ export default function UserManagement() {
             .eq('id', assignmentData.company_id);
 
           if (companyError) throw companyError;
-        } else if (assignmentData.role === "admin") {
-          // For admin role (company manager), update the company
+        } else if (assignmentData.role === "manager") {
+          // For manager role (company manager), update the company
           const { error: companyError } = await supabase
             .from('companies')
             .update({ company_manager_id: userId })
@@ -691,17 +708,21 @@ export default function UserManagement() {
 
             if (employeeError) throw employeeError;
           }
+        } else if (assignmentData.role === "super_admin") {
+          // Super admin role - just add the role, no company assignment needed
         }
 
         // Update user role based on assignment and company type
-        let finalRole: "user" | "admin" | "super_admin" | "operations_manager" | "manager" = "user";
+        let finalRole: "user" | "admin" | "super_admin" | "operations_manager" | "manager" | "employee" = "employee";
         
         if (assignmentData.role === "operations_manager") {
           finalRole = "operations_manager";
-        } else if (assignmentData.role === "admin") {
-          finalRole = "manager"; // Company managers get the manager role
+        } else if (assignmentData.role === "manager") {
+          finalRole = "manager";
         } else if (assignmentData.role === "employee") {
-          finalRole = "user"; // Employees get user role with app access based on company type
+          finalRole = "employee";
+        } else if (assignmentData.role === "super_admin") {
+          finalRole = "super_admin";
         }
         
         // First, delete any existing roles for this user (both calendar and scheduler)
@@ -734,7 +755,7 @@ export default function UserManagement() {
       setIsAssignCompanyDialogOpen(false);
       setSelectedUserForAssignment(null);
       setSelectedUsersForAssignment([]);
-      setAssignmentData({ company_id: "", role: "operations_manager" });
+      setAssignmentData({ organization_id: "", company_id: "", role: "employee" });
       await loadUsers();
     } catch (error: any) {
       console.error('Error assigning users to company:', error);
@@ -871,10 +892,9 @@ export default function UserManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="user">User</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
-                  <SelectItem value="operations_manager">Operations Manager</SelectItem>
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="manager">Company Manager</SelectItem>
+                  <SelectItem value="operations_manager">Organization Manager</SelectItem>
                   <SelectItem value="super_admin">Super Admin</SelectItem>
                 </SelectContent>
               </Select>
@@ -994,15 +1014,15 @@ export default function UserManagement() {
             <Dialog open={isAssignCompanyDialogOpen} onOpenChange={setIsAssignCompanyDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">
-                  <Building className="h-4 w-4 mr-2" />
-                  Assign to Company
+                  <Building2 className="h-4 w-4 mr-2" />
+                  Assign to Organization
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
+              <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
-                  <DialogTitle>Assign User to Company</DialogTitle>
+                  <DialogTitle>Assign User to Organization</DialogTitle>
                   <DialogDescription>
-                    Select a user and assign them to a company with a specific role.
+                    Select users and assign them to an organization/company with a specific role.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -1033,30 +1053,30 @@ export default function UserManagement() {
                     <div className="border rounded-md max-h-48 overflow-y-auto">
                       {availableUsersForAssignment.length === 0 ? (
                         <div className="p-4 text-center text-muted-foreground text-sm">
-                          No available users to assign. All users are either already assigned to companies or don't have the required permissions.
+                          No available users to assign. All users are either already assigned or don't have the required permissions.
                         </div>
                       ) : (
-                        availableUsersForAssignment.map((user) => (
+                        availableUsersForAssignment.map((userItem) => (
                             <div
-                              key={user.user_id}
+                              key={userItem.user_id}
                               className="flex items-center gap-3 p-3 border-b last:border-b-0 hover:bg-muted/50"
                             >
                               <label className="flex items-center gap-3 cursor-pointer flex-1">
                                 <input
                                   type="checkbox"
-                                  checked={selectedUsersForAssignment.includes(user.user_id)}
+                                  checked={selectedUsersForAssignment.includes(userItem.user_id)}
                                   onChange={(e) => {
-                                    console.log('Checkbox changed for:', user.user_id, e.target.checked);
-                                    toggleUserSelection(user.user_id);
+                                    console.log('Checkbox changed for:', userItem.user_id, e.target.checked);
+                                    toggleUserSelection(userItem.user_id);
                                   }}
                                   className="h-4 w-4 rounded border-gray-300"
                                 />
                                 <div className="flex-1">
-                                  <div className="font-medium text-sm">{user.full_name}</div>
-                                  <div className="text-xs text-muted-foreground">{user.email}</div>
+                                  <div className="font-medium text-sm">{userItem.full_name}</div>
+                                  <div className="text-xs text-muted-foreground">{userItem.email}</div>
                                 </div>
-                                <Badge variant={getRoleBadgeVariant(user.role)} className="text-xs">
-                                  {user.role === 'admin' ? 'Admin (Unassigned)' : user.role.replace('_', ' ')}
+                                <Badge variant={getRoleBadgeVariant(userItem.role)} className="text-xs">
+                                  {userItem.role === 'admin' ? 'Admin (Unassigned)' : userItem.role.replace('_', ' ')}
                                 </Badge>
                               </label>
                             </div>
@@ -1065,22 +1085,45 @@ export default function UserManagement() {
                     </div>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="organization_select" className="text-right">
+                      Organization
+                    </Label>
+                    <Select 
+                      value={assignmentData.organization_id} 
+                      onValueChange={(value) => setAssignmentData({ ...assignmentData, organization_id: value, company_id: "" })}
+                    >
+                      <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Select an organization" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {organizations.map((org) => (
+                          <SelectItem key={org.id} value={org.id}>
+                            {org.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="company_select" className="text-right">
                       Company
                     </Label>
                     <Select 
                       value={assignmentData.company_id} 
                       onValueChange={(value) => setAssignmentData({ ...assignmentData, company_id: value })}
+                      disabled={!assignmentData.organization_id}
                     >
                       <SelectTrigger className="col-span-3">
-                        <SelectValue placeholder="Select a company" />
+                        <SelectValue placeholder={assignmentData.organization_id ? "Select a company" : "Select organization first"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {companies.map((company) => (
-                          <SelectItem key={company.id} value={company.id}>
-                            {company.name} ({company.field_type})
-                          </SelectItem>
-                        ))}
+                        {companies
+                          .filter((company) => company.organization_id === assignmentData.organization_id)
+                          .map((company) => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1090,28 +1133,16 @@ export default function UserManagement() {
                     </Label>
                     <Select 
                       value={assignmentData.role} 
-                      onValueChange={(value: "operations_manager" | "admin" | "employee") => setAssignmentData({ ...assignmentData, role: value })}
+                      onValueChange={(value: "employee" | "manager" | "operations_manager" | "super_admin") => setAssignmentData({ ...assignmentData, role: value })}
                     >
                       <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent>
-                        {(() => {
-                          const selectedCompany = companies.find(c => c.id === assignmentData.company_id);
-                          const isITCompany = selectedCompany?.field_type === 'IT';
-                          
-                          return (
-                            <>
-                              {!isITCompany && (
-                                <SelectItem value="operations_manager">Operations Manager</SelectItem>
-                              )}
-                              {isITCompany && (
-                                <SelectItem value="admin">Company Manager</SelectItem>
-                              )}
-                              <SelectItem value="employee">Employee</SelectItem>
-                            </>
-                          );
-                        })()}
+                        <SelectItem value="employee">Employee</SelectItem>
+                        <SelectItem value="manager">Company Manager</SelectItem>
+                        <SelectItem value="operations_manager">Organization Manager</SelectItem>
+                        <SelectItem value="super_admin">Super Admin</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1122,7 +1153,7 @@ export default function UserManagement() {
                     onClick={assignUsersToCompany}
                     disabled={selectedUsersForAssignment.length === 0 || !assignmentData.company_id}
                   >
-                    Assign {selectedUsersForAssignment.length} User{selectedUsersForAssignment.length !== 1 ? 's' : ''} to Company
+                    Assign {selectedUsersForAssignment.length} User{selectedUsersForAssignment.length !== 1 ? 's' : ''} to Organization
                   </Button>
                 </DialogFooter>
               </DialogContent>
