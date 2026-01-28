@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -22,47 +22,103 @@ interface TimeClockEntry {
   overtime_hours: number | null;
 }
 
+// Get stored active clock state - works without auth
+const getStoredClockState = (): ActiveClockState | null => {
+  try {
+    const stored = localStorage.getItem(ACTIVE_CLOCK_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+};
+
+// Store active clock state
+const storeClockState = (state: ActiveClockState | null) => {
+  if (state) {
+    localStorage.setItem(ACTIVE_CLOCK_KEY, JSON.stringify(state));
+  } else {
+    localStorage.removeItem(ACTIVE_CLOCK_KEY);
+  }
+};
+
+// Calculate elapsed time from stored clock-in - works without auth
+const calculateElapsedTimeFromStorage = (): number => {
+  const stored = getStoredClockState();
+  if (stored?.clockInTime) {
+    const clockIn = new Date(stored.clockInTime);
+    const now = new Date();
+    const diffMs = now.getTime() - clockIn.getTime();
+    return Math.max(0, Math.floor(diffMs / 1000));
+  }
+  return 0;
+};
+
+// Format elapsed time
+const formatElapsedTime = (seconds: number): string => {
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
 export const usePersistentTimeClock = () => {
   const { user } = useAuth();
   const [activeEntry, setActiveEntry] = useState<TimeClockEntry | null>(null);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasInitialized = useRef(false);
 
-  // Get stored active clock state
-  const getStoredClockState = useCallback((): ActiveClockState | null => {
-    try {
-      const stored = localStorage.getItem(ACTIVE_CLOCK_KEY);
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  // Store active clock state
-  const storeClockState = useCallback((state: ActiveClockState | null) => {
-    if (state) {
-      localStorage.setItem(ACTIVE_CLOCK_KEY, JSON.stringify(state));
-    } else {
-      localStorage.removeItem(ACTIVE_CLOCK_KEY);
-    }
-  }, []);
-
-  // Calculate elapsed time from stored clock-in
-  const calculateElapsedTime = useCallback(() => {
+  // Initialize from localStorage immediately (before auth check)
+  useEffect(() => {
     const stored = getStoredClockState();
-    if (stored?.clockInTime) {
-      const clockIn = new Date(stored.clockInTime);
-      const now = new Date();
-      const diffMs = now.getTime() - clockIn.getTime();
-      return Math.floor(diffMs / 1000);
+    if (stored) {
+      setElapsedSeconds(calculateElapsedTimeFromStorage());
+      // Create a minimal activeEntry from stored state to show timer
+      setActiveEntry({
+        id: stored.entryId,
+        clock_in: stored.clockInTime,
+        clock_out: null,
+        break_start: null,
+        break_end: null,
+        total_hours: null,
+        overtime_hours: null
+      });
     }
-    return 0;
-  }, [getStoredClockState]);
+  }, []);
 
-  // Fetch employee and active entry
+  // Start timer immediately if there's an active clock state
+  useEffect(() => {
+    const stored = getStoredClockState();
+    
+    if (stored) {
+      // Clear any existing interval
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      
+      // Start the timer
+      intervalRef.current = setInterval(() => {
+        setElapsedSeconds(calculateElapsedTimeFromStorage());
+      }, 1000);
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
+
+  // Fetch employee and verify active entry when user is available
   const fetchEmployeeData = useCallback(async () => {
     if (!user) {
+      // Even without user, check localStorage for persisted timer
+      const stored = getStoredClockState();
+      if (stored) {
+        setElapsedSeconds(calculateElapsedTimeFromStorage());
+      }
       setIsLoading(false);
       return;
     }
@@ -73,7 +129,7 @@ export const usePersistentTimeClock = () => {
         .from('employees')
         .select('id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (!employee) {
         setIsLoading(false);
@@ -82,7 +138,7 @@ export const usePersistentTimeClock = () => {
 
       setEmployeeId(employee.id);
 
-      // Check for active time clock entry
+      // Check for active time clock entry in database
       const { data: activeEntryData } = await supabase
         .from('time_clock')
         .select('*')
@@ -90,7 +146,7 @@ export const usePersistentTimeClock = () => {
         .is('clock_out', null)
         .order('clock_in', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (activeEntryData) {
         setActiveEntry(activeEntryData);
@@ -103,12 +159,25 @@ export const usePersistentTimeClock = () => {
           shiftId: activeEntryData.shift_id
         });
         
-        // Calculate initial elapsed time
-        setElapsedSeconds(calculateElapsedTime());
+        // Calculate elapsed time
+        setElapsedSeconds(calculateElapsedTimeFromStorage());
+        
+        // Ensure timer is running
+        if (!intervalRef.current) {
+          intervalRef.current = setInterval(() => {
+            setElapsedSeconds(calculateElapsedTimeFromStorage());
+          }, 1000);
+        }
       } else {
+        // No active entry in DB, clear local state
         setActiveEntry(null);
         storeClockState(null);
         setElapsedSeconds(0);
+        
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
       }
     } catch (error) {
       console.error('Error fetching employee data:', error);
@@ -116,25 +185,13 @@ export const usePersistentTimeClock = () => {
       // Try to recover from localStorage
       const stored = getStoredClockState();
       if (stored) {
-        // Verify the entry still exists
-        const { data } = await supabase
-          .from('time_clock')
-          .select('*')
-          .eq('id', stored.entryId)
-          .is('clock_out', null)
-          .single();
-        
-        if (data) {
-          setActiveEntry(data);
-          setElapsedSeconds(calculateElapsedTime());
-        } else {
-          storeClockState(null);
-        }
+        setElapsedSeconds(calculateElapsedTimeFromStorage());
       }
     } finally {
       setIsLoading(false);
+      hasInitialized.current = true;
     }
-  }, [user, storeClockState, getStoredClockState, calculateElapsedTime]);
+  }, [user]);
 
   // Clock in
   const clockIn = useCallback(async (shiftId?: string) => {
@@ -159,20 +216,34 @@ export const usePersistentTimeClock = () => {
       if (error) throw error;
 
       setActiveEntry(data);
+      
+      // Store in localStorage immediately
       storeClockState({
         entryId: data.id,
         clockInTime: data.clock_in!,
         employeeId,
         shiftId
       });
+      
+      // Reset elapsed seconds and start timer
       setElapsedSeconds(0);
       
+      // Clear existing interval and start new one
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      intervalRef.current = setInterval(() => {
+        setElapsedSeconds(calculateElapsedTimeFromStorage());
+      }, 1000);
+      
       toast.success('Clocked in successfully');
+      return data;
     } catch (error) {
       console.error('Error clocking in:', error);
       toast.error('Failed to clock in');
+      throw error;
     }
-  }, [employeeId, storeClockState]);
+  }, [employeeId]);
 
   // Clock out
   const clockOut = useCallback(async () => {
@@ -210,40 +281,42 @@ export const usePersistentTimeClock = () => {
 
       if (error) throw error;
 
+      // Clear state and localStorage
       setActiveEntry(null);
       storeClockState(null);
       setElapsedSeconds(0);
+      
+      // Stop the timer
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
       
       toast.success(`Clocked out. Total: ${totalHours.toFixed(2)} hours`);
     } catch (error) {
       console.error('Error clocking out:', error);
       toast.error('Failed to clock out');
     }
-  }, [activeEntry, storeClockState]);
+  }, [activeEntry]);
 
-  // Initial fetch
+  // Initial fetch when user changes
   useEffect(() => {
     fetchEmployeeData();
   }, [fetchEmployeeData]);
 
-  // Update elapsed time every second
+  // Cleanup on unmount
   useEffect(() => {
-    if (!activeEntry) return;
-
-    const interval = setInterval(() => {
-      setElapsedSeconds(calculateElapsedTime());
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [activeEntry, calculateElapsedTime]);
-
-  // Format elapsed time
-  const formatElapsedTime = useCallback((seconds: number): string => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
   }, []);
+
+  // Check if currently clocked in (from localStorage - works without auth)
+  const isClockedIn = (): boolean => {
+    return getStoredClockState() !== null;
+  };
 
   return {
     activeEntry,
@@ -253,6 +326,7 @@ export const usePersistentTimeClock = () => {
     elapsedTimeFormatted: formatElapsedTime(elapsedSeconds),
     clockIn,
     clockOut,
-    refetch: fetchEmployeeData
+    refetch: fetchEmployeeData,
+    isClockedIn
   };
 };
