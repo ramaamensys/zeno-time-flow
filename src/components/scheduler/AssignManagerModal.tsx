@@ -55,14 +55,20 @@ export default function AssignManagerModal({
       }
 
       // Then get profiles for those managers
-      const { data: profiles, error: profilesError } = await supabase
+      let profilesQuery = supabase
         .from('profiles')
         .select('user_id, full_name, email')
         .in('user_id', managerUserIds)
-        .neq('user_id', company?.created_by || '')
         .neq('status', 'deleted')
         .eq('status', 'active')
         .order('full_name');
+
+      // Only apply this filter if we actually have a UUID; passing "" breaks Postgres uuid casting.
+      if (company?.created_by) {
+        profilesQuery = profilesQuery.neq('user_id', company.created_by);
+      }
+
+      const { data: profiles, error: profilesError } = await profilesQuery;
 
       if (profilesError) throw profilesError;
 
