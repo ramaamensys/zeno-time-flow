@@ -4,12 +4,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const ACTIVE_CLOCK_KEY = 'active_time_clock';
+const BREAK_STATE_KEY = 'active_break_state';
+const DEFAULT_BREAK_DURATION = 30; // Default break duration in minutes
 
 interface ActiveClockState {
   entryId: string;
   clockInTime: string;
   employeeId: string;
   shiftId?: string;
+}
+
+interface BreakState {
+  breakStartTime: string;
+  breakDurationMinutes: number;
+  notificationShown: boolean;
 }
 
 interface TimeClockEntry {
@@ -41,13 +49,45 @@ const storeClockState = (state: ActiveClockState | null) => {
   }
 };
 
-// Calculate elapsed time from stored clock-in - works without auth
-const calculateElapsedTimeFromStorage = (): number => {
+// Get stored break state
+const getStoredBreakState = (): BreakState | null => {
+  try {
+    const stored = localStorage.getItem(BREAK_STATE_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+};
+
+// Store break state
+const storeBreakState = (state: BreakState | null) => {
+  if (state) {
+    localStorage.setItem(BREAK_STATE_KEY, JSON.stringify(state));
+  } else {
+    localStorage.removeItem(BREAK_STATE_KEY);
+  }
+};
+
+// Calculate elapsed WORKING time from stored clock-in (excluding break time)
+const calculateElapsedTimeFromStorage = (breakStart?: string | null, breakEnd?: string | null): number => {
   const stored = getStoredClockState();
   if (stored?.clockInTime) {
     const clockIn = new Date(stored.clockInTime);
     const now = new Date();
-    const diffMs = now.getTime() - clockIn.getTime();
+    let diffMs = now.getTime() - clockIn.getTime();
+    
+    // Subtract completed break time
+    if (breakStart && breakEnd) {
+      const breakStartTime = new Date(breakStart);
+      const breakEndTime = new Date(breakEnd);
+      diffMs -= (breakEndTime.getTime() - breakStartTime.getTime());
+    }
+    // If currently on break, subtract time since break started
+    else if (breakStart && !breakEnd) {
+      const breakStartTime = new Date(breakStart);
+      diffMs -= (now.getTime() - breakStartTime.getTime());
+    }
+    
     return Math.max(0, Math.floor(diffMs / 1000));
   }
   return 0;
@@ -61,14 +101,46 @@ const formatElapsedTime = (seconds: number): string => {
   return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
+// Request notification permission
+const requestNotificationPermission = async () => {
+  if ('Notification' in window && Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+};
+
+// Show break ending notification
+const showBreakEndingNotification = () => {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('Break Ending Soon!', {
+      body: 'Your break will end in 5 minutes. Please prepare to resume work.',
+      icon: '/favicon.ico',
+      tag: 'break-ending',
+      requireInteraction: true
+    });
+  }
+  // Also show in-app toast
+  toast.warning('Break ending in 5 minutes!', {
+    description: 'Please prepare to resume work.',
+    duration: 10000
+  });
+};
+
 export const usePersistentTimeClock = () => {
   const { user } = useAuth();
   const [activeEntry, setActiveEntry] = useState<TimeClockEntry | null>(null);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [breakElapsedSeconds, setBreakElapsedSeconds] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const breakIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const breakNotificationRef = useRef<NodeJS.Timeout | null>(null);
   const hasInitialized = useRef(false);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
 
   // Initialize from localStorage immediately (before auth check)
   useEffect(() => {
@@ -86,6 +158,55 @@ export const usePersistentTimeClock = () => {
         overtime_hours: null
       });
     }
+    
+    // Check for active break state
+    const breakState = getStoredBreakState();
+    if (breakState) {
+      const breakStart = new Date(breakState.breakStartTime);
+      const elapsed = Math.floor((new Date().getTime() - breakStart.getTime()) / 1000);
+      setBreakElapsedSeconds(elapsed);
+    }
+  }, []);
+
+  // Calculate break time remaining and set up notification
+  const setupBreakNotification = useCallback((breakDurationMinutes: number, breakStartTime: string) => {
+    // Clear any existing notification timer
+    if (breakNotificationRef.current) {
+      clearTimeout(breakNotificationRef.current);
+      breakNotificationRef.current = null;
+    }
+    
+    const breakStart = new Date(breakStartTime);
+    const breakEndTime = new Date(breakStart.getTime() + breakDurationMinutes * 60 * 1000);
+    const notifyTime = new Date(breakEndTime.getTime() - 5 * 60 * 1000); // 5 minutes before
+    const now = new Date();
+    
+    const timeUntilNotify = notifyTime.getTime() - now.getTime();
+    
+    // Check if we've already passed the notification time
+    const storedBreak = getStoredBreakState();
+    if (storedBreak?.notificationShown) {
+      return; // Already showed notification
+    }
+    
+    if (timeUntilNotify > 0) {
+      // Set timer for 5 min before break ends
+      breakNotificationRef.current = setTimeout(() => {
+        showBreakEndingNotification();
+        // Mark notification as shown
+        const currentBreak = getStoredBreakState();
+        if (currentBreak) {
+          storeBreakState({ ...currentBreak, notificationShown: true });
+        }
+      }, timeUntilNotify);
+    } else if (timeUntilNotify > -5 * 60 * 1000) {
+      // We're within the last 5 minutes but haven't shown notification yet
+      showBreakEndingNotification();
+      const currentBreak = getStoredBreakState();
+      if (currentBreak) {
+        storeBreakState({ ...currentBreak, notificationShown: true });
+      }
+    }
   }, []);
 
   // Start timer immediately if there's an active clock state
@@ -98,9 +219,17 @@ export const usePersistentTimeClock = () => {
         clearInterval(intervalRef.current);
       }
       
-      // Start the timer
+      // Start the timer (will account for breaks)
       intervalRef.current = setInterval(() => {
-        setElapsedSeconds(calculateElapsedTimeFromStorage());
+        // We need to get break info from activeEntry
+        setElapsedSeconds(prev => {
+          const breakState = getStoredBreakState();
+          // If on break, don't increment working time
+          if (breakState) {
+            return prev;
+          }
+          return calculateElapsedTimeFromStorage();
+        });
       }, 1000);
     }
 
@@ -110,6 +239,40 @@ export const usePersistentTimeClock = () => {
       }
     };
   }, []);
+
+  // Handle break timer
+  useEffect(() => {
+    const breakState = getStoredBreakState();
+    
+    if (breakState) {
+      // Clear existing break interval
+      if (breakIntervalRef.current) {
+        clearInterval(breakIntervalRef.current);
+      }
+      
+      // Start break timer
+      breakIntervalRef.current = setInterval(() => {
+        const breakStart = new Date(breakState.breakStartTime);
+        const elapsed = Math.floor((new Date().getTime() - breakStart.getTime()) / 1000);
+        setBreakElapsedSeconds(elapsed);
+      }, 1000);
+      
+      // Set up notification
+      setupBreakNotification(breakState.breakDurationMinutes, breakState.breakStartTime);
+    } else {
+      setBreakElapsedSeconds(0);
+      if (breakIntervalRef.current) {
+        clearInterval(breakIntervalRef.current);
+        breakIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (breakIntervalRef.current) {
+        clearInterval(breakIntervalRef.current);
+      }
+    };
+  }, [activeEntry?.break_start, activeEntry?.break_end, setupBreakNotification]);
 
   // Fetch employee and verify active entry when user is available
   const fetchEmployeeData = useCallback(async () => {
@@ -159,20 +322,38 @@ export const usePersistentTimeClock = () => {
           shiftId: activeEntryData.shift_id
         });
         
+        // Handle break state
+        if (activeEntryData.break_start && !activeEntryData.break_end) {
+          // Currently on break - store break state
+          storeBreakState({
+            breakStartTime: activeEntryData.break_start,
+            breakDurationMinutes: DEFAULT_BREAK_DURATION,
+            notificationShown: false
+          });
+        } else {
+          // Not on break - clear break state
+          storeBreakState(null);
+        }
+        
         // Calculate elapsed time
-        setElapsedSeconds(calculateElapsedTimeFromStorage());
+        setElapsedSeconds(calculateElapsedTimeFromStorage(activeEntryData.break_start, activeEntryData.break_end));
         
         // Ensure timer is running
         if (!intervalRef.current) {
           intervalRef.current = setInterval(() => {
-            setElapsedSeconds(calculateElapsedTimeFromStorage());
+            const breakState = getStoredBreakState();
+            if (!breakState) {
+              setElapsedSeconds(calculateElapsedTimeFromStorage(activeEntryData.break_start, activeEntryData.break_end));
+            }
           }, 1000);
         }
       } else {
         // No active entry in DB, clear local state
         setActiveEntry(null);
         storeClockState(null);
+        storeBreakState(null);
         setElapsedSeconds(0);
+        setBreakElapsedSeconds(0);
         
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
@@ -192,6 +373,87 @@ export const usePersistentTimeClock = () => {
       hasInitialized.current = true;
     }
   }, [user]);
+
+  // Start break
+  const startBreak = useCallback(async (breakDurationMinutes: number = DEFAULT_BREAK_DURATION) => {
+    if (!activeEntry) {
+      toast.error('No active time entry found');
+      return;
+    }
+
+    try {
+      const breakStartTime = new Date().toISOString();
+      
+      const { data, error } = await supabase
+        .from('time_clock')
+        .update({ break_start: breakStartTime })
+        .eq('id', activeEntry.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setActiveEntry(data);
+      
+      // Store break state for persistence
+      storeBreakState({
+        breakStartTime,
+        breakDurationMinutes,
+        notificationShown: false
+      });
+      
+      // Set up notification for 5 min before break ends
+      setupBreakNotification(breakDurationMinutes, breakStartTime);
+      
+      toast.success(`Break started (${breakDurationMinutes} min)`);
+      return data;
+    } catch (error) {
+      console.error('Error starting break:', error);
+      toast.error('Failed to start break');
+      throw error;
+    }
+  }, [activeEntry, setupBreakNotification]);
+
+  // End break
+  const endBreak = useCallback(async () => {
+    if (!activeEntry) {
+      toast.error('No active time entry found');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('time_clock')
+        .update({ break_end: new Date().toISOString() })
+        .eq('id', activeEntry.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setActiveEntry(data);
+      
+      // Clear break state
+      storeBreakState(null);
+      setBreakElapsedSeconds(0);
+      
+      // Clear notification timer
+      if (breakNotificationRef.current) {
+        clearTimeout(breakNotificationRef.current);
+        breakNotificationRef.current = null;
+      }
+      
+      // Resume work timer with updated entry
+      setElapsedSeconds(calculateElapsedTimeFromStorage(data.break_start, data.break_end));
+      
+      toast.success('Break ended - timer resumed');
+      return data;
+    } catch (error) {
+      console.error('Error ending break:', error);
+      toast.error('Failed to end break');
+      throw error;
+    }
+  }, [activeEntry]);
 
   // Clock in
   const clockIn = useCallback(async (shiftId?: string) => {
@@ -233,7 +495,10 @@ export const usePersistentTimeClock = () => {
         clearInterval(intervalRef.current);
       }
       intervalRef.current = setInterval(() => {
-        setElapsedSeconds(calculateElapsedTimeFromStorage());
+        const breakState = getStoredBreakState();
+        if (!breakState) {
+          setElapsedSeconds(calculateElapsedTimeFromStorage());
+        }
       }, 1000);
       
       toast.success('Clocked in successfully');
@@ -284,12 +549,22 @@ export const usePersistentTimeClock = () => {
       // Clear state and localStorage
       setActiveEntry(null);
       storeClockState(null);
+      storeBreakState(null);
       setElapsedSeconds(0);
+      setBreakElapsedSeconds(0);
       
-      // Stop the timer
+      // Stop all timers
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
+      }
+      if (breakIntervalRef.current) {
+        clearInterval(breakIntervalRef.current);
+        breakIntervalRef.current = null;
+      }
+      if (breakNotificationRef.current) {
+        clearTimeout(breakNotificationRef.current);
+        breakNotificationRef.current = null;
       }
       
       toast.success(`Clocked out. Total: ${totalHours.toFixed(2)} hours`);
@@ -310,6 +585,12 @@ export const usePersistentTimeClock = () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+      if (breakIntervalRef.current) {
+        clearInterval(breakIntervalRef.current);
+      }
+      if (breakNotificationRef.current) {
+        clearTimeout(breakNotificationRef.current);
+      }
     };
   }, []);
 
@@ -318,15 +599,36 @@ export const usePersistentTimeClock = () => {
     return getStoredClockState() !== null;
   };
 
+  // Check if currently on break
+  const isOnBreak = (): boolean => {
+    return getStoredBreakState() !== null;
+  };
+
+  // Get break time remaining
+  const getBreakTimeRemaining = (): number => {
+    const breakState = getStoredBreakState();
+    if (!breakState) return 0;
+    
+    const breakEnd = new Date(breakState.breakStartTime).getTime() + breakState.breakDurationMinutes * 60 * 1000;
+    const remaining = Math.max(0, Math.floor((breakEnd - new Date().getTime()) / 1000));
+    return remaining;
+  };
+
   return {
     activeEntry,
     employeeId,
     isLoading,
     elapsedSeconds,
+    breakElapsedSeconds,
     elapsedTimeFormatted: formatElapsedTime(elapsedSeconds),
+    breakTimeFormatted: formatElapsedTime(breakElapsedSeconds),
     clockIn,
     clockOut,
+    startBreak,
+    endBreak,
     refetch: fetchEmployeeData,
-    isClockedIn
+    isClockedIn,
+    isOnBreak,
+    getBreakTimeRemaining
   };
 };
