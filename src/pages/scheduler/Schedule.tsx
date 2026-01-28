@@ -175,12 +175,22 @@ export default function SchedulerSchedule() {
       const shiftDate = new Date(shift.start_time);
       const shiftHour = shiftDate.getHours();
       
-      // Check if shift is on the same date and within the slot time range
-      return (
-        shiftDate.toDateString() === targetDate.toDateString() &&
-        shiftHour >= slot.startHour &&
-        (slot.endHour > slot.startHour ? shiftHour < slot.endHour : shiftHour >= slot.startHour || shiftHour < slot.endHour)
-      );
+      // Compare dates by year, month, and day to avoid timezone issues
+      const sameDate = 
+        shiftDate.getFullYear() === targetDate.getFullYear() &&
+        shiftDate.getMonth() === targetDate.getMonth() &&
+        shiftDate.getDate() === targetDate.getDate();
+      
+      if (!sameDate) return false;
+      
+      // For normal shifts (end > start), check if hour is within range
+      if (slot.endHour > slot.startHour) {
+        return shiftHour >= slot.startHour && shiftHour < slot.endHour;
+      }
+      
+      // For overnight shifts (end < start, like night shift 22-6), 
+      // match if hour is >= start OR hour < end
+      return shiftHour >= slot.startHour || shiftHour < slot.endHour;
     });
   };
 
