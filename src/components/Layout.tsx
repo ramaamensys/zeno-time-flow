@@ -9,6 +9,7 @@ import { useShiftNotifications } from "@/hooks/useShiftNotifications";
 import { usePersistentTimeClock } from "@/hooks/usePersistentTimeClock";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -17,6 +18,7 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { role } = useUserRole();
   const [locationEnabled, setLocationEnabled] = useState(() => {
     return localStorage.getItem('locationEnabled') === 'true';
   });
@@ -26,6 +28,9 @@ const Layout = ({ children }: LayoutProps) => {
   
   // Use persistent time clock
   const { activeEntry, elapsedTimeFormatted } = usePersistentTimeClock();
+  
+  // Don't show shift timer for super_admin
+  const isSuperAdmin = role === 'super_admin';
 
   const toggleLocation = () => {
     const newState = !locationEnabled;
@@ -72,8 +77,8 @@ const Layout = ({ children }: LayoutProps) => {
               </div>
               
               <div className="flex items-center gap-4">
-                {/* Show active time clock indicator */}
-                {activeEntry && (
+                {/* Show active time clock indicator - hidden for super_admin */}
+                {activeEntry && !isSuperAdmin && (
                   <Badge 
                     variant="default" 
                     className="cursor-pointer gap-2 bg-green-600 hover:bg-green-700"
@@ -84,8 +89,8 @@ const Layout = ({ children }: LayoutProps) => {
                   </Badge>
                 )}
                 
-                {/* Show upcoming shift notification */}
-                {upcomingShift && !activeEntry && (
+                {/* Show upcoming shift notification - hidden for super_admin */}
+                {upcomingShift && !activeEntry && !isSuperAdmin && (
                   <Button
                     variant="outline"
                     size="sm"

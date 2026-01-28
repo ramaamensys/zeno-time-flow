@@ -12,6 +12,7 @@ import { useCalendarShiftNotification } from "@/hooks/useCalendarShiftNotificati
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Clock, Calendar as CalendarIcon } from "lucide-react";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface Shift {
   id: string;
@@ -45,11 +46,15 @@ interface CalendarEvent {
 const Calendar = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { role, isLoading: roleLoading } = useUserRole();
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"month" | "week" | "day">("month");
   const [employeeId, setEmployeeId] = useState<string | null>(null);
+
+  // Check if user is super_admin - they get a standard calendar without employee link
+  const isSuperAdmin = role === 'super_admin';
 
   // Shift notification hook
   const { 
@@ -59,10 +64,13 @@ const Calendar = () => {
     dismissNotification 
   } = useCalendarShiftNotification();
 
-  // Fetch employee ID
+  // Fetch employee ID - skip for super_admin
   useEffect(() => {
     const fetchEmployeeId = async () => {
-      if (!user) return;
+      if (!user || isSuperAdmin) {
+        setIsLoading(false);
+        return;
+      }
       
       const { data: employee } = await supabase
         .from('employees')
@@ -76,11 +84,16 @@ const Calendar = () => {
     };
     
     fetchEmployeeId();
-  }, [user]);
+  }, [user, isSuperAdmin]);
 
-  // Fetch shifts for the current employee
+  // Fetch shifts for the current employee - skip for super_admin
   useEffect(() => {
     const fetchShifts = async () => {
+      if (isSuperAdmin) {
+        setIsLoading(false);
+        return;
+      }
+      
       if (!employeeId) {
         setIsLoading(false);
         return;
@@ -140,7 +153,7 @@ const Calendar = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [employeeId, currentDate, toast]);
+  }, [employeeId, currentDate, toast, isSuperAdmin]);
 
   // Convert shifts to calendar event format
   const shiftEvents: CalendarEvent[] = shifts.map(shift => ({
@@ -178,7 +191,7 @@ const Calendar = () => {
     // Employees can't create shifts  
   };
 
-  if (isLoading) {
+  if (isLoading || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -186,7 +199,9 @@ const Calendar = () => {
     );
   }
 
-  if (!employeeId) {
+  // Super admin sees standard calendar without employee requirement
+  // Non-super admins need an employee record to see shifts
+  if (!isSuperAdmin && !employeeId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 p-6">
         <Card className="max-w-md mx-auto">
@@ -204,8 +219,8 @@ const Calendar = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 relative">
-      {/* Shift Reminder Notification */}
-      {showNotification && notificationShift && (
+      {/* Shift Reminder Notification - only for employees */}
+      {!isSuperAdmin && showNotification && notificationShift && (
         <ShiftReminderNotification
           shift={notificationShift}
           onStartShift={startShift}
@@ -221,15 +236,17 @@ const Calendar = () => {
       <div className="relative z-10 space-y-8 p-6">
         <DailyQuote />
         
-        {/* Info Card */}
-        <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200/50">
-          <CardContent className="p-4 flex items-center gap-3">
-            <Clock className="h-5 w-5 text-blue-600" />
-            <p className="text-sm text-blue-800">
-              This calendar shows your scheduled shifts. Shifts are assigned by your manager.
-            </p>
-          </CardContent>
-        </Card>
+        {/* Info Card - different message for super_admin */}
+        {!isSuperAdmin && (
+          <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200/50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Clock className="h-5 w-5 text-blue-600" />
+              <p className="text-sm text-blue-800">
+                This calendar shows your scheduled shifts. Shifts are assigned by your manager.
+              </p>
+            </CardContent>
+          </Card>
+        )}
         
         {/* Calendar Header - without create button functionality */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-8">
