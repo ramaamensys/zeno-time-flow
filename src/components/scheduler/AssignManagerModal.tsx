@@ -40,10 +40,12 @@ export default function AssignManagerModal({
   const fetchAvailableUsers = async () => {
     try {
       // First get users with manager role
-      const { data: managerRoles } = await supabase
+      const { data: managerRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id')
         .eq('role', 'manager');
+
+      if (rolesError) throw rolesError;
 
       const managerUserIds = managerRoles?.map(r => r.user_id) || [];
 
@@ -53,7 +55,7 @@ export default function AssignManagerModal({
       }
 
       // Then get profiles for those managers
-      const { data: profiles } = await supabase
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('user_id, full_name, email')
         .in('user_id', managerUserIds)
@@ -62,10 +64,14 @@ export default function AssignManagerModal({
         .eq('status', 'active')
         .order('full_name');
 
+      if (profilesError) throw profilesError;
+
       setAvailableUsers(profiles || []);
     } catch (error) {
       console.error('Error fetching managers:', error);
-      toast.error('Failed to load available managers');
+      const message = (error as any)?.message;
+      toast.error(message ? `Failed to load managers: ${message}` : 'Failed to load available managers');
+      setAvailableUsers([]);
     }
   };
 
@@ -83,23 +89,29 @@ export default function AssignManagerModal({
         
         // Assign manager role for company manager
         if (companyManager && companyManager !== "none") {
-          await supabase
+          const { error: upsertError } = await supabase
             .from('user_roles')
             .upsert({ 
               user_id: companyManager, 
               role: 'manager',
               app_type: 'scheduler'
             });
+
+          if (upsertError) throw upsertError;
         }
       }
 
       if (Object.keys(updates).length > 0) {
-        const { error } = await supabase
+        const { data: updated, error } = await supabase
           .from('companies')
           .update(updates)
-          .eq('id', company.id);
+          .eq('id', company.id)
+          .select('id, company_manager_id');
 
         if (error) throw error;
+        if (!updated || updated.length === 0) {
+          throw new Error('Company update was blocked (no rows updated). Check permissions/RLS.');
+        }
       }
 
       onSuccess();
