@@ -28,6 +28,7 @@ export default function CreateOrganizationModal({ open, onOpenChange, onSuccess 
     address: "",
     phone: "",
     email: "",
+    operations_manager_id: "",
     organization_manager_id: ""
   });
 
@@ -71,6 +72,7 @@ export default function CreateOrganizationModal({ open, onOpenChange, onSuccess 
           address: formData.address || null,
           phone: formData.phone || null,
           email: formData.email || null,
+          operations_manager_id: (formData.operations_manager_id && formData.operations_manager_id !== "none") ? formData.operations_manager_id : null,
           organization_manager_id: (formData.organization_manager_id && formData.organization_manager_id !== "none") ? formData.organization_manager_id : null
         });
 
@@ -84,6 +86,7 @@ export default function CreateOrganizationModal({ open, onOpenChange, onSuccess 
         address: "",
         phone: "",
         email: "",
+        operations_manager_id: "",
         organization_manager_id: ""
       });
       toast.success('Organization created successfully!');
@@ -166,24 +169,46 @@ export default function CreateOrganizationModal({ open, onOpenChange, onSuccess 
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="organization-manager">Organization Manager</Label>
-            <Select
-              value={formData.organization_manager_id}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, organization_manager_id: value }))}
-            >
-              <SelectTrigger className="bg-background">
-                <SelectValue placeholder="Select organization manager" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border shadow-lg z-50">
-                <SelectItem value="none">No organization manager</SelectItem>
-                {availableUsers.map((user) => (
-                  <SelectItem key={user.user_id} value={user.user_id}>
-                    {user.full_name} ({user.email})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="operations-manager">Operations Manager</Label>
+              <Select
+                value={formData.operations_manager_id}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, operations_manager_id: value }))}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Select operations manager" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="none">No operations manager</SelectItem>
+                  {availableUsers.map((user) => (
+                    <SelectItem key={user.user_id} value={user.user_id}>
+                      {user.full_name} ({user.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="organization-manager">Organization Manager</Label>
+              <Select
+                value={formData.organization_manager_id}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, organization_manager_id: value }))}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Select organization manager" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="none">No organization manager</SelectItem>
+                  {availableUsers.map((user) => (
+                    <SelectItem key={user.user_id} value={user.user_id}>
+                      {user.full_name} ({user.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-4">

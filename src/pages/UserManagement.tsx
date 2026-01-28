@@ -81,46 +81,15 @@ export default function UserManagement() {
   });
 
   useEffect(() => {
-    if (isAssignCompanyDialogOpen && assignmentData.role) {
+    if (isAssignCompanyDialogOpen) {
       loadAvailableUsers();
     }
-  }, [isAssignCompanyDialogOpen, assignmentData.role]);
+  }, [isAssignCompanyDialogOpen, users, companies]);
 
   const loadAvailableUsers = async () => {
     try {
-      // Clear previous selection when role changes
-      setSelectedUsersForAssignment([]);
-      
-      // Map UI role to database role
-      const roleToFetch = assignmentData.role;
-      
-      // Fetch users who have the selected role
-      const { data: usersWithRole, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', roleToFetch);
-
-      if (rolesError) throw rolesError;
-
-      const userIdsWithRole = usersWithRole?.map(r => r.user_id) || [];
-
-      if (userIdsWithRole.length === 0) {
-        setAvailableUsersForAssignment([]);
-        return;
-      }
-
-      // Get profiles for these users
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('user_id, full_name, email, status')
-        .in('user_id', userIdsWithRole)
-        .eq('status', 'active')
-        .order('full_name');
-
-      if (profilesError) throw profilesError;
-
-      // Get already assigned users to exclude them
-      const assignedUserIds = new Set<string>();
+      // Get all users who are already assigned to companies
+      const assignedUserIds = new Set();
       
       // Add operations managers and company managers from companies
       companies.forEach(company => {
@@ -138,33 +107,34 @@ export default function UserManagement() {
         .select('user_id')
         .eq('status', 'active');
 
-      if (!employeesError && employees) {
-        employees.forEach(employee => {
-          if (employee.user_id) {
-            assignedUserIds.add(employee.user_id);
-          }
-        });
-      }
+      if (employeesError) throw employeesError;
 
-      // Filter out already assigned users and current user
-      const availableUsers = (profiles || [])
-        .filter(profile => {
-          // Exclude current user
-          if (profile.user_id === user?.id) {
-            return false;
-          }
-          // Exclude already assigned users
-          if (assignedUserIds.has(profile.user_id)) {
-            return false;
-          }
-          return true;
-        })
-        .map(profile => ({
-          ...profile,
-          id: profile.user_id,
-          created_at: '',
-          role: roleToFetch
-        })) as UserProfile[];
+      employees?.forEach(employee => {
+        if (employee.user_id) {
+          assignedUserIds.add(employee.user_id);
+        }
+      });
+
+      // Filter users to show only unassigned ones
+      const availableUsers = users.filter(userProfile => {
+        // Exclude current user (super admin doing the assignment)
+        if (userProfile.user_id === user?.id) {
+          return false;
+        }
+        
+        // Exclude users who are already assigned to companies
+        if (assignedUserIds.has(userProfile.user_id)) {
+          return false;
+        }
+        
+        // Only show active users
+        if (userProfile.status !== 'active') {
+          return false;
+        }
+        
+        // Show users and admins (potential candidates for assignment)
+        return ['user', 'admin'].includes(userProfile.role);
+      });
 
       setAvailableUsersForAssignment(availableUsers);
     } catch (error) {
@@ -528,7 +498,6 @@ export default function UserManagement() {
         .update({ 
           full_name: editingUser.full_name,
           email: editingUser.email,
-          status: editingUser.status,
           manager_id: finalManagerId
         })
         .eq('user_id', editingUser.user_id);
@@ -1189,95 +1158,6 @@ export default function UserManagement() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-
-            {/* Edit User Dialog */}
-            <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
-              setIsEditDialogOpen(open);
-              if (!open) setEditingUser(null);
-            }}>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Edit User</DialogTitle>
-                  <DialogDescription>
-                    Update user information and role.
-                  </DialogDescription>
-                </DialogHeader>
-                {editingUser && (
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="edit_email" className="text-right">
-                        Email
-                      </Label>
-                      <Input
-                        id="edit_email"
-                        type="email"
-                        value={editingUser.email}
-                        onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                        className="col-span-3"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="edit_full_name" className="text-right">
-                        Full Name
-                      </Label>
-                      <Input
-                        id="edit_full_name"
-                        value={editingUser.full_name || ''}
-                        onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
-                        className="col-span-3"
-                      />
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="edit_role" className="text-right">
-                        Role
-                      </Label>
-                      <Select 
-                        value={editingUser.role} 
-                        onValueChange={(value) => {
-                          setEditingUser({ ...editingUser, role: value });
-                          updateUserRole(editingUser.user_id, value as "employee" | "manager" | "operations_manager" | "super_admin");
-                        }}
-                      >
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="employee">Employee</SelectItem>
-                          <SelectItem value="manager">Company Manager</SelectItem>
-                          <SelectItem value="operations_manager">Organization Manager</SelectItem>
-                          {currentUserRole === 'super_admin' && <SelectItem value="super_admin">Super Admin</SelectItem>}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="edit_status" className="text-right">
-                        Status
-                      </Label>
-                      <Select 
-                        value={editingUser.status} 
-                        onValueChange={(value) => setEditingUser({ ...editingUser, status: value })}
-                      >
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                )}
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={editUser}>
-                    Save Changes
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
             </div>
           </CardTitle>
         </CardHeader>
@@ -1329,27 +1209,14 @@ export default function UserManagement() {
                     {new Date(userProfile.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingUser(userProfile);
-                          setIsEditDialogOpen(true);
-                        }}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteUser(userProfile.user_id, userProfile.email)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => deleteUser(userProfile.user_id, userProfile.email)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
                 ))

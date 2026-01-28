@@ -39,32 +39,18 @@ export default function AssignManagerModal({
 
   const fetchAvailableUsers = async () => {
     try {
-      // First get users with manager role
-      const { data: managerRoles } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'manager');
-
-      const managerUserIds = managerRoles?.map(r => r.user_id) || [];
-
-      if (managerUserIds.length === 0) {
-        setAvailableUsers([]);
-        return;
-      }
-
-      // Then fetch profiles for those managers
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, full_name, email')
-        .in('user_id', managerUserIds)
+        .neq('user_id', company?.created_by || '')
         .neq('status', 'deleted')
         .eq('status', 'active')
         .order('full_name');
 
       setAvailableUsers(profiles || []);
     } catch (error) {
-      console.error('Error fetching managers:', error);
-      toast.error('Failed to load available managers');
+      console.error('Error fetching users:', error);
+      toast.error('Failed to load available users');
     }
   };
 
