@@ -41,8 +41,8 @@ export default function EmployeeDashboard() {
   const [shifts, setShifts] = useState<any[]>([]);
   const [todayShift, setTodayShift] = useState<any>(null);
 
-  // Check if currently on break
-  const onBreak = activeEntry?.break_start && !activeEntry?.break_end;
+  // Check if currently on break - use the function from hook
+  const onBreak = isOnBreak();
 
   // Update clock every second (for current time display)
   useEffect(() => {
@@ -211,8 +211,9 @@ export default function EmployeeDashboard() {
                       variant="outline"
                       className="gap-2"
                       onClick={async () => {
-                        await startBreak(30); // 30 minute default break
+                        await startBreak(30);
                         refetchEntries();
+                        refetchPersistent();
                       }}
                     >
                       <Coffee className="h-5 w-5" />
@@ -221,15 +222,16 @@ export default function EmployeeDashboard() {
                   ) : (
                     <Button 
                       size="lg" 
-                      variant="outline"
-                      className="gap-2 animate-pulse"
+                      variant="secondary"
+                      className="gap-2 border-2 border-orange-500 bg-orange-100 hover:bg-orange-200 text-orange-700"
                       onClick={async () => {
                         await endBreak();
                         refetchEntries();
+                        refetchPersistent();
                       }}
                     >
                       <Coffee className="h-5 w-5" />
-                      End Break
+                      Stop Break
                     </Button>
                   )}
                   <Button 
