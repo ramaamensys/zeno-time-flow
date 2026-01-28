@@ -92,19 +92,6 @@ export default function AssignManagerModal({
       
       if (companyManager !== company.company_manager_id) {
         updates.company_manager_id = (companyManager && companyManager !== "none") ? companyManager : null;
-        
-        // Assign manager role for company manager
-        if (companyManager && companyManager !== "none") {
-          const { error: upsertError } = await supabase
-            .from('user_roles')
-            .upsert({ 
-              user_id: companyManager, 
-              role: 'manager',
-              app_type: 'scheduler'
-            });
-
-          if (upsertError) throw upsertError;
-        }
       }
 
       if (Object.keys(updates).length > 0) {
@@ -125,7 +112,8 @@ export default function AssignManagerModal({
       toast.success('Manager assigned successfully!');
     } catch (error) {
       console.error('Error assigning manager:', error);
-      toast.error('Failed to assign manager');
+      const message = (error as any)?.message;
+      toast.error(message ? `Failed to assign manager: ${message}` : 'Failed to assign manager');
     } finally {
       setLoading(false);
     }
