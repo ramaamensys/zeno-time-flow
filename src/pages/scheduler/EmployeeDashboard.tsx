@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useEmployeeTimeClock } from "@/hooks/useEmployeeTimeClock";
+import { usePersistentTimeClock } from "@/hooks/usePersistentTimeClock";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isToday, parseISO } from "date-fns";
@@ -27,34 +28,21 @@ export default function EmployeeDashboard() {
     calculatePeriodHours 
   } = useEmployeeTimeClock();
   
+  // Use persistent time clock for accurate elapsed time across sessions
+  const { elapsedTimeFormatted } = usePersistentTimeClock();
+  
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [elapsedTime, setElapsedTime] = useState<string>("00:00:00");
   const [shifts, setShifts] = useState<any[]>([]);
   const [todayShift, setTodayShift] = useState<any>(null);
 
-  // Update clock every second
+  // Update clock every second (for current time display)
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-      
-      // Calculate elapsed time if clocked in
-      if (activeEntry?.clock_in) {
-        const start = new Date(activeEntry.clock_in);
-        const now = new Date();
-        const diff = now.getTime() - start.getTime();
-        
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-        
-        setElapsedTime(
-          `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-        );
-      }
     }, 1000);
     
     return () => clearInterval(timer);
-  }, [activeEntry]);
+  }, []);
 
   // Fetch employee's shifts
   useEffect(() => {
@@ -174,7 +162,7 @@ export default function EmployeeDashboard() {
               {activeEntry && (
                 <div className="flex items-center gap-4 text-lg">
                   <span className="font-mono text-3xl font-bold text-primary">
-                    {elapsedTime}
+                    {elapsedTimeFormatted}
                   </span>
                   <Badge variant={isOnBreak ? "secondary" : "default"} className="text-sm">
                     {isOnBreak ? "On Break" : "Working"}
