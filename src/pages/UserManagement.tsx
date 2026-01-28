@@ -476,29 +476,11 @@ export default function UserManagement() {
     if (!editingUser) return;
 
     try {
-      // Determine final manager_id
-      let finalManagerId = editingUser.manager_id === "none" ? null : editingUser.manager_id;
-      
-      // If editing an admin, set super admin as their manager
-      if (editingUser.role === 'admin') {
-        const { data: superAdminData, error: superAdminError } = await supabase
-          .from('user_roles')
-          .select('user_id')
-          .eq('role', 'super_admin')
-          .limit(1)
-          .single();
-          
-        if (superAdminData && !superAdminError) {
-          finalManagerId = superAdminData.user_id;
-        }
-      }
-
       const { error } = await supabase
         .from('profiles')
         .update({ 
           full_name: editingUser.full_name,
-          email: editingUser.email,
-          manager_id: finalManagerId
+          email: editingUser.email
         })
         .eq('user_id', editingUser.user_id);
 
@@ -1298,27 +1280,6 @@ export default function UserManagement() {
                     <SelectItem value="manager">Company Manager</SelectItem>
                     <SelectItem value="operations_manager">Organization Manager</SelectItem>
                     <SelectItem value="super_admin">Super Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit_manager" className="text-right">
-                  Manager
-                </Label>
-                <Select 
-                  value={editingUser.manager_id || "none"} 
-                  onValueChange={(value) => setEditingUser({ ...editingUser, manager_id: value })}
-                >
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select a manager" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No manager</SelectItem>
-                    {managers.map((manager) => (
-                      <SelectItem key={manager.user_id} value={manager.user_id}>
-                        {manager.full_name} ({manager.email})
-                      </SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
               </div>
