@@ -20,24 +20,29 @@ export default function EmployeeDashboard() {
     employee, 
     entries, 
     loading, 
-    startBreak, 
-    endBreak,
     calculatePeriodHours,
     refetch: refetchEntries
   } = useEmployeeTimeClock();
   
-  // Use persistent time clock for clock in/out and timer - this persists across sessions
+  // Use persistent time clock for clock in/out, breaks and timer - this persists across sessions
   const { 
     activeEntry, 
-    elapsedTimeFormatted, 
+    elapsedTimeFormatted,
+    breakTimeFormatted,
     clockIn, 
     clockOut,
+    startBreak,
+    endBreak,
+    isOnBreak,
     refetch: refetchPersistent 
   } = usePersistentTimeClock();
   
   const [currentTime, setCurrentTime] = useState(new Date());
   const [shifts, setShifts] = useState<any[]>([]);
   const [todayShift, setTodayShift] = useState<any>(null);
+
+  // Check if currently on break
+  const onBreak = activeEntry?.break_start && !activeEntry?.break_end;
 
   // Update clock every second (for current time display)
   useEffect(() => {
@@ -104,9 +109,6 @@ export default function EmployeeDashboard() {
   const weekHours = calculatePeriodHours(weekEntries);
   const monthHours = calculatePeriodHours(monthEntries);
 
-  // Check if on break
-  const isOnBreak = activeEntry?.break_start && !activeEntry?.break_end;
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -164,13 +166,20 @@ export default function EmployeeDashboard() {
                 {activeEntry ? 'Currently Clocked In' : 'Not Clocked In'}
               </h2>
               {activeEntry && (
-                <div className="flex items-center gap-4 text-lg">
-                  <span className="font-mono text-3xl font-bold text-primary">
-                    {elapsedTimeFormatted}
-                  </span>
-                  <Badge variant={isOnBreak ? "secondary" : "default"} className="text-sm">
-                    {isOnBreak ? "On Break" : "Working"}
-                  </Badge>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-4 text-lg">
+                    <span className="font-mono text-3xl font-bold text-primary">
+                      {onBreak ? breakTimeFormatted : elapsedTimeFormatted}
+                    </span>
+                    <Badge variant={onBreak ? "secondary" : "default"} className="text-sm">
+                      {onBreak ? "On Break" : "Working"}
+                    </Badge>
+                  </div>
+                  {onBreak && (
+                    <p className="text-sm text-muted-foreground">
+                      Break time elapsed • Work timer paused at {elapsedTimeFormatted}
+                    </p>
+                  )}
                 </div>
               )}
               {todayShift && !activeEntry && (
@@ -196,12 +205,15 @@ export default function EmployeeDashboard() {
                 </Button>
               ) : (
                 <>
-                  {!isOnBreak ? (
+                  {!onBreak ? (
                     <Button 
                       size="lg" 
                       variant="outline"
                       className="gap-2"
-                      onClick={startBreak}
+                      onClick={async () => {
+                        await startBreak(30); // 30 minute default break
+                        refetchEntries();
+                      }}
                     >
                       <Coffee className="h-5 w-5" />
                       Start Break
@@ -210,8 +222,11 @@ export default function EmployeeDashboard() {
                     <Button 
                       size="lg" 
                       variant="outline"
-                      className="gap-2"
-                      onClick={endBreak}
+                      className="gap-2 animate-pulse"
+                      onClick={async () => {
+                        await endBreak();
+                        refetchEntries();
+                      }}
                     >
                       <Coffee className="h-5 w-5" />
                       End Break
@@ -225,7 +240,7 @@ export default function EmployeeDashboard() {
                       await clockOut();
                       refetchEntries();
                     }}
-                    disabled={isOnBreak}
+                    disabled={onBreak}
                   >
                     <Square className="h-5 w-5" />
                     Clock Out
