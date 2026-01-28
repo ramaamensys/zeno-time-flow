@@ -498,6 +498,7 @@ export default function UserManagement() {
         .update({ 
           full_name: editingUser.full_name,
           email: editingUser.email,
+          status: editingUser.status,
           manager_id: finalManagerId
         })
         .eq('user_id', editingUser.user_id);
@@ -1158,6 +1159,95 @@ export default function UserManagement() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* Edit User Dialog */}
+            <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+              setIsEditDialogOpen(open);
+              if (!open) setEditingUser(null);
+            }}>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Edit User</DialogTitle>
+                  <DialogDescription>
+                    Update user information and role.
+                  </DialogDescription>
+                </DialogHeader>
+                {editingUser && (
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="edit_email" className="text-right">
+                        Email
+                      </Label>
+                      <Input
+                        id="edit_email"
+                        type="email"
+                        value={editingUser.email}
+                        onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                        className="col-span-3"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="edit_full_name" className="text-right">
+                        Full Name
+                      </Label>
+                      <Input
+                        id="edit_full_name"
+                        value={editingUser.full_name || ''}
+                        onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
+                        className="col-span-3"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="edit_role" className="text-right">
+                        Role
+                      </Label>
+                      <Select 
+                        value={editingUser.role} 
+                        onValueChange={(value) => {
+                          setEditingUser({ ...editingUser, role: value });
+                          updateUserRole(editingUser.user_id, value as "employee" | "manager" | "operations_manager" | "super_admin");
+                        }}
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="employee">Employee</SelectItem>
+                          <SelectItem value="manager">Company Manager</SelectItem>
+                          <SelectItem value="operations_manager">Organization Manager</SelectItem>
+                          {currentUserRole === 'super_admin' && <SelectItem value="super_admin">Super Admin</SelectItem>}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="edit_status" className="text-right">
+                        Status
+                      </Label>
+                      <Select 
+                        value={editingUser.status} 
+                        onValueChange={(value) => setEditingUser({ ...editingUser, status: value })}
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={editUser}>
+                    Save Changes
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             </div>
           </CardTitle>
         </CardHeader>
@@ -1209,14 +1299,27 @@ export default function UserManagement() {
                     {new Date(userProfile.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => deleteUser(userProfile.user_id, userProfile.email)}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingUser(userProfile);
+                          setIsEditDialogOpen(true);
+                        }}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteUser(userProfile.user_id, userProfile.email)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
                 ))
