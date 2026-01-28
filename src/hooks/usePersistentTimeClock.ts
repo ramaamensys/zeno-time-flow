@@ -384,9 +384,13 @@ export const usePersistentTimeClock = () => {
     try {
       const breakStartTime = new Date().toISOString();
       
+      // Clear break_end when starting a new break to handle multiple break cycles
       const { data, error } = await supabase
         .from('time_clock')
-        .update({ break_start: breakStartTime })
+        .update({ 
+          break_start: breakStartTime,
+          break_end: null  // Clear previous break_end
+        })
         .eq('id', activeEntry.id)
         .select()
         .single();
@@ -599,9 +603,21 @@ export const usePersistentTimeClock = () => {
     return getStoredClockState() !== null;
   };
 
-  // Check if currently on break
+  // Check if currently on break - check localStorage and validate activeEntry
   const isOnBreak = (): boolean => {
-    return getStoredBreakState() !== null;
+    const breakState = getStoredBreakState();
+    if (breakState) return true;
+    
+    // Also check activeEntry for valid break state (break_start exists and is after break_end or break_end is null)
+    if (activeEntry?.break_start && !activeEntry?.break_end) return true;
+    if (activeEntry?.break_start && activeEntry?.break_end) {
+      // Check if break_start is after break_end (corrupted data from previous cycle)
+      const start = new Date(activeEntry.break_start);
+      const end = new Date(activeEntry.break_end);
+      if (start > end) return true; // Currently on a new break
+    }
+    
+    return false;
   };
 
   // Get break time remaining
