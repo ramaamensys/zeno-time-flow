@@ -127,17 +127,15 @@ export default function SchedulerSchedule() {
   const canManageShifts = userRole === 'super_admin' || userRole === 'operations_manager' || userRole === 'manager';
   const isEmployeeView = userRole === 'employee';
 
-  // Further filter to only show Non-IT companies for scheduling (admins) or employee's company (employees)
-  const nonITCompanies = isEmployeeView 
-    ? availableCompanies 
-    : availableCompanies.filter(company => company.field_type === "Non-IT");
+  // Use all available companies for scheduling (field_type filter removed)
+  const schedulableCompanies = availableCompanies;
 
   // Don't auto-select company - let user choose
   // useEffect(() => {
-  //   if (nonITCompanies.length > 0 && !selectedCompany) {
-  //     setSelectedCompany(nonITCompanies[0].id);
+  //   if (schedulableCompanies.length > 0 && !selectedCompany) {
+  //     setSelectedCompany(schedulableCompanies[0].id);
   //   }
-  // }, [nonITCompanies, selectedCompany]);
+  // }, [schedulableCompanies, selectedCompany]);
 
   function getWeekStart(date: Date) {
     const start = new Date(date);
@@ -278,7 +276,7 @@ export default function SchedulerSchedule() {
   };
 
   const downloadSchedule = () => {
-    const companyName = nonITCompanies.find(c => c.id === selectedCompany)?.name || 'Schedule';
+    const companyName = schedulableCompanies.find(c => c.id === selectedCompany)?.name || 'Schedule';
     const weekRange = `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
     
     // Create CSV content
@@ -407,11 +405,11 @@ export default function SchedulerSchedule() {
 
         <div className="flex items-center gap-2">
           <Select value={selectedCompany} onValueChange={setSelectedCompany}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-[200px] bg-background">
               <SelectValue placeholder="Select company" />
             </SelectTrigger>
-            <SelectContent>
-              {nonITCompanies.map((company) => (
+            <SelectContent className="bg-background border shadow-lg z-50">
+              {schedulableCompanies.map((company) => (
                 <SelectItem key={company.id} value={company.id}>
                   {company.name}
                 </SelectItem>
@@ -420,10 +418,10 @@ export default function SchedulerSchedule() {
           </Select>
           
           <Select value={selectedDepartment} onValueChange={setSelectedDepartment} disabled={!selectedCompany}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px] bg-background">
               <SelectValue placeholder="Select department" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-background border shadow-lg z-50">
               <SelectItem value="all">All Departments</SelectItem>
               {departments.map((dept) => (
                 <SelectItem key={dept.id} value={dept.id}>
