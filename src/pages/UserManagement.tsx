@@ -1209,14 +1209,36 @@ export default function UserManagement() {
                     {new Date(userProfile.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => deleteUser(userProfile.user_id, userProfile.email)}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingUser(userProfile);
+                          setIsEditDialogOpen(true);
+                        }}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => reinviteUser(userProfile.email, userProfile.full_name || '', userProfile.role)}
+                        className="h-8 px-2"
+                        title="Re-invite user"
+                      >
+                        <Mail className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteUser(userProfile.user_id, userProfile.email)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
                 ))
@@ -1225,6 +1247,99 @@ export default function UserManagement() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit User Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update user information.
+            </DialogDescription>
+          </DialogHeader>
+          {editingUser && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_email" className="text-right">
+                  Email
+                </Label>
+                <Input
+                  id="edit_email"
+                  type="email"
+                  value={editingUser.email}
+                  onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_full_name" className="text-right">
+                  Full Name
+                </Label>
+                <Input
+                  id="edit_full_name"
+                  value={editingUser.full_name || ""}
+                  onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_role" className="text-right">
+                  Role
+                </Label>
+                <Select 
+                  value={editingUser.role} 
+                  onValueChange={(value: "employee" | "manager" | "operations_manager" | "super_admin") => setEditingUser({ ...editingUser, role: value })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="employee">Employee</SelectItem>
+                    <SelectItem value="manager">Company Manager</SelectItem>
+                    <SelectItem value="operations_manager">Organization Manager</SelectItem>
+                    <SelectItem value="super_admin">Super Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit_manager" className="text-right">
+                  Manager
+                </Label>
+                <Select 
+                  value={editingUser.manager_id || "none"} 
+                  onValueChange={(value) => setEditingUser({ ...editingUser, manager_id: value })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select a manager" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No manager</SelectItem>
+                    {managers.map((manager) => (
+                      <SelectItem key={manager.user_id} value={manager.user_id}>
+                        {manager.full_name} ({manager.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditDialogOpen(false);
+                setEditingUser(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={editUser}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
