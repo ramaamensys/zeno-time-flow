@@ -48,12 +48,17 @@ export const useCalendarShiftNotification = () => {
   }, [getShownNotifications]);
 
   // Start shift handler
-  const startShift = useCallback(async () => {
+  const startShift = useCallback(async (): Promise<boolean> => {
     if (notificationShift) {
-      await clockIn(notificationShift.id);
-      setShowNotification(false);
-      setNotificationShift(null);
-      return true;
+      try {
+        await clockIn(notificationShift.id);
+        setShowNotification(false);
+        setNotificationShift(null);
+        return true;
+      } catch (error) {
+        console.error('Error starting shift:', error);
+        return false;
+      }
     }
     return false;
   }, [notificationShift, clockIn]);

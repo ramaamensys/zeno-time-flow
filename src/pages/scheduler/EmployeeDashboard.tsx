@@ -18,18 +18,22 @@ export default function EmployeeDashboard() {
   const { user } = useAuth();
   const { 
     employee, 
-    activeEntry, 
     entries, 
     loading, 
-    clockIn, 
-    clockOut, 
     startBreak, 
     endBreak,
-    calculatePeriodHours 
+    calculatePeriodHours,
+    refetch: refetchEntries
   } = useEmployeeTimeClock();
   
-  // Use persistent time clock for accurate elapsed time across sessions
-  const { elapsedTimeFormatted } = usePersistentTimeClock();
+  // Use persistent time clock for clock in/out and timer - this persists across sessions
+  const { 
+    activeEntry, 
+    elapsedTimeFormatted, 
+    clockIn, 
+    clockOut,
+    refetch: refetchPersistent 
+  } = usePersistentTimeClock();
   
   const [currentTime, setCurrentTime] = useState(new Date());
   const [shifts, setShifts] = useState<any[]>([]);
@@ -181,7 +185,10 @@ export default function EmployeeDashboard() {
                 <Button 
                   size="lg" 
                   className="gap-2"
-                  onClick={() => clockIn(todayShift?.id)}
+                  onClick={async () => {
+                    await clockIn(todayShift?.id);
+                    refetchEntries();
+                  }}
                 >
                   <Play className="h-5 w-5" />
                   Clock In
@@ -214,7 +221,10 @@ export default function EmployeeDashboard() {
                     size="lg" 
                     variant="destructive"
                     className="gap-2"
-                    onClick={clockOut}
+                    onClick={async () => {
+                      await clockOut();
+                      refetchEntries();
+                    }}
                     disabled={isOnBreak}
                   >
                     <Square className="h-5 w-5" />
