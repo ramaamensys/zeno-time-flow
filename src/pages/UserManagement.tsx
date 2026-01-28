@@ -81,15 +81,46 @@ export default function UserManagement() {
   });
 
   useEffect(() => {
-    if (isAssignCompanyDialogOpen) {
+    if (isAssignCompanyDialogOpen && assignmentData.role) {
       loadAvailableUsers();
     }
-  }, [isAssignCompanyDialogOpen, users, companies]);
+  }, [isAssignCompanyDialogOpen, assignmentData.role]);
 
   const loadAvailableUsers = async () => {
     try {
-      // Get all users who are already assigned to companies
-      const assignedUserIds = new Set();
+      // Clear previous selection when role changes
+      setSelectedUsersForAssignment([]);
+      
+      // Map UI role to database role
+      const roleToFetch = assignmentData.role;
+      
+      // Fetch users who have the selected role
+      const { data: usersWithRole, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', roleToFetch);
+
+      if (rolesError) throw rolesError;
+
+      const userIdsWithRole = usersWithRole?.map(r => r.user_id) || [];
+
+      if (userIdsWithRole.length === 0) {
+        setAvailableUsersForAssignment([]);
+        return;
+      }
+
+      // Get profiles for these users
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email, status')
+        .in('user_id', userIdsWithRole)
+        .eq('status', 'active')
+        .order('full_name');
+
+      if (profilesError) throw profilesError;
+
+      // Get already assigned users to exclude them
+      const assignedUserIds = new Set<string>();
       
       // Add operations managers and company managers from companies
       companies.forEach(company => {
@@ -107,34 +138,33 @@ export default function UserManagement() {
         .select('user_id')
         .eq('status', 'active');
 
-      if (employeesError) throw employeesError;
+      if (!employeesError && employees) {
+        employees.forEach(employee => {
+          if (employee.user_id) {
+            assignedUserIds.add(employee.user_id);
+          }
+        });
+      }
 
-      employees?.forEach(employee => {
-        if (employee.user_id) {
-          assignedUserIds.add(employee.user_id);
-        }
-      });
-
-      // Filter users to show only unassigned ones
-      const availableUsers = users.filter(userProfile => {
-        // Exclude current user (super admin doing the assignment)
-        if (userProfile.user_id === user?.id) {
-          return false;
-        }
-        
-        // Exclude users who are already assigned to companies
-        if (assignedUserIds.has(userProfile.user_id)) {
-          return false;
-        }
-        
-        // Only show active users
-        if (userProfile.status !== 'active') {
-          return false;
-        }
-        
-        // Show users and admins (potential candidates for assignment)
-        return ['user', 'admin'].includes(userProfile.role);
-      });
+      // Filter out already assigned users and current user
+      const availableUsers = (profiles || [])
+        .filter(profile => {
+          // Exclude current user
+          if (profile.user_id === user?.id) {
+            return false;
+          }
+          // Exclude already assigned users
+          if (assignedUserIds.has(profile.user_id)) {
+            return false;
+          }
+          return true;
+        })
+        .map(profile => ({
+          ...profile,
+          id: profile.user_id,
+          created_at: '',
+          role: roleToFetch
+        })) as UserProfile[];
 
       setAvailableUsersForAssignment(availableUsers);
     } catch (error) {
