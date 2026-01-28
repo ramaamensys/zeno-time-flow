@@ -130,12 +130,12 @@ export default function SchedulerSchedule() {
   // Use all available companies for scheduling (field_type filter removed)
   const schedulableCompanies = availableCompanies;
 
-  // Don't auto-select company - let user choose
-  // useEffect(() => {
-  //   if (schedulableCompanies.length > 0 && !selectedCompany) {
-  //     setSelectedCompany(schedulableCompanies[0].id);
-  //   }
-  // }, [schedulableCompanies, selectedCompany]);
+  // Auto-select the first company if none is selected (and employee hasn't auto-selected theirs)
+  useEffect(() => {
+    if (schedulableCompanies.length > 0 && !selectedCompany) {
+      setSelectedCompany(schedulableCompanies[0].id);
+    }
+  }, [schedulableCompanies, selectedCompany]);
 
   function getWeekStart(date: Date) {
     const start = new Date(date);
