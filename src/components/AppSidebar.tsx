@@ -104,11 +104,10 @@ export function AppSidebar() {
     { title: "Daily Routines", url: "/habits", icon: Target },
   ];
 
-  // Employee-specific items (schedule view, time clock)
+  // Employee-specific items (schedule view)
   const employeeItems = [
     { title: "My Dashboard", url: "/scheduler/my-dashboard", icon: LayoutDashboard },
     { title: "Schedule", url: "/scheduler/schedule", icon: Calendar },
-    { title: "Time Clock", url: "/scheduler/time-clock", icon: Clock },
   ];
 
   // Admin scheduler items
@@ -116,7 +115,6 @@ export function AppSidebar() {
     { title: "Companies", url: "/scheduler/companies", icon: Building },
     { title: "Schedule", url: "/scheduler/schedule", icon: Calendar },
     { title: "Employees", url: "/scheduler/employees", icon: UserCheck },
-    { title: "Time Clock", url: "/scheduler/time-clock", icon: Clock },
   ];
 
   // Management items based on role

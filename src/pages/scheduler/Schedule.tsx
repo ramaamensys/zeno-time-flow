@@ -416,54 +416,9 @@ export default function SchedulerSchedule() {
               ))}
             </SelectContent>
           </Select>
-          
-          <Select value={selectedDepartment} onValueChange={setSelectedDepartment} disabled={!selectedCompany}>
-            <SelectTrigger className="w-[180px] bg-background">
-              <SelectValue placeholder="Select department" />
-            </SelectTrigger>
-            <SelectContent className="bg-background border shadow-lg z-50">
-              <SelectItem value="all">All Departments</SelectItem>
-              {departments.map((dept) => (
-                <SelectItem key={dept.id} value={dept.id}>
-                  {dept.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3 mb-6 no-print">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{employees.length}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Active Employees</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {employees.filter(e => e.status === 'active').length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">This Week's Shifts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{shifts.length}</div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Main Layout: Schedule Grid + Employee Sidebar */}
       <div className={`grid grid-cols-1 ${canManageShifts ? 'xl:grid-cols-4' : ''} gap-6`}>
