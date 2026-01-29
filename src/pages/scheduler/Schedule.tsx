@@ -561,17 +561,31 @@ export default function SchedulerSchedule() {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>Weekly Schedule</span>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   {canManageShifts && (
-                    <Button 
-                      variant={isEditMode ? "default" : "outline"} 
-                      size="sm"
-                      onClick={() => setIsEditMode(!isEditMode)}
-                      disabled={!selectedCompany}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      {isEditMode ? "Exit Edit" : "Edit Schedule"}
-                    </Button>
+                    <>
+                      <Button 
+                        variant="default" 
+                        size="sm"
+                        onClick={() => {
+                          setEditingTemplate(null);
+                          setShowSaveScheduleModal(true);
+                        }}
+                        disabled={!selectedCompany || shifts.length === 0}
+                      >
+                        <Save className="h-4 w-4 mr-1" />
+                        Save Schedule
+                      </Button>
+                      <Button 
+                        variant={isEditMode ? "secondary" : "outline"} 
+                        size="sm"
+                        onClick={() => setIsEditMode(!isEditMode)}
+                        disabled={!selectedCompany}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        {isEditMode ? "Exit Edit" : "Edit Schedule"}
+                      </Button>
+                    </>
                   )}
                   <Button variant="outline" size="sm" onClick={printSchedule} disabled={!selectedCompany}>
                     <Printer className="h-4 w-4 mr-1" />
