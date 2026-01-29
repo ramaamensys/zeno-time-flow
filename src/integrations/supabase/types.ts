@@ -1100,6 +1100,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_company: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_access_organization: {
+        Args: { _organization_id: string; _user_id: string }
+        Returns: boolean
+      }
       get_available_admins_for_user: {
         Args: { _user_id: string }
         Returns: {
@@ -1108,6 +1116,10 @@ export type Database = {
           role: string
           user_id: string
         }[]
+      }
+      get_company_organization_id: {
+        Args: { _company_id: string }
+        Returns: string
       }
       get_user_app_type: {
         Args: { _user_id: string }
@@ -1129,6 +1141,14 @@ export type Database = {
       }
       is_company_manager_for_employee: {
         Args: { _employee_user_id: string; _manager_id: string }
+        Returns: boolean
+      }
+      is_employee_at_company: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_org_creator: {
+        Args: { _organization_id: string; _user_id: string }
         Returns: boolean
       }
       is_organization_manager: {
