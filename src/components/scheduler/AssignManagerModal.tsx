@@ -59,8 +59,7 @@ export default function AssignManagerModal({
         .from('profiles')
         .select('user_id, full_name, email')
         .in('user_id', managerUserIds)
-        .neq('status', 'deleted')
-        .eq('status', 'active')
+        .or('status.eq.active,status.is.null')
         .order('full_name');
 
       // Only apply this filter if we actually have a UUID; passing "" breaks Postgres uuid casting.
