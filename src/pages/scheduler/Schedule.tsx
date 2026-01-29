@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar, ChevronLeft, ChevronRight, Plus, Users, Clock, Building, Edit, Trash2, MoreHorizontal, Download, Printer } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Plus, Users, Clock, Building, Edit, Trash2, MoreHorizontal, Download, Printer, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,12 +9,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useCompanies, useDepartments, useEmployees, useShifts, Shift, Employee } from "@/hooks/useSchedulerDatabase";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import CreateCompanyModal from "@/components/scheduler/CreateCompanyModal";
 import CreateShiftModal from "@/components/scheduler/CreateShiftModal";
 import EditShiftModal from "@/components/scheduler/EditShiftModal";
 import CreateEmployeeModal from "@/components/scheduler/CreateEmployeeModal";
 import SlotEditModal from "@/components/scheduler/SlotEditModal";
 import EditEmployeeModal from "@/components/scheduler/EditEmployeeModal";
+import SaveScheduleModal from "@/components/scheduler/SaveScheduleModal";
+import SavedSchedulesCard from "@/components/scheduler/SavedSchedulesCard";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -46,6 +49,11 @@ export default function SchedulerSchedule() {
   const [showSlotEditModal, setShowSlotEditModal] = useState(false);
   const [editingSlot, setEditingSlot] = useState<{ id: string; name: string; time: string; startHour: number; endHour: number } | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [showSaveScheduleModal, setShowSaveScheduleModal] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<{ id: string; name: string; description: string | null } | null>(null);
+  const [savedSchedulesRefresh, setSavedSchedulesRefresh] = useState(0);
+  
+  const { toast } = useToast();
   
   // Database hooks
   const { companies, loading: companiesLoading } = useCompanies();
@@ -343,6 +351,110 @@ export default function SchedulerSchedule() {
     if (!open) setSelectedEmployee(null);
   };
 
+  // Prepare shifts data for saving
+  const prepareShiftsForSave = () => {
+    return shifts.map(shift => {
+      const shiftDate = new Date(shift.start_time);
+      const dayIndex = (shiftDate.getDay() + 6) % 7; // Convert to Monday-based index
+      const startHour = shiftDate.getHours();
+      const endDate = new Date(shift.end_time);
+      const endHour = endDate.getHours();
+      
+      // Find which slot this shift belongs to
+      const slot = shiftSlots.find(s => {
+        if (s.endHour > s.startHour) {
+          return startHour >= s.startHour && startHour < s.endHour;
+        }
+        return startHour >= s.startHour || startHour < s.endHour;
+      });
+      
+      return {
+        employee_id: shift.employee_id,
+        employee_name: getEmployeeName(shift.employee_id),
+        day_index: dayIndex,
+        slot_id: slot?.id || 'morning',
+        start_hour: startHour,
+        end_hour: endHour,
+        break_minutes: shift.break_minutes || 0,
+        hourly_rate: shift.hourly_rate,
+        department_id: shift.department_id
+      };
+    });
+  };
+
+  // Handle loading a saved schedule
+  const handleLoadSchedule = async (template: any) => {
+    if (!template.template_data) return;
+    
+    const { shiftSlots: savedSlots, shifts: savedShifts, week_start } = template.template_data;
+    
+    // Update shift slots if they were saved
+    if (savedSlots && savedSlots.length > 0) {
+      setShiftSlots(savedSlots);
+    }
+    
+    // Navigate to the saved week
+    if (week_start) {
+      setSelectedWeek(new Date(week_start));
+    }
+    
+    // Recreate shifts from saved data
+    if (savedShifts && savedShifts.length > 0) {
+      // First delete existing shifts for this week
+      for (const shift of shifts) {
+        await deleteShift(shift.id);
+      }
+      
+      // Then create new shifts from template
+      const newWeekDates = getWeekDates(week_start ? new Date(week_start) : selectedWeek);
+      
+      for (const savedShift of savedShifts) {
+        const date = newWeekDates[savedShift.day_index];
+        const startDateTime = new Date(date);
+        startDateTime.setHours(savedShift.start_hour, 0, 0, 0);
+        
+        const endDateTime = new Date(date);
+        endDateTime.setHours(savedShift.end_hour, 0, 0, 0);
+        
+        // If night shift crosses midnight, adjust end date
+        if (savedShift.end_hour < savedShift.start_hour) {
+          endDateTime.setDate(endDateTime.getDate() + 1);
+        }
+        
+        await createShift({
+          employee_id: savedShift.employee_id,
+          company_id: selectedCompany,
+          department_id: savedShift.department_id,
+          start_time: startDateTime.toISOString(),
+          end_time: endDateTime.toISOString(),
+          break_minutes: savedShift.break_minutes,
+          hourly_rate: savedShift.hourly_rate,
+          status: 'scheduled'
+        });
+      }
+      
+      toast({
+        title: "Schedule Loaded",
+        description: `"${template.name}" has been applied.`
+      });
+    }
+  };
+
+  // Handle editing a saved schedule
+  const handleEditSavedSchedule = (template: any) => {
+    setEditingTemplate({
+      id: template.id,
+      name: template.name,
+      description: template.description
+    });
+    setShowSaveScheduleModal(true);
+  };
+
+  const handleScheduleSaved = () => {
+    setSavedSchedulesRefresh(prev => prev + 1);
+    setEditingTemplate(null);
+  };
+
   return (
     <div className="space-y-6 p-6">
       <style dangerouslySetInnerHTML={{
@@ -379,6 +491,17 @@ export default function SchedulerSchedule() {
         </div>
         {canManageShifts && (
           <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setEditingTemplate(null);
+                setShowSaveScheduleModal(true);
+              }} 
+              disabled={!selectedCompany || shifts.length === 0}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save Schedule
+            </Button>
             <Button onClick={() => setShowCreateShift(true)} disabled={!selectedCompany}>
               <Plus className="h-4 w-4 mr-2" />
               Add Shift
@@ -859,6 +982,18 @@ export default function SchedulerSchedule() {
         </Card>
       </div>
 
+      {/* Saved Schedules Section */}
+      {canManageShifts && selectedCompany && (
+        <div className="mt-6">
+          <SavedSchedulesCard
+            companyId={selectedCompany}
+            onLoadSchedule={handleLoadSchedule}
+            onEditSchedule={handleEditSavedSchedule}
+            refreshTrigger={savedSchedulesRefresh}
+          />
+        </div>
+      )}
+
       {/* Modals */}
       <CreateCompanyModal 
         open={showCreateCompany} 
@@ -900,6 +1035,20 @@ export default function SchedulerSchedule() {
         onOpenChange={setShowSlotEditModal}
         slot={editingSlot}
         onSave={handleSlotSave}
+      />
+
+      <SaveScheduleModal
+        open={showSaveScheduleModal}
+        onOpenChange={(open) => {
+          setShowSaveScheduleModal(open);
+          if (!open) setEditingTemplate(null);
+        }}
+        companyId={selectedCompany}
+        shiftSlots={shiftSlots}
+        shifts={prepareShiftsForSave()}
+        weekStart={getWeekStart(selectedWeek)}
+        existingTemplate={editingTemplate}
+        onSaved={handleScheduleSaved}
       />
     </div>
   );
