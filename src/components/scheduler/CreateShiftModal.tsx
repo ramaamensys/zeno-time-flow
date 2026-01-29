@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useShifts, useEmployees, useDepartments } from "@/hooks/useSchedulerDatabase";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Check } from "lucide-react";
 
 interface CreateShiftModalProps {
   open: boolean;
@@ -258,10 +258,13 @@ export default function CreateShiftModal({
                   }`}
                   onClick={() => toggleDay(index)}
                 >
-                  <Checkbox
-                    checked={formData.selectedDays[index]}
-                    className="mb-1"
-                  />
+                  <div className={`w-4 h-4 rounded border mb-1 flex items-center justify-center ${
+                    formData.selectedDays[index] 
+                      ? 'bg-primary border-primary' 
+                      : 'border-muted-foreground'
+                  }`}>
+                    {formData.selectedDays[index] && <Check className="w-3 h-3 text-primary-foreground" />}
+                  </div>
                   <span className="text-xs font-medium">{day}</span>
                   <span className="text-[10px] text-muted-foreground">
                     {weekDates[index].getDate()}
