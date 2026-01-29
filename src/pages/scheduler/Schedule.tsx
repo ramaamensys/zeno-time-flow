@@ -17,7 +17,7 @@ import CreateEmployeeModal from "@/components/scheduler/CreateEmployeeModal";
 import SlotEditModal from "@/components/scheduler/SlotEditModal";
 import EditEmployeeModal from "@/components/scheduler/EditEmployeeModal";
 import SaveScheduleModal from "@/components/scheduler/SaveScheduleModal";
-import SavedSchedulesCard from "@/components/scheduler/SavedSchedulesCard";
+import SavedSchedulesCard, { SavedSchedule } from "@/components/scheduler/SavedSchedulesCard";
 
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -456,19 +456,89 @@ export default function SchedulerSchedule() {
     
     // Clear the current schedule after saving (shifts are now preserved in the saved template)
     // Delete all current shifts from the database for this week
+    // Note: Some shifts may have time_clock references, so we handle errors gracefully
+    const currentShiftIds = shifts.map(s => s.id);
+    for (const shiftId of currentShiftIds) {
+      try {
+        // First, unlink any time_clock entries referencing this shift
+        await supabase
+          .from('time_clock')
+          .update({ shift_id: null })
+          .eq('shift_id', shiftId);
+        
+        await deleteShift(shiftId);
+      } catch (e) {
+        console.error('Failed to delete shift:', shiftId, e);
+        // Continue with other shifts even if one fails
+      }
+    }
+    
+    // Auto-advance to next week - create a completely new week date
+    const currentWeekStart = getWeekStart(selectedWeek);
+    const nextWeekStart = new Date(currentWeekStart);
+    nextWeekStart.setDate(currentWeekStart.getDate() + 7);
+    
+    // Use setTimeout to ensure state updates properly after all deletions
+    setTimeout(() => {
+      setSelectedWeek(nextWeekStart);
+      setIsEditMode(false); // Exit edit mode after saving
+      toast({
+        title: "Schedule Saved",
+        description: `Schedule saved! Now viewing week of ${nextWeekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`
+      });
+    }, 100);
+  };
+
+  // Handle copying a saved schedule to the currently selected week
+  const handleCopyScheduleToCurrentWeek = async (template: SavedSchedule) => {
+    if (!template.template_data) return;
+    
+    const { shiftSlots: savedSlots, shifts: savedShifts } = template.template_data;
+    
+    // Update shift slots if they were saved
+    if (savedSlots && savedSlots.length > 0) {
+      setShiftSlots(savedSlots);
+    }
+    
+    // Delete existing shifts for current week
     for (const shift of shifts) {
       await deleteShift(shift.id);
     }
     
-    // Auto-advance to next week
-    const nextWeek = new Date(selectedWeek);
-    nextWeek.setDate(selectedWeek.getDate() + 7);
-    setSelectedWeek(nextWeek);
-    
-    toast({
-      title: "Schedule Saved",
-      description: "The schedule has been saved. Calendar moved to next week for new scheduling."
-    });
+    // Create new shifts using current week's dates (not the saved week)
+    if (savedShifts && savedShifts.length > 0) {
+      const currentWeekDates = getWeekDates(selectedWeek);
+      
+      for (const savedShift of savedShifts) {
+        const date = currentWeekDates[savedShift.day_index];
+        const startDateTime = new Date(date);
+        startDateTime.setHours(savedShift.start_hour, 0, 0, 0);
+        
+        const endDateTime = new Date(date);
+        endDateTime.setHours(savedShift.end_hour, 0, 0, 0);
+        
+        // If night shift crosses midnight, adjust end date
+        if (savedShift.end_hour < savedShift.start_hour) {
+          endDateTime.setDate(endDateTime.getDate() + 1);
+        }
+        
+        await createShift({
+          employee_id: savedShift.employee_id,
+          company_id: selectedCompany,
+          department_id: savedShift.department_id,
+          start_time: startDateTime.toISOString(),
+          end_time: endDateTime.toISOString(),
+          break_minutes: savedShift.break_minutes,
+          hourly_rate: savedShift.hourly_rate,
+          status: 'scheduled'
+        });
+      }
+      
+      toast({
+        title: "Schedule Copied",
+        description: `"${template.name}" has been copied to the current week. You can now modify and save it.`
+      });
+    }
   };
 
   return (
@@ -1000,6 +1070,8 @@ export default function SchedulerSchedule() {
             companyId={selectedCompany}
             onLoadSchedule={handleLoadSchedule}
             onEditSchedule={handleEditSavedSchedule}
+            onCopyToCurrentWeek={handleCopyScheduleToCurrentWeek}
+            currentWeekLabel={`${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
             refreshTrigger={savedSchedulesRefresh}
           />
         </div>
