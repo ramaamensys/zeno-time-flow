@@ -450,9 +450,20 @@ export default function SchedulerSchedule() {
     setShowSaveScheduleModal(true);
   };
 
-  const handleScheduleSaved = () => {
+  const handleScheduleSaved = async () => {
     setSavedSchedulesRefresh(prev => prev + 1);
     setEditingTemplate(null);
+    
+    // Clear the current schedule after saving (shifts are now preserved in the saved template)
+    // Delete all current shifts from the database for this week
+    for (const shift of shifts) {
+      await deleteShift(shift.id);
+    }
+    
+    toast({
+      title: "Schedule Cleared",
+      description: "The weekly schedule has been cleared. Load a saved schedule to continue editing."
+    });
   };
 
   return (
