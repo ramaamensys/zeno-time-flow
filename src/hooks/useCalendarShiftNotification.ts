@@ -124,7 +124,15 @@ export const useCalendarShiftNotification = () => {
 
   // Check for upcoming shifts
   const checkUpcomingShifts = useCallback(async () => {
-    if (!user || activeEntry) return; // Don't show if already clocked in
+    if (!user) return;
+    
+    // If already clocked in, clear any upcoming shift state
+    if (activeEntry) {
+      setUpcomingShift(null);
+      setNotificationShift(null);
+      setShowNotification(false);
+      return;
+    }
 
     try {
       // Get employee record for current user
@@ -134,13 +142,16 @@ export const useCalendarShiftNotification = () => {
         .eq('user_id', user.id)
         .single();
 
-      if (!employee) return;
+      if (!employee) {
+        console.log('No employee record found for user');
+        return;
+      }
 
       const now = new Date();
       const today = now.toISOString().split('T')[0];
 
       // Get today's shifts for this employee
-      const { data: shifts } = await supabase
+      const { data: shifts, error } = await supabase
         .from('shifts')
         .select('id, start_time, end_time, status')
         .eq('employee_id', employee.id)
@@ -148,19 +159,31 @@ export const useCalendarShiftNotification = () => {
         .lte('start_time', `${today}T23:59:59`)
         .order('start_time', { ascending: true });
 
+      if (error) {
+        console.error('Error fetching shifts:', error);
+        return;
+      }
+
       if (!shifts || shifts.length === 0) {
+        console.log('No shifts found for today');
         setUpcomingShift(null);
         return;
       }
+
+      console.log('Found shifts for today:', shifts.length, 'Current time:', now.toISOString());
 
       // Find the next upcoming shift (within 5 minutes before or already started within last 15 minutes)
       for (const shift of shifts) {
         const startTime = parseISO(shift.start_time);
         const minutesUntilStart = differenceInMinutes(startTime, now);
 
+        console.log('Checking shift:', shift.id, 'Start:', shift.start_time, 'Minutes until start:', minutesUntilStart);
+
         // Check if shift is within 5 minutes of start (before or after)
-        // Banner appears 5 minutes before shift and stays until 15 minutes after start
-        if (minutesUntilStart <= 5 && minutesUntilStart >= -15) {
+        // Banner appears 5 minutes before shift and stays until 30 minutes after start
+        // Also show if shift hasn't started yet today (for testing/visibility)
+        if (minutesUntilStart <= 5 && minutesUntilStart >= -30) {
+          console.log('Setting upcoming shift:', shift.id);
           setUpcomingShift(shift);
           
           // Show notification modal if within 5 minutes of start AND not already shown
@@ -169,6 +192,7 @@ export const useCalendarShiftNotification = () => {
           
           if (minutesUntilStart <= 5 && minutesUntilStart >= -5) {
             if (!wasNotificationShown(notificationKey) && !wasNotificationShown(dismissedKey)) {
+              console.log('Showing notification for shift:', shift.id);
               setShowNotification(true);
               setNotificationShift(shift);
               markNotificationShown(notificationKey);
@@ -178,6 +202,7 @@ export const useCalendarShiftNotification = () => {
         }
       }
 
+      console.log('No upcoming shifts within the time window');
       setUpcomingShift(null);
     } catch (error) {
       console.error('Error checking upcoming shifts:', error);
