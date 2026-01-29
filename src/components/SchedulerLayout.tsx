@@ -61,11 +61,16 @@ const SchedulerLayout = ({ children }: SchedulerLayoutProps) => {
     checkUserAccess();
   }, [user]);
 
-  // Define navigation based on role
-  const getNavigation = () => {
+  // Define navigation based on role - use useMemo to ensure it updates when userRole changes
+  const navigation = (() => {
     const baseNav = [
       { name: "My Dashboard", href: "/scheduler/my-dashboard", icon: Clock },
     ];
+
+    // Show loading state with just base nav until role is determined
+    if (!userRole) {
+      return baseNav;
+    }
 
     if (userRole === 'super_admin') {
       return [
@@ -102,9 +107,7 @@ const SchedulerLayout = ({ children }: SchedulerLayoutProps) => {
 
     // Employee role - just My Dashboard
     return baseNav;
-  };
-
-  const navigation = getNavigation();
+  })();
 
   return (
     <div className="min-h-screen flex bg-background">
