@@ -101,16 +101,13 @@ export function AppSidebar() {
     fetchUserData();
   }, [user]);
 
-  // Main features - Calendar available to managers, super_admins, and employees
-  // Tasks, Focus Hours, Daily Routines only for employees or calendar app users
-  const mainItems = userRole === 'manager' || userRole === 'operations_manager'
-    ? [{ title: "Calendar", url: "/calendar", icon: Calendar }]
-    : [
-        { title: "Calendar", url: "/calendar", icon: Calendar },
-        { title: "Tasks", url: "/tasks", icon: CheckSquare },
-        { title: "Focus Hours", url: "/focus", icon: Timer },
-        { title: "Daily Routines", url: "/habits", icon: Target },
-      ];
+  // Main features - available to all users
+  const mainItems = [
+    { title: "Calendar", url: "/calendar", icon: Calendar },
+    { title: "Tasks", url: "/tasks", icon: CheckSquare },
+    { title: "Focus Hours", url: "/focus", icon: Timer },
+    { title: "Daily Routines", url: "/habits", icon: Target },
+  ];
 
   // Employee-specific items (schedule view)
   const employeeItems = [
