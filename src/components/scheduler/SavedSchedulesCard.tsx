@@ -17,7 +17,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-interface SavedSchedule {
+// Exported for use in other components
+export interface SavedSchedule {
   id: string;
   name: string;
   description: string | null;
@@ -50,6 +51,8 @@ interface SavedSchedulesCardProps {
   companyId: string;
   onLoadSchedule: (template: SavedSchedule) => void;
   onEditSchedule: (template: SavedSchedule) => void;
+  onCopyToCurrentWeek?: (template: SavedSchedule) => void;
+  currentWeekLabel?: string;
   refreshTrigger?: number;
 }
 
@@ -57,6 +60,8 @@ export default function SavedSchedulesCard({
   companyId, 
   onLoadSchedule, 
   onEditSchedule,
+  onCopyToCurrentWeek,
+  currentWeekLabel,
   refreshTrigger 
 }: SavedSchedulesCardProps) {
   const [savedSchedules, setSavedSchedules] = useState<SavedSchedule[]>([]);
@@ -241,33 +246,46 @@ export default function SavedSchedulesCard({
                         Saved: {format(parseISO(schedule.created_at), 'MMM d, yyyy h:mm a')}
                       </div>
                       
-                      <div className="flex items-center gap-2 pt-2 border-t">
-                        <Button 
-                          variant="default" 
-                          size="sm" 
-                          className="flex-1"
-                          onClick={() => onLoadSchedule(schedule)}
-                        >
-                          <ArrowRight className="h-4 w-4 mr-1" />
-                          Load
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => onEditSchedule(schedule)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            setScheduleToDelete(schedule);
-                            setDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div className="flex flex-col gap-2 pt-2 border-t">
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="default" 
+                            size="sm" 
+                            className="flex-1"
+                            onClick={() => onLoadSchedule(schedule)}
+                          >
+                            <ArrowRight className="h-4 w-4 mr-1" />
+                            Load
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => onEditSchedule(schedule)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setScheduleToDelete(schedule);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {onCopyToCurrentWeek && (
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="w-full"
+                            onClick={() => onCopyToCurrentWeek(schedule)}
+                          >
+                            <Copy className="h-4 w-4 mr-1" />
+                            Copy to {currentWeekLabel || 'Current Week'}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>
