@@ -30,8 +30,7 @@ export default function CreateShiftModal({
   const [formData, setFormData] = useState({
     employee_id: "",
     department_id: "",
-    start_date: "",
-    end_date: "",
+    date: "",
     start_time: "",
     end_time: "",
     break_minutes: 30,
@@ -57,8 +56,7 @@ export default function CreateShiftModal({
       
       setFormData(prev => ({
         ...prev,
-        start_date: dateStr,
-        end_date: dateStr,
+        date: dateStr,
         start_time: startTime,
         end_time: endTime
       }));
@@ -68,40 +66,32 @@ export default function CreateShiftModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.employee_id || !formData.start_date || !formData.end_date || !formData.start_time || !formData.end_time || !companyId) {
+    if (!formData.employee_id || !formData.date || !formData.start_time || !formData.end_time || !companyId) {
       return;
     }
 
     setLoading(true);
     try {
-      // Create shifts for each day in the date range
-      const startDate = new Date(formData.start_date);
-      const endDate = new Date(formData.end_date);
+      const startDateTime = new Date(`${formData.date}T${formData.start_time}:00`);
+      const endDateTime = new Date(`${formData.date}T${formData.end_time}:00`);
       
-      for (let currentDate = new Date(startDate); currentDate <= endDate; currentDate.setDate(currentDate.getDate() + 1)) {
-        const dateStr = currentDate.toISOString().split('T')[0];
-        const startDateTime = new Date(`${dateStr}T${formData.start_time}:00`);
-        const endDateTime = new Date(`${dateStr}T${formData.end_time}:00`);
-        
-        await createShift({
-          employee_id: formData.employee_id,
-          company_id: companyId,
-          department_id: formData.department_id || undefined,
-          start_time: startDateTime.toISOString(),
-          end_time: endDateTime.toISOString(),
-          break_minutes: formData.break_minutes,
-          hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : undefined,
-          notes: formData.notes || undefined,
-          status: formData.status
-        });
-      }
+      await createShift({
+        employee_id: formData.employee_id,
+        company_id: companyId,
+        department_id: formData.department_id || undefined,
+        start_time: startDateTime.toISOString(),
+        end_time: endDateTime.toISOString(),
+        break_minutes: formData.break_minutes,
+        hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : undefined,
+        notes: formData.notes || undefined,
+        status: formData.status
+      });
       
       onOpenChange(false);
       setFormData({
         employee_id: "",
         department_id: "",
-        start_date: "",
-        end_date: "",
+        date: "",
         start_time: "",
         end_time: "",
         break_minutes: 30,
@@ -175,29 +165,15 @@ export default function CreateShiftModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="start_date">Start Date *</Label>
-              <Input
-                id="start_date"
-                type="date"
-                value={formData.start_date}
-                onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="end_date">End Date *</Label>
-              <Input
-                id="end_date"
-                type="date"
-                value={formData.end_date}
-                onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
-                min={formData.start_date}
-                required
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="date">Date *</Label>
+            <Input
+              id="date"
+              type="date"
+              value={formData.date}
+              onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+              required
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -293,7 +269,7 @@ export default function CreateShiftModal({
             </Button>
             <Button 
               type="submit" 
-              disabled={loading || !formData.employee_id || !formData.start_date || !formData.end_date || !formData.start_time || !formData.end_time}
+              disabled={loading || !formData.employee_id || !formData.date || !formData.start_time || !formData.end_time}
             >
               {loading ? "Creating..." : "Create Shift"}
             </Button>
