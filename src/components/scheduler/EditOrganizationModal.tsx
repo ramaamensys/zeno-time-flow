@@ -61,12 +61,30 @@ export default function EditOrganizationModal({ open, onOpenChange, organization
 
   const fetchAvailableUsers = async () => {
     try {
-      const { data: profiles } = await supabase
+      // Get users with operations_manager role for organization manager assignment
+      const { data: managerRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'operations_manager');
+
+      if (rolesError) throw rolesError;
+
+      const managerUserIds = managerRoles?.map(r => r.user_id) || [];
+
+      if (managerUserIds.length === 0) {
+        setAvailableUsers([]);
+        return;
+      }
+
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('user_id, full_name, email')
+        .in('user_id', managerUserIds)
         .neq('status', 'deleted')
         .eq('status', 'active')
         .order('full_name');
+
+      if (profilesError) throw profilesError;
 
       setAvailableUsers(profiles || []);
     } catch (error) {
