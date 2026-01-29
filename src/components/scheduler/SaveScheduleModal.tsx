@@ -67,15 +67,18 @@ export default function SaveScheduleModal({
   const { toast } = useToast();
   const { user } = useAuth();
 
+  // Reset form when modal opens
   useEffect(() => {
-    if (existingTemplate) {
-      setName(existingTemplate.name);
-      setDescription(existingTemplate.description || "");
-    } else {
-      setName(`Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`);
-      setDescription("");
+    if (open) {
+      if (existingTemplate) {
+        setName(existingTemplate.name);
+        setDescription(existingTemplate.description || "");
+      } else {
+        setName(`Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`);
+        setDescription("");
+      }
     }
-  }, [existingTemplate, weekStart, open]);
+  }, [open]);
 
   const handleSave = async () => {
     if (!name.trim()) {
