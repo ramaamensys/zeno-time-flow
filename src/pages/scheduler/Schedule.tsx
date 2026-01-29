@@ -460,9 +460,14 @@ export default function SchedulerSchedule() {
       await deleteShift(shift.id);
     }
     
+    // Auto-advance to next week
+    const nextWeek = new Date(selectedWeek);
+    nextWeek.setDate(selectedWeek.getDate() + 7);
+    setSelectedWeek(nextWeek);
+    
     toast({
-      title: "Schedule Cleared",
-      description: "The weekly schedule has been cleared. Load a saved schedule to continue editing."
+      title: "Schedule Saved",
+      description: "The schedule has been saved. Calendar moved to next week for new scheduling."
     });
   };
 
@@ -500,19 +505,8 @@ export default function SchedulerSchedule() {
               : 'Manage employee schedules and shift assignments'}
           </p>
         </div>
-        {canManageShifts && (
+      {canManageShifts && (
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setEditingTemplate(null);
-                setShowSaveScheduleModal(true);
-              }} 
-              disabled={!selectedCompany || shifts.length === 0}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              Save Schedule
-            </Button>
             <Button onClick={() => setShowCreateShift(true)} disabled={!selectedCompany}>
               <Plus className="h-4 w-4 mr-2" />
               Add Shift
@@ -576,6 +570,15 @@ export default function SchedulerSchedule() {
                   {canManageShifts && (
                     <>
                       <Button 
+                        variant={isEditMode ? "secondary" : "outline"} 
+                        size="sm"
+                        onClick={() => setIsEditMode(!isEditMode)}
+                        disabled={!selectedCompany}
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        {isEditMode ? "Exit Edit" : "Edit Schedule"}
+                      </Button>
+                      <Button 
                         variant="default" 
                         size="sm"
                         onClick={() => {
@@ -586,15 +589,6 @@ export default function SchedulerSchedule() {
                       >
                         <Save className="h-4 w-4 mr-1" />
                         Save Schedule
-                      </Button>
-                      <Button 
-                        variant={isEditMode ? "secondary" : "outline"} 
-                        size="sm"
-                        onClick={() => setIsEditMode(!isEditMode)}
-                        disabled={!selectedCompany}
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        {isEditMode ? "Exit Edit" : "Edit Schedule"}
                       </Button>
                     </>
                   )}
@@ -735,11 +729,11 @@ export default function SchedulerSchedule() {
                                     isMyShift 
                                       ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700' 
                                       : 'bg-primary/10 border-primary/20'
-                                  } ${canManageShifts ? 'cursor-move hover:bg-primary/20' : 'cursor-default'}`}
-                                  onClick={canManageShifts ? () => handleEditShift(shift) : undefined}
-                                  draggable={canManageShifts}
-                                  onDragStart={canManageShifts ? (e) => handleDragStart(e, shift.employee_id, shift) : undefined}
-                                  onDragEnd={canManageShifts ? handleDragEnd : undefined}
+                                  } ${isEditMode && canManageShifts ? 'cursor-move hover:bg-primary/20' : 'cursor-default'}`}
+                                  onClick={isEditMode && canManageShifts ? () => handleEditShift(shift) : undefined}
+                                  draggable={isEditMode && canManageShifts}
+                                  onDragStart={isEditMode && canManageShifts ? (e) => handleDragStart(e, shift.employee_id, shift) : undefined}
+                                  onDragEnd={isEditMode && canManageShifts ? handleDragEnd : undefined}
                                 >
                                   <Avatar className="h-6 w-6">
                                     <AvatarFallback className="text-xs">
@@ -751,14 +745,6 @@ export default function SchedulerSchedule() {
                                       {employeeName}
                                     </div>
                                   </div>
-                                  <Badge 
-                                    variant={shift.status === 'confirmed' ? 'default' : 
-                                            shift.status === 'scheduled' ? 'secondary' : 
-                                            shift.status === 'pending' ? 'outline' : 'destructive'}
-                                    className="text-xs"
-                                  >
-                                    {shift.status}
-                                  </Badge>
                                   {isEditMode && (
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
