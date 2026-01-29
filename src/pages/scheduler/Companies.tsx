@@ -58,7 +58,7 @@ export default function Companies() {
     fetchUserRole();
   }, [user]);
 
-  const canCreateOrganization = userRole === 'super_admin' || userRole === 'operations_manager';
+  const canCreateOrganization = userRole === 'super_admin';
   const canCreateCompany = userRole === 'super_admin' || userRole === 'operations_manager';
   const canEditCompany = userRole === 'super_admin' || userRole === 'operations_manager';
 
@@ -115,15 +115,30 @@ export default function Companies() {
             </p>
           </div>
           
-          {canCreateOrganization && (
-            <Button 
-              onClick={() => setShowCreateOrgModal(true)}
-              className="bg-primary hover:bg-primary/90"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create Organization
-            </Button>
-          )}
+          <div className="flex gap-2">
+            {canCreateOrganization && (
+              <Button 
+                onClick={() => setShowCreateOrgModal(true)}
+                className="bg-primary hover:bg-primary/90"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Organization
+              </Button>
+            )}
+            {!canCreateOrganization && canCreateCompany && organizations.length > 0 && (
+              <Button 
+                onClick={() => {
+                  // For org managers, use their first organization
+                  setSelectedOrgIdForCompany(organizations[0]?.id || "");
+                  setShowCreateCompanyModal(true);
+                }}
+                className="bg-primary hover:bg-primary/90"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Company
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="space-y-6">

@@ -22,8 +22,10 @@ const SchedulerLayout = ({ children }: SchedulerLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const [userRole, setUserRole] = useState<string | null>(null);
+
   useEffect(() => {
-    const checkMultiAppAccess = async () => {
+    const checkUserAccess = async () => {
       if (!user) return;
 
       try {
@@ -32,25 +34,77 @@ const SchedulerLayout = ({ children }: SchedulerLayoutProps) => {
           .select('role')
           .eq('user_id', user.id);
 
-        const isAdmin = roles?.some(r => r.role === 'admin' || r.role === 'super_admin') || false;
-        setHasMultipleApps(isAdmin);
+        if (roles && roles.length > 0) {
+          const roleList = roles.map(r => r.role);
+          if (roleList.includes('super_admin')) {
+            setUserRole('super_admin');
+            setHasMultipleApps(true);
+          } else if (roleList.includes('operations_manager')) {
+            setUserRole('operations_manager');
+            setHasMultipleApps(true);
+          } else if (roleList.includes('manager')) {
+            setUserRole('manager');
+            setHasMultipleApps(true);
+          } else if (roleList.includes('admin')) {
+            setUserRole('admin');
+            setHasMultipleApps(true);
+          } else {
+            setUserRole('employee');
+            setHasMultipleApps(false);
+          }
+        }
       } catch (error) {
-        console.error('Error checking multi-app access:', error);
+        console.error('Error checking user access:', error);
       }
     };
 
-    checkMultiAppAccess();
+    checkUserAccess();
   }, [user]);
 
-  const navigation = [
-    { name: "My Dashboard", href: "/scheduler/my-dashboard", icon: Clock, employeeOnly: true },
-    { name: "Companies", href: "/scheduler/companies", icon: Building, adminOnly: true },
-    { name: "Schedule", href: "/scheduler/schedule", icon: Calendar, adminOnly: true },
-    { name: "Employees", href: "/scheduler/employees", icon: Users, adminOnly: true },
-    { name: "Time Clock", href: "/scheduler/time-clock", icon: Clock, adminOnly: true },
-    { name: "User Management", href: "/scheduler/user-management", icon: Users, adminOnly: true },
-    { name: "Settings", href: "/scheduler/settings", icon: Settings, adminOnly: true },
-  ];
+  // Define navigation based on role
+  const getNavigation = () => {
+    const baseNav = [
+      { name: "My Dashboard", href: "/scheduler/my-dashboard", icon: Clock },
+    ];
+
+    if (userRole === 'super_admin') {
+      return [
+        ...baseNav,
+        { name: "Companies", href: "/scheduler/companies", icon: Building },
+        { name: "Schedule", href: "/scheduler/schedule", icon: Calendar },
+        { name: "Employees", href: "/scheduler/employees", icon: Users },
+        { name: "Time Clock", href: "/scheduler/time-clock", icon: Clock },
+        { name: "User Management", href: "/scheduler/user-management", icon: Users },
+        { name: "Settings", href: "/scheduler/settings", icon: Settings },
+      ];
+    }
+
+    if (userRole === 'operations_manager') {
+      return [
+        ...baseNav,
+        { name: "Companies", href: "/scheduler/companies", icon: Building },
+        { name: "Schedule", href: "/scheduler/schedule", icon: Calendar },
+        { name: "Employees", href: "/scheduler/employees", icon: Users },
+        { name: "Time Clock", href: "/scheduler/time-clock", icon: Clock },
+        { name: "Settings", href: "/scheduler/settings", icon: Settings },
+      ];
+    }
+
+    if (userRole === 'manager') {
+      return [
+        ...baseNav,
+        { name: "Schedule", href: "/scheduler/schedule", icon: Calendar },
+        { name: "Employees", href: "/scheduler/employees", icon: Users },
+        { name: "Time Clock", href: "/scheduler/time-clock", icon: Clock },
+        { name: "Settings", href: "/scheduler/settings", icon: Settings },
+      ];
+    }
+
+    // Employee role - just My Dashboard
+    return baseNav;
+  };
+
+  const navigation = getNavigation();
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -69,31 +123,24 @@ const SchedulerLayout = ({ children }: SchedulerLayoutProps) => {
 
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1">
-            {navigation
-              .filter(item => {
-                // Filter based on role
-                if (item.adminOnly && !hasMultipleApps) return false;
-                if (item.employeeOnly) return true; // Always show employee dashboard
-                return true;
-              })
-              .map((item) => {
-                const isActive = location.pathname === item.href;
-                
-                return (
-                  <NavLink
-                    key={item.name}
-                    to={item.href}
-                    className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
-                  >
-                    <item.icon className="h-5 w-5 flex-shrink-0" />
-                    {sidebarOpen && <span>{item.name}</span>}
-                  </NavLink>
-                );
-              })}
+            {navigation.map((item) => {
+              const isActive = location.pathname === item.href;
+              
+              return (
+                <NavLink
+                  key={item.name}
+                  to={item.href}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  {sidebarOpen && <span>{item.name}</span>}
+                </NavLink>
+              );
+            })}
           </nav>
 
           {/* User info */}
