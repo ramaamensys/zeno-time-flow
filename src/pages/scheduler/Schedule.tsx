@@ -1087,8 +1087,6 @@ export default function SchedulerSchedule() {
         open={showCreateShift} 
         onOpenChange={setShowCreateShift}
         companyId={selectedCompany}
-        preSelectedDate={preSelectedDate}
-        preSelectedSlot={preSelectedSlot}
       />
       
       <EditShiftModal 
