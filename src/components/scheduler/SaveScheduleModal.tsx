@@ -95,6 +95,21 @@ export default function SaveScheduleModal({
         week_start: weekStart.toISOString()
       }));
 
+      // Check for existing schedule with same week_start for this company (to prevent duplicates)
+      const weekStartStr = weekStart.toISOString();
+      const { data: existingSchedules } = await supabase
+        .from('schedule_templates')
+        .select('id, name, template_data')
+        .eq('company_id', companyId);
+      
+      // Find if there's already a schedule for this week
+      const duplicateSchedule = existingSchedules?.find(schedule => {
+        const scheduleData = typeof schedule.template_data === 'string' 
+          ? JSON.parse(schedule.template_data) 
+          : schedule.template_data;
+        return scheduleData?.week_start === weekStartStr && schedule.id !== existingTemplate?.id;
+      });
+
       if (existingTemplate) {
         // Update existing template
         const { error } = await supabase
@@ -112,6 +127,24 @@ export default function SaveScheduleModal({
         toast({
           title: "Schedule Updated",
           description: `"${name}" has been updated successfully.`
+        });
+      } else if (duplicateSchedule) {
+        // Update the existing schedule for this week instead of creating a duplicate
+        const { error } = await supabase
+          .from('schedule_templates')
+          .update({
+            name: name.trim(),
+            description: description.trim() || null,
+            template_data: templateData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', duplicateSchedule.id);
+
+        if (error) throw error;
+        
+        toast({
+          title: "Schedule Updated",
+          description: `Existing schedule for this week has been updated to "${name}".`
         });
       } else {
         // Create new template
