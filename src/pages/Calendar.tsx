@@ -8,7 +8,9 @@ import { WeekView } from "@/components/calendar/WeekView";
 import { DayView } from "@/components/calendar/DayView";
 import DailyQuote from "@/components/DailyQuote";
 import ShiftReminderNotification from "@/components/calendar/ShiftReminderNotification";
+import ShiftAlertBanner from "@/components/calendar/ShiftAlertBanner";
 import { useCalendarShiftNotification } from "@/hooks/useCalendarShiftNotification";
+import { usePersistentTimeClock } from "@/hooks/usePersistentTimeClock";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Clock, Calendar as CalendarIcon } from "lucide-react";
@@ -60,9 +62,14 @@ const Calendar = () => {
   const { 
     showNotification, 
     notificationShift, 
+    dismissedShift,
     startShift, 
+    startShiftFromBanner,
     dismissNotification 
   } = useCalendarShiftNotification();
+
+  // Time clock hook to check if already clocked in
+  const { activeEntry } = usePersistentTimeClock();
 
   // Fetch employee ID - skip for super_admin
   useEffect(() => {
@@ -233,7 +240,15 @@ const Calendar = () => {
       <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-400/10 to-purple-400/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-purple-400/10 to-pink-400/10 rounded-full blur-3xl pointer-events-none" />
       
-      <div className="relative z-10 space-y-8 p-6">
+      <div className="relative z-10 space-y-6 p-6">
+        {/* Shift Alert Banner - shows when notification was dismissed but shift is still upcoming */}
+        {!isSuperAdmin && !showNotification && dismissedShift && !activeEntry && (
+          <ShiftAlertBanner
+            shift={dismissedShift}
+            onStartShift={startShiftFromBanner}
+          />
+        )}
+
         <DailyQuote />
         
         {/* Info Card - different message for super_admin */}

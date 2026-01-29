@@ -12,6 +12,7 @@ interface Shift {
 }
 
 const CALENDAR_NOTIFICATION_KEY = 'calendar_shift_notifications_shown';
+const CALENDAR_DISMISSED_KEY = 'calendar_shift_dismissed';
 
 export const useCalendarShiftNotification = () => {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ export const useCalendarShiftNotification = () => {
   const [upcomingShift, setUpcomingShift] = useState<Shift | null>(null);
   const [showNotification, setShowNotification] = useState(false);
   const [notificationShift, setNotificationShift] = useState<Shift | null>(null);
+  const [dismissedShift, setDismissedShift] = useState<Shift | null>(null);
 
   // Get already shown notifications from localStorage
   const getShownNotifications = useCallback((): string[] => {
@@ -63,13 +65,62 @@ export const useCalendarShiftNotification = () => {
     return false;
   }, [notificationShift, clockIn]);
 
-  // Dismiss notification
+  // Dismiss notification - keeps the shift info for the banner
   const dismissNotification = useCallback(() => {
     setShowNotification(false);
     if (notificationShift) {
       markNotificationShown(`${notificationShift.id}-dismissed`);
+      setDismissedShift(notificationShift);
+      // Store in localStorage for persistence
+      localStorage.setItem(CALENDAR_DISMISSED_KEY, JSON.stringify(notificationShift));
     }
   }, [notificationShift, markNotificationShown]);
+
+  // Clear dismissed shift (when starting shift or shift time passes)
+  const clearDismissedShift = useCallback(() => {
+    setDismissedShift(null);
+    localStorage.removeItem(CALENDAR_DISMISSED_KEY);
+  }, []);
+
+  // Load dismissed shift from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(CALENDAR_DISMISSED_KEY);
+      if (stored) {
+        const shift = JSON.parse(stored);
+        const now = new Date();
+        const shiftStart = parseISO(shift.start_time);
+        const minutesPassed = differenceInMinutes(now, shiftStart);
+        
+        // Only restore if shift hasn't started more than 30 minutes ago
+        if (minutesPassed < 30) {
+          setDismissedShift(shift);
+        } else {
+          localStorage.removeItem(CALENDAR_DISMISSED_KEY);
+        }
+      }
+    } catch {
+      localStorage.removeItem(CALENDAR_DISMISSED_KEY);
+    }
+  }, []);
+
+  // Start shift from banner
+  const startShiftFromBanner = useCallback(async (): Promise<boolean> => {
+    const shiftToStart = dismissedShift || notificationShift;
+    if (shiftToStart) {
+      try {
+        await clockIn(shiftToStart.id);
+        clearDismissedShift();
+        setShowNotification(false);
+        setNotificationShift(null);
+        return true;
+      } catch (error) {
+        console.error('Error starting shift:', error);
+        return false;
+      }
+    }
+    return false;
+  }, [dismissedShift, notificationShift, clockIn, clearDismissedShift]);
 
   // Check for upcoming shifts
   const checkUpcomingShifts = useCallback(async () => {
@@ -141,7 +192,10 @@ export const useCalendarShiftNotification = () => {
     upcomingShift, 
     showNotification, 
     notificationShift,
+    dismissedShift,
     startShift, 
-    dismissNotification 
+    startShiftFromBanner,
+    dismissNotification,
+    clearDismissedShift
   };
 };
