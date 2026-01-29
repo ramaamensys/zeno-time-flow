@@ -112,7 +112,8 @@ export default function CreateShiftModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Create New Shift</DialogTitle>
+          <DialogTitle>Add New Schedule</DialogTitle>
+          <p className="text-sm text-muted-foreground mt-1">Create a new shift assignment for an employee</p>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
