@@ -245,7 +245,6 @@ export default function CompanyDetailModal({
         open={showAddEmployee}
         onOpenChange={setShowAddEmployee}
         companyId={company?.id}
-        companyFieldType={company?.field_type}
         companyName={company?.name}
       />
     </>

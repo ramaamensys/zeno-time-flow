@@ -12,7 +12,6 @@ interface SimpleEmployeeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   companyId: string;
-  companyFieldType: "IT" | "Non-IT";
   companyName: string;
 }
 
@@ -20,7 +19,6 @@ export default function SimpleEmployeeModal({
   open, 
   onOpenChange, 
   companyId, 
-  companyFieldType, 
   companyName 
 }: SimpleEmployeeModalProps) {
   const { createEmployee } = useEmployees();
@@ -70,7 +68,7 @@ export default function SimpleEmployeeModal({
         email: formData.email.trim(),
         phone: formData.phone.trim(),
         company_id: companyId,
-        position: companyFieldType === "IT" ? "IT Employee" : "Employee",
+        position: "Employee",
         status: "active" as const,
         hire_date: new Date().toISOString().split('T')[0] // Today's date
       };
@@ -108,9 +106,6 @@ export default function SimpleEmployeeModal({
             <UserPlus className="w-5 h-5" />
             Add New Employee - {companyName}
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">
-            Adding employee to <span className="font-medium">{companyFieldType}</span> field
-          </p>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
