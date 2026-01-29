@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useShifts, useEmployees, useDepartments } from "@/hooks/useSchedulerDatabase";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface CreateShiftModalProps {
   open: boolean;
@@ -15,12 +17,10 @@ interface CreateShiftModalProps {
 }
 
 const SHIFT_OPTIONS = [
-  { id: "morning", name: "Morning Shift", time: "6:00 AM - 2:00 PM", startHour: 6, endHour: 14 },
-  { id: "afternoon", name: "Afternoon Shift", time: "2:00 PM - 10:00 PM", startHour: 14, endHour: 22 },
-  { id: "night", name: "Night Shift", time: "10:00 PM - 6:00 AM", startHour: 22, endHour: 6 }
+  { id: "morning", name: "Morning Shift", startHour: 6, endHour: 14 },
+  { id: "afternoon", name: "Afternoon Shift", startHour: 14, endHour: 22 },
+  { id: "night", name: "Night Shift", startHour: 22, endHour: 6 }
 ];
-
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function CreateShiftModal({ 
   open, 
@@ -33,17 +33,16 @@ export default function CreateShiftModal({
   const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState({
-    employee_id: "",
-    department_id: "",
-    selectedShift: "morning",
-    selectedDays: [true, true, true, true, true, false, false] // Mon-Fri by default
+    schedule_name: "",
+    selected_employees: [] as string[],
+    department_id: ""
   });
 
   // Get current week's Monday
   const getWeekStart = () => {
     const now = new Date();
     const dayOfWeek = now.getDay();
-    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Adjust to Monday
+    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
     const monday = new Date(now);
     monday.setDate(now.getDate() + diff);
     monday.setHours(0, 0, 0, 0);
@@ -67,10 +66,9 @@ export default function CreateShiftModal({
   useEffect(() => {
     if (open) {
       setFormData({
-        employee_id: "",
-        department_id: "",
-        selectedShift: "morning",
-        selectedDays: [true, true, true, true, true, false, false]
+        schedule_name: "",
+        selected_employees: [],
+        department_id: ""
       });
     }
   }, [open]);
@@ -78,80 +76,76 @@ export default function CreateShiftModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.employee_id || !companyId) {
-      return;
-    }
-
-    // Check if at least one day is selected
-    if (!formData.selectedDays.some(d => d)) {
+    if (formData.selected_employees.length === 0 || !companyId) {
       return;
     }
 
     setLoading(true);
     try {
-      const shift = SHIFT_OPTIONS.find(s => s.id === formData.selectedShift);
-      if (!shift) return;
-
-      const employee = employees.find(e => e.id === formData.employee_id);
-      
-      // Create shifts for each selected day
-      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-        if (!formData.selectedDays[dayIndex]) continue;
+      // Create all 3 shifts for each day (Mon-Sun) for each selected employee
+      for (const employeeId of formData.selected_employees) {
+        const employee = employees.find(e => e.id === employeeId);
         
-        const date = weekDates[dayIndex];
-        const startDateTime = new Date(date);
-        startDateTime.setHours(shift.startHour, 0, 0, 0);
-        
-        const endDateTime = new Date(date);
-        endDateTime.setHours(shift.endHour, 0, 0, 0);
-        
-        // If night shift crosses midnight, adjust end date
-        if (shift.endHour < shift.startHour) {
-          endDateTime.setDate(endDateTime.getDate() + 1);
+        for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+          const date = weekDates[dayIndex];
+          
+          for (const shift of SHIFT_OPTIONS) {
+            const startDateTime = new Date(date);
+            startDateTime.setHours(shift.startHour, 0, 0, 0);
+            
+            const endDateTime = new Date(date);
+            endDateTime.setHours(shift.endHour, 0, 0, 0);
+            
+            // If night shift crosses midnight, adjust end date
+            if (shift.endHour < shift.startHour) {
+              endDateTime.setDate(endDateTime.getDate() + 1);
+            }
+            
+            await createShift({
+              employee_id: employeeId,
+              company_id: companyId,
+              department_id: formData.department_id || employee?.department_id || undefined,
+              start_time: startDateTime.toISOString(),
+              end_time: endDateTime.toISOString(),
+              break_minutes: 30,
+              hourly_rate: employee?.hourly_rate || undefined,
+              notes: formData.schedule_name ? `Schedule: ${formData.schedule_name}` : undefined,
+              status: 'scheduled'
+            });
+          }
         }
-        
-        await createShift({
-          employee_id: formData.employee_id,
-          company_id: companyId,
-          department_id: formData.department_id || undefined,
-          start_time: startDateTime.toISOString(),
-          end_time: endDateTime.toISOString(),
-          break_minutes: 30,
-          hourly_rate: employee?.hourly_rate || undefined,
-          status: 'scheduled'
-        });
       }
       
       onOpenChange(false);
     } catch (error) {
-      console.error('Failed to create shifts:', error);
+      console.error('Failed to create schedule:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleDay = (index: number) => {
+  const toggleEmployee = (employeeId: string) => {
     setFormData(prev => ({
       ...prev,
-      selectedDays: prev.selectedDays.map((d, i) => i === index ? !d : d)
+      selected_employees: prev.selected_employees.includes(employeeId)
+        ? prev.selected_employees.filter(id => id !== employeeId)
+        : [...prev.selected_employees, employeeId]
     }));
   };
 
-  const selectAllDays = () => {
+  const removeEmployee = (employeeId: string) => {
     setFormData(prev => ({
       ...prev,
-      selectedDays: [true, true, true, true, true, true, true]
+      selected_employees: prev.selected_employees.filter(id => id !== employeeId)
     }));
   };
 
-  const selectWeekdays = () => {
-    setFormData(prev => ({
-      ...prev,
-      selectedDays: [true, true, true, true, true, false, false]
-    }));
+  const getEmployeeName = (id: string) => {
+    const emp = employees.find(e => e.id === id);
+    return emp ? `${emp.first_name} ${emp.last_name}` : 'Unknown';
   };
 
-  const selectedDaysCount = formData.selectedDays.filter(d => d).length;
+  const totalShifts = formData.selected_employees.length * 7 * 3; // employees × days × shifts
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -159,47 +153,80 @@ export default function CreateShiftModal({
         <DialogHeader>
           <DialogTitle>Add New Schedule</DialogTitle>
           <p className="text-sm text-muted-foreground mt-1">
-            Create a weekly schedule for an employee ({weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})
+            Create a weekly schedule ({weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}) with all 3 shifts (Morning, Afternoon, Night)
           </p>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Schedule Name */}
+          <div className="space-y-2">
+            <Label htmlFor="schedule_name">Schedule Name</Label>
+            <Input
+              id="schedule_name"
+              value={formData.schedule_name}
+              onChange={(e) => setFormData(prev => ({ ...prev, schedule_name: e.target.value }))}
+              placeholder="e.g., Week 5 Schedule"
+            />
+          </div>
+
           {/* Employee Selection */}
           <div className="space-y-2">
-            <Label htmlFor="employee">Employee *</Label>
-            <Select
-              value={formData.employee_id}
-              onValueChange={(value) => {
-                const employee = employees.find(e => e.id === value);
-                setFormData(prev => ({
-                  ...prev,
-                  employee_id: value,
-                  department_id: employee?.department_id || ""
-                }));
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select employee" />
-              </SelectTrigger>
-              <SelectContent>
-                {employees.map((employee) => (
-                  <SelectItem key={employee.id} value={employee.id}>
-                    {employee.first_name} {employee.last_name} - {employee.position}
-                  </SelectItem>
+            <Label>Select Employees *</Label>
+            
+            {/* Selected employees badges */}
+            {formData.selected_employees.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {formData.selected_employees.map(id => (
+                  <Badge key={id} variant="secondary" className="flex items-center gap-1">
+                    {getEmployeeName(id)}
+                    <X 
+                      className="h-3 w-3 cursor-pointer hover:text-destructive" 
+                      onClick={() => removeEmployee(id)}
+                    />
+                  </Badge>
                 ))}
-              </SelectContent>
-            </Select>
+              </div>
+            )}
+            
+            {/* Employee list */}
+            <div className="border rounded-lg max-h-48 overflow-y-auto">
+              {employees.map((employee) => (
+                <div
+                  key={employee.id}
+                  className={`flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 border-b last:border-b-0 ${
+                    formData.selected_employees.includes(employee.id) ? 'bg-primary/10' : ''
+                  }`}
+                  onClick={() => toggleEmployee(employee.id)}
+                >
+                  <div>
+                    <span className="font-medium">{employee.first_name} {employee.last_name}</span>
+                    {employee.position && (
+                      <span className="text-sm text-muted-foreground ml-2">- {employee.position}</span>
+                    )}
+                  </div>
+                  {formData.selected_employees.includes(employee.id) && (
+                    <Check className="h-4 w-4 text-primary" />
+                  )}
+                </div>
+              ))}
+              {employees.length === 0 && (
+                <p className="p-3 text-sm text-muted-foreground">No employees found</p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {formData.selected_employees.length} employee{formData.selected_employees.length !== 1 ? 's' : ''} selected
+            </p>
           </div>
 
           {/* Department Selection */}
           <div className="space-y-2">
-            <Label htmlFor="department">Department</Label>
+            <Label htmlFor="department">Department (Optional)</Label>
             <Select
               value={formData.department_id}
               onValueChange={(value) => setFormData(prev => ({ ...prev, department_id: value }))}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select department" />
+                <SelectValue placeholder="Use employee's department" />
               </SelectTrigger>
               <SelectContent>
                 {departments.map((department) => (
@@ -211,71 +238,15 @@ export default function CreateShiftModal({
             </Select>
           </div>
 
-          {/* Shift Selection */}
-          <div className="space-y-2">
-            <Label>Shift Type *</Label>
-            <div className="grid grid-cols-1 gap-2">
-              {SHIFT_OPTIONS.map((shift) => (
-                <div
-                  key={shift.id}
-                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                    formData.selectedShift === shift.id
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:border-primary/50'
-                  }`}
-                  onClick={() => setFormData(prev => ({ ...prev, selectedShift: shift.id }))}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{shift.name}</span>
-                    <span className="text-sm text-muted-foreground">{shift.time}</span>
-                  </div>
-                </div>
-              ))}
+          {/* Summary */}
+          {formData.selected_employees.length > 0 && (
+            <div className="bg-muted/50 p-3 rounded-lg">
+              <p className="text-sm font-medium">Schedule Summary</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                This will create {totalShifts} shifts ({formData.selected_employees.length} employee{formData.selected_employees.length !== 1 ? 's' : ''} × 7 days × 3 shifts)
+              </p>
             </div>
-          </div>
-
-          {/* Day Selection */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Days *</Label>
-              <div className="flex gap-2">
-                <Button type="button" variant="ghost" size="sm" onClick={selectWeekdays}>
-                  Weekdays
-                </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={selectAllDays}>
-                  All Days
-                </Button>
-              </div>
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {DAYS.map((day, index) => (
-                <div
-                  key={day}
-                  className={`flex flex-col items-center p-2 border rounded-lg cursor-pointer transition-colors ${
-                    formData.selectedDays[index]
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border hover:border-primary/50'
-                  }`}
-                  onClick={() => toggleDay(index)}
-                >
-                  <div className={`w-4 h-4 rounded border mb-1 flex items-center justify-center ${
-                    formData.selectedDays[index] 
-                      ? 'bg-primary border-primary' 
-                      : 'border-muted-foreground'
-                  }`}>
-                    {formData.selectedDays[index] && <Check className="w-3 h-3 text-primary-foreground" />}
-                  </div>
-                  <span className="text-xs font-medium">{day}</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {weekDates[index].getDate()}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {selectedDaysCount} day{selectedDaysCount !== 1 ? 's' : ''} selected
-            </p>
-          </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-4">
             <Button
@@ -288,9 +259,9 @@ export default function CreateShiftModal({
             </Button>
             <Button 
               type="submit" 
-              disabled={loading || !formData.employee_id || selectedDaysCount === 0}
+              disabled={loading || formData.selected_employees.length === 0}
             >
-              {loading ? "Creating..." : `Create ${selectedDaysCount} Shift${selectedDaysCount !== 1 ? 's' : ''}`}
+              {loading ? "Creating..." : `Create Schedule`}
             </Button>
           </div>
         </form>
