@@ -1131,6 +1131,26 @@ export type Database = {
         Args: { _employee_user_id: string; _manager_id: string }
         Returns: boolean
       }
+      is_organization_manager: {
+        Args: { _organization_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_organization_manager_for_company: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_organization_manager_for_employee: {
+        Args: { _employee_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_organization_manager_for_shift: {
+        Args: { _shift_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_organization_manager_for_user: {
+        Args: { _manager_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role:
