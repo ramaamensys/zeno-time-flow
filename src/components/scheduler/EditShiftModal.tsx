@@ -93,6 +93,14 @@ export default function EditShiftModal({ open, onOpenChange, shift, companyId }:
 
     setDeleteLoading(true);
     try {
+      // First unlink any time_clock entries that reference this shift
+      const { supabase } = await import("@/integrations/supabase/client");
+      await supabase
+        .from('time_clock')
+        .update({ shift_id: null })
+        .eq('shift_id', shift.id);
+      
+      // Now delete the shift
       await deleteShift(shift.id);
       onOpenChange(false);
     } catch (error) {
