@@ -475,18 +475,18 @@ export default function SchedulerSchedule() {
     
     // Auto-advance to next week - create a completely new week date
     const currentWeekStart = getWeekStart(selectedWeek);
-    const nextWeekStart = new Date(currentWeekStart);
-    nextWeekStart.setDate(currentWeekStart.getDate() + 7);
+    const nextWeekStart = new Date(currentWeekStart.getTime());
+    nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+    nextWeekStart.setHours(12, 0, 0, 0); // Set to noon to avoid timezone edge cases
     
-    // Use setTimeout to ensure state updates properly after all deletions
-    setTimeout(() => {
-      setSelectedWeek(nextWeekStart);
-      setIsEditMode(false); // Exit edit mode after saving
-      toast({
-        title: "Schedule Saved",
-        description: `Schedule saved! Now viewing week of ${nextWeekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`
-      });
-    }, 100);
+    // Force state update with new Date object
+    setSelectedWeek(new Date(nextWeekStart.getTime()));
+    setIsEditMode(false); // Exit edit mode after saving
+    
+    toast({
+      title: "Schedule Saved",
+      description: `Schedule saved! Now viewing week of ${nextWeekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`
+    });
   };
 
   // Handle copying a saved schedule to the currently selected week
@@ -579,7 +579,7 @@ export default function SchedulerSchedule() {
           <div className="flex items-center gap-2">
             <Button onClick={() => setShowCreateShift(true)} disabled={!selectedCompany}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Shift
+              Add New Schedule
             </Button>
           </div>
         )}
