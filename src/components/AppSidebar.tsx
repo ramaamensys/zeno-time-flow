@@ -28,7 +28,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-type UserRole = 'user' | 'admin' | 'super_admin' | 'operations_manager' | 'manager' | 'candidate' | 'employee';
+type UserRole = 'user' | 'admin' | 'super_admin' | 'operations_manager' | 'manager' | 'employee';
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -77,12 +77,9 @@ export function AppSidebar() {
         } else if (roles.includes('admin')) {
           setUserRole('admin');
           setUserAppType('scheduler');
-        } else if (roles.includes('employee')) {
+        } else if (roles.includes('employee') || roles.includes('candidate' as any)) {
           setUserRole('employee');
           setUserAppType('employee'); // Special app type for employees
-        } else if (roles.includes('candidate')) {
-          setUserRole('candidate');
-          setUserAppType('candidate'); // Special app type for candidates
         } else {
           setUserRole('user');
           setUserAppType(appTypes[0] || 'calendar');
@@ -96,7 +93,7 @@ export function AppSidebar() {
     fetchUserData();
   }, [user]);
 
-  // Main features - available to all users including candidates
+  // Main features - available to all users including employees
   const mainItems = [
     { title: "Calendar", url: "/calendar", icon: Calendar },
     { title: "Tasks", url: "/tasks", icon: CheckSquare },
@@ -123,8 +120,8 @@ export function AppSidebar() {
       { title: "Account", url: "/account", icon: Settings },
     ];
 
-    // Checklists for candidates, employees, managers, super_admins
-    if (userRole === 'super_admin' || userRole === 'manager' || userRole === 'candidate' || userRole === 'employee') {
+    // Checklists for employees, managers, super_admins
+    if (userRole === 'super_admin' || userRole === 'manager' || userRole === 'employee') {
       items.push({ title: "Check Lists", url: "/template", icon: GraduationCap });
     }
 
@@ -141,7 +138,7 @@ export function AppSidebar() {
     isActive ? "bg-accent text-accent-foreground font-medium" : "hover:bg-accent/50";
 
   // Determine which sections to show
-  const showMainFeatures = userRole === 'candidate' || userRole === 'employee' || 
+  const showMainFeatures = userRole === 'employee' || 
     userRole === 'manager' || userRole === 'super_admin' || userRole === 'operations_manager' ||
     userAppType === 'calendar' || userAppType === 'both' || userAppType === 'calendar_plus';
   
@@ -149,9 +146,6 @@ export function AppSidebar() {
   
   const showSchedulerAdmin = userRole === 'super_admin' || userRole === 'admin' || 
     userRole === 'operations_manager' || userAppType === 'scheduler' || userAppType === 'both';
-  
-  // Candidates don't see scheduler/employee sections
-  const isCandidate = userRole === 'candidate';
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"} collapsible="icon">
@@ -177,8 +171,8 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {/* Employee Section - only for employees (not candidates) */}
-        {showEmployeeSection && !isCandidate && (
+        {/* Employee Section - only for linked employees */}
+        {showEmployeeSection && (
           <SidebarGroup>
             <SidebarGroupLabel>My Work</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -198,8 +192,8 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {/* Scheduler Admin Section - for admins only, not candidates or regular employees */}
-        {showSchedulerAdmin && !isCandidate && userRole !== 'employee' && (
+        {/* Scheduler Admin Section - for admins only, not regular employees */}
+        {showSchedulerAdmin && userRole !== 'employee' && (
           <SidebarGroup>
             <SidebarGroupLabel>
               {userAppType === 'calendar_plus' ? 'Companies' : 'Scheduler'}
