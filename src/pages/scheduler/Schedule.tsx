@@ -635,7 +635,7 @@ export default function SchedulerSchedule() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span>Weekly Schedule</span>
+                <span>{weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                 <div className="flex gap-2 flex-wrap">
                   {canManageShifts && (
                     <>

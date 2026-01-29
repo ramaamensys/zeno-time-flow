@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useShifts, useEmployees, useDepartments, Employee, Department } from "@/hooks/useSchedulerDatabase";
+import { useShifts, useEmployees, useDepartments } from "@/hooks/useSchedulerDatabase";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface CreateShiftModalProps {
   open: boolean;
@@ -15,12 +14,18 @@ interface CreateShiftModalProps {
   preSelectedSlot?: { id: string; startHour: number; endHour: number };
 }
 
+const SHIFT_OPTIONS = [
+  { id: "morning", name: "Morning Shift", time: "6:00 AM - 2:00 PM", startHour: 6, endHour: 14 },
+  { id: "afternoon", name: "Afternoon Shift", time: "2:00 PM - 10:00 PM", startHour: 14, endHour: 22 },
+  { id: "night", name: "Night Shift", time: "10:00 PM - 6:00 AM", startHour: 22, endHour: 6 }
+];
+
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
 export default function CreateShiftModal({ 
   open, 
   onOpenChange, 
-  companyId,
-  preSelectedDate,
-  preSelectedSlot 
+  companyId
 }: CreateShiftModalProps) {
   const { createShift } = useShifts();
   const { employees } = useEmployees(companyId);
@@ -30,232 +35,243 @@ export default function CreateShiftModal({
   const [formData, setFormData] = useState({
     employee_id: "",
     department_id: "",
-    date: "",
-    start_time: "",
-    end_time: "",
-    break_minutes: 30,
-    hourly_rate: "",
-    notes: "",
-    status: "scheduled"
+    selectedShift: "morning",
+    selectedDays: [true, true, true, true, true, false, false] // Mon-Fri by default
   });
 
-  // Set default values when modal opens
+  // Get current week's Monday
+  const getWeekStart = () => {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Adjust to Monday
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diff);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  };
+
+  const getWeekDates = () => {
+    const monday = getWeekStart();
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + i);
+      dates.push(date);
+    }
+    return dates;
+  };
+
+  const weekDates = getWeekDates();
+
+  // Reset form when modal opens
   useEffect(() => {
     if (open) {
-      const today = new Date();
-      const defaultDate = preSelectedDate || today;
-      const dateStr = defaultDate.toISOString().split('T')[0];
-      
-      let startTime = "09:00";
-      let endTime = "17:00";
-      
-      if (preSelectedSlot) {
-        startTime = `${preSelectedSlot.startHour.toString().padStart(2, '0')}:00`;
-        endTime = `${preSelectedSlot.endHour.toString().padStart(2, '0')}:00`;
-      }
-      
-      setFormData(prev => ({
-        ...prev,
-        date: dateStr,
-        start_time: startTime,
-        end_time: endTime
-      }));
+      setFormData({
+        employee_id: "",
+        department_id: "",
+        selectedShift: "morning",
+        selectedDays: [true, true, true, true, true, false, false]
+      });
     }
-  }, [open, preSelectedDate, preSelectedSlot]);
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.employee_id || !formData.date || !formData.start_time || !formData.end_time || !companyId) {
+    if (!formData.employee_id || !companyId) {
+      return;
+    }
+
+    // Check if at least one day is selected
+    if (!formData.selectedDays.some(d => d)) {
       return;
     }
 
     setLoading(true);
     try {
-      const startDateTime = new Date(`${formData.date}T${formData.start_time}:00`);
-      const endDateTime = new Date(`${formData.date}T${formData.end_time}:00`);
+      const shift = SHIFT_OPTIONS.find(s => s.id === formData.selectedShift);
+      if (!shift) return;
+
+      const employee = employees.find(e => e.id === formData.employee_id);
       
-      await createShift({
-        employee_id: formData.employee_id,
-        company_id: companyId,
-        department_id: formData.department_id || undefined,
-        start_time: startDateTime.toISOString(),
-        end_time: endDateTime.toISOString(),
-        break_minutes: formData.break_minutes,
-        hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : undefined,
-        notes: formData.notes || undefined,
-        status: formData.status
-      });
+      // Create shifts for each selected day
+      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        if (!formData.selectedDays[dayIndex]) continue;
+        
+        const date = weekDates[dayIndex];
+        const startDateTime = new Date(date);
+        startDateTime.setHours(shift.startHour, 0, 0, 0);
+        
+        const endDateTime = new Date(date);
+        endDateTime.setHours(shift.endHour, 0, 0, 0);
+        
+        // If night shift crosses midnight, adjust end date
+        if (shift.endHour < shift.startHour) {
+          endDateTime.setDate(endDateTime.getDate() + 1);
+        }
+        
+        await createShift({
+          employee_id: formData.employee_id,
+          company_id: companyId,
+          department_id: formData.department_id || undefined,
+          start_time: startDateTime.toISOString(),
+          end_time: endDateTime.toISOString(),
+          break_minutes: 30,
+          hourly_rate: employee?.hourly_rate || undefined,
+          status: 'scheduled'
+        });
+      }
       
       onOpenChange(false);
-      setFormData({
-        employee_id: "",
-        department_id: "",
-        date: "",
-        start_time: "",
-        end_time: "",
-        break_minutes: 30,
-        hourly_rate: "",
-        notes: "",
-        status: "scheduled"
-      });
     } catch (error) {
-      console.error('Failed to create shift:', error);
+      console.error('Failed to create shifts:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const selectedEmployee = employees.find(e => e.id === formData.employee_id);
+  const toggleDay = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedDays: prev.selectedDays.map((d, i) => i === index ? !d : d)
+    }));
+  };
+
+  const selectAllDays = () => {
+    setFormData(prev => ({
+      ...prev,
+      selectedDays: [true, true, true, true, true, true, true]
+    }));
+  };
+
+  const selectWeekdays = () => {
+    setFormData(prev => ({
+      ...prev,
+      selectedDays: [true, true, true, true, true, false, false]
+    }));
+  };
+
+  const selectedDaysCount = formData.selectedDays.filter(d => d).length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Add New Schedule</DialogTitle>
-          <p className="text-sm text-muted-foreground mt-1">Create a new shift assignment for an employee</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Create a weekly schedule for an employee ({weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})
+          </p>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="employee">Employee *</Label>
-              <Select
-                value={formData.employee_id}
-                onValueChange={(value) => {
-                  const employee = employees.find(e => e.id === value);
-                  setFormData(prev => ({
-                    ...prev,
-                    employee_id: value,
-                    department_id: employee?.department_id || "",
-                    hourly_rate: employee?.hourly_rate?.toString() || ""
-                  }));
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select employee" />
-                </SelectTrigger>
-                <SelectContent>
-                  {employees.map((employee) => (
-                    <SelectItem key={employee.id} value={employee.id}>
-                      {employee.first_name} {employee.last_name} - {employee.position}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="department">Department</Label>
-              <Select
-                value={formData.department_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, department_id: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((department) => (
-                    <SelectItem key={department.id} value={department.id}>
-                      {department.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Employee Selection */}
           <div className="space-y-2">
-            <Label htmlFor="date">Date *</Label>
-            <Input
-              id="date"
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="start_time">Start Time *</Label>
-              <Input
-                id="start_time"
-                type="time"
-                value={formData.start_time}
-                onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="end_time">End Time *</Label>
-              <Input
-                id="end_time"
-                type="time"
-                value={formData.end_time}
-                onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="break_minutes">Break Minutes</Label>
-              <Input
-                id="break_minutes"
-                type="number"
-                min="0"
-                max="480"
-                value={formData.break_minutes}
-                onChange={(e) => setFormData(prev => ({ ...prev, break_minutes: parseInt(e.target.value) || 0 }))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="hourly_rate">
-                Hourly Rate {selectedEmployee?.hourly_rate && `(Default: $${selectedEmployee.hourly_rate})`}
-              </Label>
-              <Input
-                id="hourly_rate"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.hourly_rate}
-                onChange={(e) => setFormData(prev => ({ ...prev, hourly_rate: e.target.value }))}
-                placeholder={selectedEmployee?.hourly_rate?.toString() || "15.00"}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
+            <Label htmlFor="employee">Employee *</Label>
             <Select
-              value={formData.status}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
+              value={formData.employee_id}
+              onValueChange={(value) => {
+                const employee = employees.find(e => e.id === value);
+                setFormData(prev => ({
+                  ...prev,
+                  employee_id: value,
+                  department_id: employee?.department_id || ""
+                }));
+              }}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Select employee" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="scheduled">Scheduled</SelectItem>
-                <SelectItem value="confirmed">Confirmed</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
+                {employees.map((employee) => (
+                  <SelectItem key={employee.id} value={employee.id}>
+                    {employee.first_name} {employee.last_name} - {employee.position}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
+          {/* Department Selection */}
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-              placeholder="Add any additional notes for this shift..."
-              rows={3}
-            />
+            <Label htmlFor="department">Department</Label>
+            <Select
+              value={formData.department_id}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, department_id: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select department" />
+              </SelectTrigger>
+              <SelectContent>
+                {departments.map((department) => (
+                  <SelectItem key={department.id} value={department.id}>
+                    {department.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Shift Selection */}
+          <div className="space-y-2">
+            <Label>Shift Type *</Label>
+            <div className="grid grid-cols-1 gap-2">
+              {SHIFT_OPTIONS.map((shift) => (
+                <div
+                  key={shift.id}
+                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                    formData.selectedShift === shift.id
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                  onClick={() => setFormData(prev => ({ ...prev, selectedShift: shift.id }))}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{shift.name}</span>
+                    <span className="text-sm text-muted-foreground">{shift.time}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Day Selection */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Days *</Label>
+              <div className="flex gap-2">
+                <Button type="button" variant="ghost" size="sm" onClick={selectWeekdays}>
+                  Weekdays
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={selectAllDays}>
+                  All Days
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {DAYS.map((day, index) => (
+                <div
+                  key={day}
+                  className={`flex flex-col items-center p-2 border rounded-lg cursor-pointer transition-colors ${
+                    formData.selectedDays[index]
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                  onClick={() => toggleDay(index)}
+                >
+                  <Checkbox
+                    checked={formData.selectedDays[index]}
+                    className="mb-1"
+                  />
+                  <span className="text-xs font-medium">{day}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {weekDates[index].getDate()}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {selectedDaysCount} day{selectedDaysCount !== 1 ? 's' : ''} selected
+            </p>
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
@@ -269,9 +285,9 @@ export default function CreateShiftModal({
             </Button>
             <Button 
               type="submit" 
-              disabled={loading || !formData.employee_id || !formData.date || !formData.start_time || !formData.end_time}
+              disabled={loading || !formData.employee_id || selectedDaysCount === 0}
             >
-              {loading ? "Creating..." : "Create Shift"}
+              {loading ? "Creating..." : `Create ${selectedDaysCount} Shift${selectedDaysCount !== 1 ? 's' : ''}`}
             </Button>
           </div>
         </form>
