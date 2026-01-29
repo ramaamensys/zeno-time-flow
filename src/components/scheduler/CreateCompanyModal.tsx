@@ -57,11 +57,24 @@ export default function CreateCompanyModal({ open, onOpenChange, organizationId,
 
   const fetchAvailableUsers = async () => {
     try {
+      // Fetch users with manager role for company manager assignment
+      const { data: managerRoles } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'manager');
+
+      const managerUserIds = managerRoles?.map(r => r.user_id) || [];
+
+      if (managerUserIds.length === 0) {
+        setAvailableUsers([]);
+        return;
+      }
+
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, full_name, email')
-        .neq('status', 'deleted')
-        .eq('status', 'active')
+        .in('user_id', managerUserIds)
+        .or('status.eq.active,status.is.null')
         .order('full_name');
 
       setAvailableUsers(profiles || []);
