@@ -839,7 +839,7 @@ export default function SchedulerSchedule() {
                     
                     {days.map((_, dayIndex) => {
                       const dayShifts = getShiftsForDayAndSlot(dayIndex, slot.id);
-                      const isDropTarget = draggedEmployee !== null;
+                      const isDropTarget = draggedEmployee !== null && isEditMode;
                       
                       return (
                         <div 
@@ -847,8 +847,8 @@ export default function SchedulerSchedule() {
                           className={`min-h-[100px] border rounded p-2 space-y-1 transition-colors ${
                             isDropTarget && canManageShifts ? 'border-primary/50 bg-primary/5' : ''
                           }`}
-                          onDragOver={canManageShifts ? handleDragOver : undefined}
-                          onDrop={canManageShifts ? (e) => handleDrop(e, dayIndex, slot.id) : undefined}
+                          onDragOver={canManageShifts && isEditMode ? handleDragOver : undefined}
+                          onDrop={canManageShifts && isEditMode ? (e) => handleDrop(e, dayIndex, slot.id) : undefined}
                         >
                           {dayShifts.map((shift) => {
                             const employeeName = getEmployeeName(shift.employee_id);
@@ -907,7 +907,7 @@ export default function SchedulerSchedule() {
                                 </div>
                             );
                           })}
-                          {dayShifts.length === 0 && canManageShifts && (
+                          {dayShifts.length === 0 && canManageShifts && isEditMode && (
                             <div
                               className={`w-full h-full min-h-[60px] border-2 border-dashed rounded flex items-center justify-center transition-colors ${
                                 isDropTarget 
@@ -931,6 +931,11 @@ export default function SchedulerSchedule() {
                                   <Plus className="h-4 w-4" />
                                 </Button>
                               )}
+                            </div>
+                          )}
+                          {dayShifts.length === 0 && canManageShifts && !isEditMode && (
+                            <div className="w-full h-full min-h-[60px] border-2 border-dashed rounded flex items-center justify-center text-muted-foreground/50">
+                              <span className="text-xs">Empty</span>
                             </div>
                           )}
                           {dayShifts.length === 0 && !canManageShifts && (
@@ -958,7 +963,7 @@ export default function SchedulerSchedule() {
                 Employees
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                Drag to schedule slots
+                {isEditMode ? 'Drag to schedule slots' : 'Enable Edit Mode to schedule'}
               </p>
             </CardHeader>
             <CardContent>
@@ -1004,12 +1009,14 @@ export default function SchedulerSchedule() {
                       return (
                         <div 
                           key={employee.id} 
-                          className={`group flex flex-col gap-2 p-3 rounded border cursor-grab active:cursor-grabbing transition-all hover:shadow-sm ${
+                          className={`group flex flex-col gap-2 p-3 rounded border transition-all hover:shadow-sm ${
                             isDragging ? 'opacity-50 scale-95' : ''
-                          } ${employee.status === 'active' ? 'border-green-200 bg-green-50/50' : 'border-gray-200'}`}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, employee.id)}
-                          onDragEnd={handleDragEnd}
+                          } ${employee.status === 'active' ? 'border-green-200 bg-green-50/50' : 'border-gray-200'} ${
+                            isEditMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
+                          }`}
+                          draggable={isEditMode}
+                          onDragStart={isEditMode ? (e) => handleDragStart(e, employee.id) : undefined}
+                          onDragEnd={isEditMode ? handleDragEnd : undefined}
                         >
                           <div className="flex items-center gap-2">
                             <Avatar className="h-8 w-8">
