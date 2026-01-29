@@ -179,11 +179,11 @@ export const useCalendarShiftNotification = () => {
 
         console.log('Checking shift:', shift.id, 'Start:', shift.start_time, 'Minutes until start:', minutesUntilStart);
 
-        // Check if shift is within 5 minutes of start (before or after)
-        // Banner appears 5 minutes before shift and stays until 30 minutes after start
-        // Also show if shift hasn't started yet today (for testing/visibility)
-        if (minutesUntilStart <= 5 && minutesUntilStart >= -30) {
-          console.log('Setting upcoming shift:', shift.id);
+        // Banner appears ONLY 5 minutes before shift starts (not after)
+        // minutesUntilStart > 0 means shift hasn't started yet
+        // minutesUntilStart <= 5 means we're within 5 minutes of start
+        if (minutesUntilStart <= 5 && minutesUntilStart > 0) {
+          console.log('Setting upcoming shift (5 min before):', shift.id, 'Minutes until start:', minutesUntilStart);
           setUpcomingShift(shift);
           
           // Show notification modal if within 5 minutes of start AND not already shown
