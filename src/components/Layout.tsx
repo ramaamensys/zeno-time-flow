@@ -29,8 +29,8 @@ const Layout = ({ children }: LayoutProps) => {
   // Use persistent time clock
   const { activeEntry, elapsedTimeFormatted } = usePersistentTimeClock();
   
-  // Don't show shift timer for super_admin
-  const isSuperAdmin = role === 'super_admin';
+  // Only show shift timer for employee role
+  const isEmployee = role === 'employee';
 
   const toggleLocation = () => {
     const newState = !locationEnabled;
@@ -77,8 +77,8 @@ const Layout = ({ children }: LayoutProps) => {
               </div>
               
               <div className="flex items-center gap-4">
-                {/* Show active time clock indicator - hidden for super_admin */}
-                {activeEntry && !isSuperAdmin && (
+                {/* Show active time clock indicator - only for employee role */}
+                {activeEntry && isEmployee && (
                   <Badge 
                     variant="default" 
                     className="cursor-pointer gap-2 bg-green-600 hover:bg-green-700"
@@ -89,8 +89,8 @@ const Layout = ({ children }: LayoutProps) => {
                   </Badge>
                 )}
                 
-                {/* Show upcoming shift notification - hidden for super_admin */}
-                {upcomingShift && !activeEntry && !isSuperAdmin && (
+                {/* Show upcoming shift notification - only for employee role */}
+                {upcomingShift && !activeEntry && isEmployee && (
                   <Button
                     variant="outline"
                     size="sm"

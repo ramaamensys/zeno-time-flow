@@ -128,8 +128,8 @@ export function AppSidebar() {
       { title: "Account", url: "/account", icon: Settings },
     ];
 
-    // Checklists for employees, managers, super_admins
-    if (userRole === 'super_admin' || userRole === 'manager' || userRole === 'employee') {
+    // Checklists for managers and super_admins only (not employees)
+    if (userRole === 'super_admin' || userRole === 'manager') {
       items.push({ title: "Check Lists", url: "/template", icon: GraduationCap });
     }
 
