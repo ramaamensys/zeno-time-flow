@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useShifts, useEmployees, useDepartments, Employee, Department } from "@/hooks/useSchedulerDatabase";
+import { useShifts, useEmployees, useDepartments } from "@/hooks/useSchedulerDatabase";
+import { format, startOfWeek, addDays } from "date-fns";
 
 interface CreateShiftModalProps {
   open: boolean;
@@ -14,6 +15,12 @@ interface CreateShiftModalProps {
   preSelectedDate?: Date;
   preSelectedSlot?: { id: string; startHour: number; endHour: number };
 }
+
+// Helper to get week dates (Monday-Sunday)
+const getWeekDates = (date: Date) => {
+  const monday = startOfWeek(date, { weekStartsOn: 1 });
+  return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+};
 
 export default function CreateShiftModal({ 
   open, 
@@ -30,7 +37,6 @@ export default function CreateShiftModal({
   const [formData, setFormData] = useState({
     employee_id: "",
     department_id: "",
-    date: "",
     start_time: "",
     end_time: "",
     break_minutes: 30,
@@ -39,13 +45,12 @@ export default function CreateShiftModal({
     status: "scheduled"
   });
 
+  // Calculate week dates based on preSelectedDate or current date
+  const weekDates = getWeekDates(preSelectedDate || new Date());
+
   // Set default values when modal opens
   useEffect(() => {
     if (open) {
-      const today = new Date();
-      const defaultDate = preSelectedDate || today;
-      const dateStr = defaultDate.toISOString().split('T')[0];
-      
       let startTime = "09:00";
       let endTime = "17:00";
       
@@ -56,42 +61,44 @@ export default function CreateShiftModal({
       
       setFormData(prev => ({
         ...prev,
-        date: dateStr,
         start_time: startTime,
         end_time: endTime
       }));
     }
-  }, [open, preSelectedDate, preSelectedSlot]);
+  }, [open, preSelectedSlot]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.employee_id || !formData.date || !formData.start_time || !formData.end_time || !companyId) {
+    if (!formData.employee_id || !formData.start_time || !formData.end_time || !companyId) {
       return;
     }
 
     setLoading(true);
     try {
-      const startDateTime = new Date(`${formData.date}T${formData.start_time}:00`);
-      const endDateTime = new Date(`${formData.date}T${formData.end_time}:00`);
-      
-      await createShift({
-        employee_id: formData.employee_id,
-        company_id: companyId,
-        department_id: formData.department_id || undefined,
-        start_time: startDateTime.toISOString(),
-        end_time: endDateTime.toISOString(),
-        break_minutes: formData.break_minutes,
-        hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : undefined,
-        notes: formData.notes || undefined,
-        status: formData.status
-      });
+      // Create shifts for all 7 days of the week
+      for (const date of weekDates) {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const startDateTime = new Date(`${dateStr}T${formData.start_time}:00`);
+        const endDateTime = new Date(`${dateStr}T${formData.end_time}:00`);
+        
+        await createShift({
+          employee_id: formData.employee_id,
+          company_id: companyId,
+          department_id: formData.department_id || undefined,
+          start_time: startDateTime.toISOString(),
+          end_time: endDateTime.toISOString(),
+          break_minutes: formData.break_minutes,
+          hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : undefined,
+          notes: formData.notes || undefined,
+          status: formData.status
+        });
+      }
       
       onOpenChange(false);
       setFormData({
         employee_id: "",
         department_id: "",
-        date: "",
         start_time: "",
         end_time: "",
         break_minutes: 30,
@@ -100,7 +107,7 @@ export default function CreateShiftModal({
         status: "scheduled"
       });
     } catch (error) {
-      console.error('Failed to create shift:', error);
+      console.error('Failed to create shifts:', error);
     } finally {
       setLoading(false);
     }
@@ -113,7 +120,9 @@ export default function CreateShiftModal({
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Add New Schedule</DialogTitle>
-          <p className="text-sm text-muted-foreground mt-1">Create a new shift assignment for an employee</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Create a weekly schedule for an employee ({format(weekDates[0], 'MMM d')} - {format(weekDates[6], 'MMM d, yyyy')})
+          </p>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -165,20 +174,22 @@ export default function CreateShiftModal({
             </div>
           </div>
 
+          {/* Week preview */}
           <div className="space-y-2">
-            <Label htmlFor="date">Date *</Label>
-            <Input
-              id="date"
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-              required
-            />
+            <Label>Week Schedule</Label>
+            <div className="grid grid-cols-7 gap-1 text-center text-xs">
+              {weekDates.map((date, index) => (
+                <div key={index} className="p-2 bg-muted rounded-md">
+                  <div className="font-medium">{format(date, 'EEE')}</div>
+                  <div className="text-muted-foreground">{format(date, 'MMM d')}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="start_time">Start Time *</Label>
+              <Label htmlFor="start_time">Start Time (Daily) *</Label>
               <Input
                 id="start_time"
                 type="time"
@@ -189,7 +200,7 @@ export default function CreateShiftModal({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="end_time">End Time *</Label>
+              <Label htmlFor="end_time">End Time (Daily) *</Label>
               <Input
                 id="end_time"
                 type="time"
@@ -253,7 +264,7 @@ export default function CreateShiftModal({
               id="notes"
               value={formData.notes}
               onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-              placeholder="Add any additional notes for this shift..."
+              placeholder="Add any additional notes for this schedule..."
               rows={3}
             />
           </div>
@@ -269,9 +280,9 @@ export default function CreateShiftModal({
             </Button>
             <Button 
               type="submit" 
-              disabled={loading || !formData.employee_id || !formData.date || !formData.start_time || !formData.end_time}
+              disabled={loading || !formData.employee_id || !formData.start_time || !formData.end_time}
             >
-              {loading ? "Creating..." : "Create Shift"}
+              {loading ? "Creating..." : "Create Weekly Schedule"}
             </Button>
           </div>
         </form>
