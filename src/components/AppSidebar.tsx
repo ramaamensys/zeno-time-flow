@@ -80,7 +80,8 @@ export function AppSidebar() {
           setUserAppType(appType === 'calendar' ? 'calendar_plus' : 'scheduler');
         } else if (roles.includes('manager')) {
           setUserRole('manager');
-          setUserAppType('calendar');
+         // Company Managers are part of the Scheduler app (they manage employees + schedules)
+         setUserAppType('scheduler');
         } else if (roles.includes('admin')) {
           setUserRole('admin');
           setUserAppType('scheduler');
@@ -152,7 +153,13 @@ export function AppSidebar() {
   const showEmployeeSection = (userRole === 'employee' && isEmployeeLinked);
   
   const showSchedulerAdmin = userRole === 'super_admin' || userRole === 'admin' || 
-    userRole === 'operations_manager' || userAppType === 'scheduler' || userAppType === 'both';
+    userRole === 'operations_manager' || userRole === 'manager' ||
+    userAppType === 'scheduler' || userAppType === 'both';
+
+  const schedulerItemsForRole =
+    userRole === 'manager'
+      ? schedulerAdminItems.filter((item) => item.title !== 'Companies')
+      : schedulerAdminItems;
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"} collapsible="icon">
@@ -217,7 +224,7 @@ export function AppSidebar() {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ) : (
-                  schedulerAdminItems.map((item) => (
+                  schedulerItemsForRole.map((item) => (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton asChild>
                         <NavLink to={item.url} end className={getNavCls}>
