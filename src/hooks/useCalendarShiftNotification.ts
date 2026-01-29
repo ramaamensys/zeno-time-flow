@@ -153,16 +153,17 @@ export const useCalendarShiftNotification = () => {
         return;
       }
 
-      // Find the next upcoming shift (within 30 minutes or already started within last 15 minutes)
+      // Find the next upcoming shift (within 5 minutes before or already started within last 15 minutes)
       for (const shift of shifts) {
         const startTime = parseISO(shift.start_time);
         const minutesUntilStart = differenceInMinutes(startTime, now);
 
-        // Check if shift is upcoming (within 30 min) or just started (within 15 min ago)
-        if (minutesUntilStart <= 30 && minutesUntilStart >= -15) {
+        // Check if shift is within 5 minutes of start (before or after)
+        // Banner appears 5 minutes before shift and stays until 15 minutes after start
+        if (minutesUntilStart <= 5 && minutesUntilStart >= -15) {
           setUpcomingShift(shift);
           
-          // Show notification if within 5 minutes of start AND not already shown
+          // Show notification modal if within 5 minutes of start AND not already shown
           const notificationKey = `${shift.id}-${today}`;
           const dismissedKey = `${shift.id}-dismissed`;
           
