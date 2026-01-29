@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
-export type UserRole = 'user' | 'admin' | 'super_admin' | 'operations_manager' | 'manager' | 'candidate' | 'employee';
+export type UserRole = 'user' | 'admin' | 'super_admin' | 'operations_manager' | 'manager' | 'employee';
 
 export const useUserRole = () => {
   const { user } = useAuth();
@@ -39,10 +39,8 @@ export const useUserRole = () => {
             setRole('manager');
           } else if (roles.includes('admin')) {
             setRole('admin');
-          } else if (roles.includes('employee')) {
+          } else if (roles.includes('employee') || roles.includes('candidate' as any)) {
             setRole('employee');
-          } else if (roles.includes('candidate')) {
-            setRole('candidate');
           } else {
             setRole('user');
           }
@@ -62,7 +60,6 @@ export const useUserRole = () => {
 
   const isAdmin = role === 'admin' || role === 'super_admin' || role === 'operations_manager' || role === 'manager';
   const isEmployee = role === 'employee';
-  const isCandidate = role === 'candidate';
   const canManageShifts = role === 'admin' || role === 'super_admin' || role === 'operations_manager' || role === 'manager';
 
   return { 
@@ -71,7 +68,6 @@ export const useUserRole = () => {
     isLoading, 
     isAdmin, 
     isEmployee, 
-    isCandidate,
     canManageShifts 
   };
 };
