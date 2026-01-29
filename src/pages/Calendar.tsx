@@ -55,9 +55,12 @@ const Calendar = () => {
   const [view, setView] = useState<"month" | "week" | "day">("month");
   const [employeeId, setEmployeeId] = useState<string | null>(null);
 
-  // Check if user is super_admin or manager - they get a standard calendar without employee link
+  // Check user role types
   const isSuperAdmin = role === 'super_admin';
-  const isManager = role === 'manager' || role === 'operations_manager';
+  const isOrganizationManager = role === 'operations_manager';
+  const isCompanyManager = role === 'manager';
+  const isEmployee = role === 'employee';
+  const isManager = isCompanyManager || isOrganizationManager;
 
   // Shift notification hook
   const { 
@@ -73,7 +76,7 @@ const Calendar = () => {
   // Time clock hook to check if already clocked in
   const { activeEntry } = usePersistentTimeClock();
 
-  // Fetch employee ID - skip for super_admin and managers
+  // Fetch employee ID - only for employees
   useEffect(() => {
     const fetchEmployeeId = async () => {
       if (!user || isSuperAdmin || isManager) {
@@ -95,10 +98,12 @@ const Calendar = () => {
     fetchEmployeeId();
   }, [user, isSuperAdmin, isManager]);
 
-  // Fetch tasks for managers (tasks assigned to them)
+  // Fetch tasks for managers and employees (tasks assigned to them)
   useEffect(() => {
-    const fetchManagerTasks = async () => {
-      if (!user || !isManager) return;
+    const fetchAssignedTasks = async () => {
+      if (!user || isSuperAdmin) return;
+      // Skip if employee role without employee ID - they see shifts instead
+      if (isEmployee && !employeeId) return;
       
       setIsLoading(true);
       try {
@@ -130,10 +135,11 @@ const Calendar = () => {
       }
     };
 
-    if (isManager) {
-      fetchManagerTasks();
+    // Fetch tasks for organization managers, company managers, and employees
+    if (isOrganizationManager || isCompanyManager || isEmployee) {
+      fetchAssignedTasks();
     }
-  }, [user, isManager, currentDate, toast]);
+  }, [user, isOrganizationManager, isCompanyManager, isEmployee, employeeId, currentDate, toast]);
 
   // Fetch shifts for the current employee - skip for super_admin and managers
   useEffect(() => {
@@ -220,8 +226,11 @@ const Calendar = () => {
     parent_task_id: null,
   }));
 
-  // Get the events to display based on role
-  const calendarEvents = isManager ? tasks : shiftEvents;
+  // Combine shifts and tasks for employees, just tasks for managers
+  // Employees see both their shifts AND their assigned tasks
+  const calendarEvents = isEmployee 
+    ? [...shiftEvents, ...tasks] 
+    : (isManager ? tasks : shiftEvents);
 
   // Handler for viewing shift details (read-only)
   const handleViewShift = (event: CalendarEvent) => {
@@ -297,22 +306,32 @@ const Calendar = () => {
         <DailyQuote />
         
         {/* Info Card - different message for each role */}
-        {isManager && (
+        {isOrganizationManager && (
           <Card className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200/50">
             <CardContent className="p-4 flex items-center gap-3">
               <ListTodo className="h-5 w-5 text-purple-600" />
               <p className="text-sm text-purple-800">
-                This calendar shows tasks assigned to you by organization managers and super admins.
+                This calendar shows tasks assigned to you by super admins.
               </p>
             </CardContent>
           </Card>
         )}
-        {!isSuperAdmin && !isManager && (
+        {isCompanyManager && (
+          <Card className="bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200/50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <ListTodo className="h-5 w-5 text-indigo-600" />
+              <p className="text-sm text-indigo-800">
+                This calendar shows tasks assigned to you by super admins and organization managers.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+        {isEmployee && (
           <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200/50">
             <CardContent className="p-4 flex items-center gap-3">
               <Clock className="h-5 w-5 text-blue-600" />
               <p className="text-sm text-blue-800">
-                This calendar shows your scheduled shifts. Shifts are assigned by your manager.
+                This calendar shows your scheduled shifts and tasks assigned by your company manager.
               </p>
             </CardContent>
           </Card>

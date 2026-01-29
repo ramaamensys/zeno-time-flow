@@ -96,8 +96,8 @@ const Tasks = () => {
     status: "pending", // Default to pending tasks only
   });
 
-  // Helper variable for admin permissions - manager is the main admin for calendar
-  const isAdminUser = userRole === 'super_admin' || userRole === 'manager';
+  // Helper variable for admin permissions - super_admin, operations_manager, and manager can assign tasks
+  const isAdminUser = userRole === 'super_admin' || userRole === 'operations_manager' || userRole === 'manager';
   const [newEvent, setNewEvent] = useState({
     title: "",
     description: "",
@@ -152,7 +152,7 @@ const Tasks = () => {
   }, [user, userRole]);
 
   useEffect(() => {
-    if (userRole === 'super_admin' || userRole === 'manager') {
+    if (userRole === 'super_admin' || userRole === 'operations_manager' || userRole === 'manager') {
       fetchTeamMembers();
     }
   }, [userRole]);
@@ -222,8 +222,12 @@ const Tasks = () => {
       const roles = data.map(item => item.role);
       if (roles.includes('super_admin')) {
         setUserRole('super_admin');
+      } else if (roles.includes('operations_manager')) {
+        setUserRole('operations_manager');
       } else if (roles.includes('manager')) {
         setUserRole('manager');
+      } else if (roles.includes('employee')) {
+        setUserRole('employee');
       } else {
         setUserRole('user');
       }
@@ -240,24 +244,24 @@ const Tasks = () => {
       created_by
     `);
     
-    if (userRole !== 'super_admin' && userRole !== 'manager') {
-      eventsQuery = eventsQuery.eq('user_id', user.id);
+    // Role-based task filtering:
+    // - Super Admin: sees all tasks (for management purposes)
+    // - Organization Manager: sees tasks assigned to them (by super admin)
+    // - Company Manager: sees tasks assigned to them (by super admin or org manager)
+    // - Employee: sees tasks assigned to them (by their company manager)
+    // - User: sees only their own tasks
+    
+    if (userRole === 'super_admin') {
+      // Super admins see all tasks without template_id
+      eventsQuery = eventsQuery.is('template_id', null);
+    } else if (userRole === 'operations_manager' || userRole === 'manager' || userRole === 'employee') {
+      // Managers and employees see tasks assigned TO them
+      eventsQuery = eventsQuery
+        .eq('user_id', user.id)
+        .is('template_id', null);
     } else {
-      if (userRole === 'super_admin' || userRole === 'manager') {
-        eventsQuery = eventsQuery.is('template_id', null);
-      } else {
-        const { data: managedUsers } = await supabase
-          .from('profiles')
-          .select('user_id')
-          .eq('manager_id', user.id);
-        
-        const managedUserIds = managedUsers?.map(u => u.user_id) || [];
-        const allowedUserIds = [...managedUserIds, user.id];
-        
-        eventsQuery = eventsQuery
-          .in('user_id', allowedUserIds)
-          .is('template_id', null);
-      }
+      // Regular users see only their own tasks
+      eventsQuery = eventsQuery.eq('user_id', user.id);
     }
     
     const { data: eventsData, error: eventsError } = await eventsQuery
@@ -301,10 +305,10 @@ const Tasks = () => {
   };
 
   const fetchTeamMembers = async () => {
-    if (userRole !== 'super_admin' && userRole !== 'manager') return;
+    if (userRole !== 'super_admin' && userRole !== 'operations_manager' && userRole !== 'manager') return;
     
     if (userRole === 'super_admin') {
-      // Super admins can see all users
+      // Super admins can see all users (organization managers, company managers, employees)
       const { data, error } = await supabase
         .from("profiles")
         .select("user_id, full_name, email");
@@ -314,8 +318,36 @@ const Tasks = () => {
       } else {
         setTeamMembers(data || []);
       }
+    } else if (userRole === 'operations_manager') {
+      // Organization managers can assign tasks to company managers within their organization
+      const { data: companies, error: companiesError } = await supabase
+        .from("companies")
+        .select("company_manager_id")
+        .eq('operations_manager_id', user?.id);
+
+      if (companiesError) {
+        console.error("Error fetching organization companies:", companiesError);
+        setTeamMembers([]);
+      } else {
+        const managerIds = companies?.map(c => c.company_manager_id).filter(Boolean) || [];
+        if (managerIds.length > 0) {
+          const { data: profiles, error: profilesError } = await supabase
+            .from("profiles")
+            .select("user_id, full_name, email")
+            .in("user_id", managerIds);
+
+          if (profilesError) {
+            console.error("Error fetching manager profiles:", profilesError);
+            setTeamMembers([]);
+          } else {
+            setTeamMembers(profiles || []);
+          }
+        } else {
+          setTeamMembers([]);
+        }
+      }
     } else if (userRole === 'manager') {
-      // IT Company managers see their company employees
+      // Company managers see their company employees
       const { data: employees, error: employeesError } = await supabase
         .from("employees")
         .select(`
