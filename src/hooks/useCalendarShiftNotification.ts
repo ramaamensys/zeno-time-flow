@@ -106,11 +106,14 @@ export const useCalendarShiftNotification = () => {
 
   // Start shift from banner
   const startShiftFromBanner = useCallback(async (): Promise<boolean> => {
-    const shiftToStart = dismissedShift || notificationShift;
+    // Banner can be shown for either a dismissed notification shift OR an upcoming shift.
+    // If the modal wasn't shown (or was already shown), we still need to clock in from the banner.
+    const shiftToStart = dismissedShift || notificationShift || upcomingShift;
     if (shiftToStart) {
       try {
         await clockIn(shiftToStart.id);
         clearDismissedShift();
+        setUpcomingShift(null);
         setShowNotification(false);
         setNotificationShift(null);
         return true;
@@ -120,7 +123,7 @@ export const useCalendarShiftNotification = () => {
       }
     }
     return false;
-  }, [dismissedShift, notificationShift, clockIn, clearDismissedShift]);
+  }, [dismissedShift, notificationShift, upcomingShift, clockIn, clearDismissedShift]);
 
   // Check for upcoming shifts
   const checkUpcomingShifts = useCallback(async () => {
@@ -179,18 +182,18 @@ export const useCalendarShiftNotification = () => {
 
         console.log('Checking shift:', shift.id, 'Start:', shift.start_time, 'Minutes until start:', minutesUntilStart);
 
-        // Banner appears ONLY 5 minutes before shift starts (not after)
-        // minutesUntilStart > 0 means shift hasn't started yet
-        // minutesUntilStart <= 5 means we're within 5 minutes of start
-        if (minutesUntilStart <= 5 && minutesUntilStart > 0) {
-          console.log('Setting upcoming shift (5 min before):', shift.id, 'Minutes until start:', minutesUntilStart);
+        // Banner appears 5 minutes before shift starts and stays visible up to 15 minutes after start
+        // (only if the employee hasn't clocked in - handled above via activeEntry).
+        if (minutesUntilStart <= 5 && minutesUntilStart >= -15) {
+          console.log('Setting upcoming shift (banner window):', shift.id, 'Minutes until start:', minutesUntilStart);
           setUpcomingShift(shift);
           
           // Show notification modal if within 5 minutes of start AND not already shown
           const notificationKey = `${shift.id}-${today}`;
           const dismissedKey = `${shift.id}-dismissed`;
           
-          if (minutesUntilStart <= 5 && minutesUntilStart >= -5) {
+          // Modal should only show BEFORE shift start (not after)
+          if (minutesUntilStart <= 5 && minutesUntilStart > 0) {
             if (!wasNotificationShown(notificationKey) && !wasNotificationShown(dismissedKey)) {
               console.log('Showing notification for shift:', shift.id);
               setShowNotification(true);
