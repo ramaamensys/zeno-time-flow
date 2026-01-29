@@ -3,32 +3,40 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useShifts, useDepartments } from "@/hooks/useSchedulerDatabase";
+import { useDepartments } from "@/hooks/useSchedulerDatabase";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 interface CreateShiftModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   companyId?: string;
+  onScheduleCreated?: () => void;
 }
 
-const SHIFT_OPTIONS = [
-  { id: "morning", name: "Morning Shift", startHour: 6, endHour: 14 },
-  { id: "afternoon", name: "Afternoon Shift", startHour: 14, endHour: 22 },
-  { id: "night", name: "Night Shift", startHour: 22, endHour: 6 }
+const DEFAULT_SHIFT_SLOTS = [
+  { id: "morning", name: "Morning Shift", time: "6:00 AM - 2:00 PM", startHour: 6, endHour: 14 },
+  { id: "afternoon", name: "Afternoon Shift", time: "2:00 PM - 10:00 PM", startHour: 14, endHour: 22 },
+  { id: "night", name: "Night Shift", time: "10:00 PM - 6:00 AM", startHour: 22, endHour: 6 }
 ];
 
 export default function CreateShiftModal({ 
   open, 
   onOpenChange, 
-  companyId
+  companyId,
+  onScheduleCreated
 }: CreateShiftModalProps) {
-  const { createShift } = useShifts();
   const { departments } = useDepartments(companyId);
+  const { toast } = useToast();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     schedule_name: "",
+    description: "",
     department_id: ""
   });
 
@@ -55,12 +63,14 @@ export default function CreateShiftModal({
   };
 
   const weekDates = getWeekDates();
+  const weekStart = getWeekStart();
 
   // Reset form when modal opens
   useEffect(() => {
     if (open) {
       setFormData({
-        schedule_name: "",
+        schedule_name: `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+        description: "",
         department_id: ""
       });
     }
@@ -69,70 +79,96 @@ export default function CreateShiftModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!companyId) {
+    if (!companyId || !user?.id) {
+      toast({
+        title: "Error",
+        description: "Company or user not available",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!formData.schedule_name.trim()) {
+      toast({
+        title: "Name Required",
+        description: "Please enter a name for the schedule",
+        variant: "destructive"
+      });
       return;
     }
 
     setLoading(true);
     try {
-      // Create all 3 shifts for each day (Mon-Sun) without employee assignment
-      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-        const date = weekDates[dayIndex];
-        
-        for (const shift of SHIFT_OPTIONS) {
-          const startDateTime = new Date(date);
-          startDateTime.setHours(shift.startHour, 0, 0, 0);
-          
-          const endDateTime = new Date(date);
-          endDateTime.setHours(shift.endHour, 0, 0, 0);
-          
-          // If night shift crosses midnight, adjust end date
-          if (shift.endHour < shift.startHour) {
-            endDateTime.setDate(endDateTime.getDate() + 1);
-          }
-          
-          await createShift({
-            employee_id: undefined, // No employee - will be assigned via drag/drop
-            company_id: companyId,
-            department_id: formData.department_id || undefined,
-            start_time: startDateTime.toISOString(),
-            end_time: endDateTime.toISOString(),
-            break_minutes: 30,
-            notes: formData.schedule_name ? `Schedule: ${formData.schedule_name}` : undefined,
-            status: 'scheduled'
-          });
-        }
-      }
-      
+      // Create schedule template with empty shifts - manager will assign employees later
+      const templateData = {
+        shiftSlots: DEFAULT_SHIFT_SLOTS,
+        shifts: [], // Empty - no employees assigned yet
+        week_start: weekStart.toISOString(),
+        department_id: formData.department_id || null
+      };
+
+      const { error } = await supabase
+        .from('schedule_templates')
+        .insert([{
+          name: formData.schedule_name.trim(),
+          description: formData.description.trim() || null,
+          template_data: templateData,
+          company_id: companyId,
+          created_by: user.id
+        }]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Schedule Created",
+        description: `"${formData.schedule_name}" has been created. Load it to assign employees.`
+      });
+
+      onScheduleCreated?.();
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to create schedule:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create schedule. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const totalShifts = 7 * 3; // 7 days × 3 shifts
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
-          <DialogTitle>Add New Schedule</DialogTitle>
+          <DialogTitle>Create New Schedule</DialogTitle>
           <p className="text-sm text-muted-foreground mt-1">
-            Create a weekly schedule ({weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}) with Morning, Afternoon, and Night shifts
+            Create a weekly schedule template ({weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})
           </p>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Schedule Name */}
           <div className="space-y-2">
-            <Label htmlFor="schedule_name">Schedule Name</Label>
+            <Label htmlFor="schedule_name">Schedule Name *</Label>
             <Input
               id="schedule_name"
               value={formData.schedule_name}
               onChange={(e) => setFormData(prev => ({ ...prev, schedule_name: e.target.value }))}
               placeholder="e.g., Week 5 Schedule"
+            />
+          </div>
+
+          {/* Description */}
+          <div className="space-y-2">
+            <Label htmlFor="description">Description (Optional)</Label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Add notes about this schedule..."
+              rows={2}
             />
           </div>
 
@@ -158,9 +194,10 @@ export default function CreateShiftModal({
 
           {/* Summary */}
           <div className="bg-muted/50 p-3 rounded-lg">
-            <p className="text-sm font-medium">Schedule Summary</p>
+            <p className="text-sm font-medium">Schedule Template</p>
             <p className="text-xs text-muted-foreground mt-1">
-              This will create {totalShifts} empty shift slots (7 days × 3 shifts per day). You can then drag and drop employees to assign them.
+              This will create an empty schedule with 3 shift slots (Morning, Afternoon, Night) for 7 days. 
+              Load the schedule and drag employees to assign shifts.
             </p>
           </div>
 

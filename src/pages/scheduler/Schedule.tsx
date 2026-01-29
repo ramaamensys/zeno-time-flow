@@ -440,14 +440,78 @@ export default function SchedulerSchedule() {
     }
   };
 
-  // Handle editing a saved schedule
-  const handleEditSavedSchedule = (template: any) => {
+  // Handle editing a saved schedule - load it into the grid for editing
+  const handleEditSavedSchedule = async (template: any) => {
+    if (!template.template_data) return;
+    
+    const { shiftSlots: savedSlots, shifts: savedShifts, week_start } = template.template_data;
+    
+    // Update shift slots if they were saved
+    if (savedSlots && savedSlots.length > 0) {
+      setShiftSlots(savedSlots);
+    }
+    
+    // Navigate to the saved week
+    if (week_start) {
+      setSelectedWeek(new Date(week_start));
+    }
+    
+    // Delete existing shifts for this week first
+    for (const shift of shifts) {
+      try {
+        await supabase
+          .from('time_clock')
+          .update({ shift_id: null })
+          .eq('shift_id', shift.id);
+        await deleteShift(shift.id);
+      } catch (e) {
+        console.error('Failed to delete shift:', shift.id, e);
+      }
+    }
+    
+    // Recreate shifts from saved data if any
+    if (savedShifts && savedShifts.length > 0) {
+      const newWeekDates = getWeekDates(week_start ? new Date(week_start) : selectedWeek);
+      
+      for (const savedShift of savedShifts) {
+        const date = newWeekDates[savedShift.day_index];
+        const startDateTime = new Date(date);
+        startDateTime.setHours(savedShift.start_hour, 0, 0, 0);
+        
+        const endDateTime = new Date(date);
+        endDateTime.setHours(savedShift.end_hour, 0, 0, 0);
+        
+        if (savedShift.end_hour < savedShift.start_hour) {
+          endDateTime.setDate(endDateTime.getDate() + 1);
+        }
+        
+        await createShift({
+          employee_id: savedShift.employee_id,
+          company_id: selectedCompany,
+          department_id: savedShift.department_id,
+          start_time: startDateTime.toISOString(),
+          end_time: endDateTime.toISOString(),
+          break_minutes: savedShift.break_minutes,
+          hourly_rate: savedShift.hourly_rate,
+          status: 'scheduled'
+        });
+      }
+    }
+    
+    // Set up template for saving updates
     setEditingTemplate({
       id: template.id,
       name: template.name,
       description: template.description
     });
-    setShowSaveScheduleModal(true);
+    
+    // Enable edit mode so they can modify
+    setIsEditMode(true);
+    
+    toast({
+      title: "Schedule Loaded for Editing",
+      description: `"${template.name}" is now loaded. Make changes and click "Save Schedule" when done.`
+    });
   };
 
   const handleScheduleSaved = async () => {
@@ -1087,6 +1151,7 @@ export default function SchedulerSchedule() {
         open={showCreateShift} 
         onOpenChange={setShowCreateShift}
         companyId={selectedCompany}
+        onScheduleCreated={() => setSavedSchedulesRefresh(prev => prev + 1)}
       />
       
       <EditShiftModal 
