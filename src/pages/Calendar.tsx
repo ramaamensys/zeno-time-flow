@@ -63,6 +63,7 @@ const Calendar = () => {
     showNotification, 
     notificationShift, 
     dismissedShift,
+    upcomingShift,
     startShift, 
     startShiftFromBanner,
     dismissNotification 
@@ -241,10 +242,10 @@ const Calendar = () => {
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-purple-400/10 to-pink-400/10 rounded-full blur-3xl pointer-events-none" />
       
       <div className="relative z-10 space-y-6 p-6">
-        {/* Shift Alert Banner - shows when notification was dismissed but shift is still upcoming */}
-        {!isSuperAdmin && !showNotification && dismissedShift && !activeEntry && (
+        {/* Shift Alert Banner - shows when notification was dismissed OR when shift is upcoming */}
+        {!isSuperAdmin && !showNotification && !activeEntry && (dismissedShift || upcomingShift) && (
           <ShiftAlertBanner
-            shift={dismissedShift}
+            shift={dismissedShift || upcomingShift!}
             onStartShift={startShiftFromBanner}
           />
         )}

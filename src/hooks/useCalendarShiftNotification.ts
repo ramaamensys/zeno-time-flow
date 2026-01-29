@@ -153,21 +153,25 @@ export const useCalendarShiftNotification = () => {
         return;
       }
 
-      // Find the next upcoming shift
+      // Find the next upcoming shift (within 30 minutes or already started within last 15 minutes)
       for (const shift of shifts) {
         const startTime = parseISO(shift.start_time);
         const minutesUntilStart = differenceInMinutes(startTime, now);
 
-        // Check if shift is exactly 5 minutes away (within 30 second window)
-        if (minutesUntilStart <= 5 && minutesUntilStart >= 0) {
+        // Check if shift is upcoming (within 30 min) or just started (within 15 min ago)
+        if (minutesUntilStart <= 30 && minutesUntilStart >= -15) {
           setUpcomingShift(shift);
           
-          // Show notification if not already shown
+          // Show notification if within 5 minutes of start AND not already shown
           const notificationKey = `${shift.id}-${today}`;
-          if (!wasNotificationShown(notificationKey)) {
-            setShowNotification(true);
-            setNotificationShift(shift);
-            markNotificationShown(notificationKey);
+          const dismissedKey = `${shift.id}-dismissed`;
+          
+          if (minutesUntilStart <= 5 && minutesUntilStart >= -5) {
+            if (!wasNotificationShown(notificationKey) && !wasNotificationShown(dismissedKey)) {
+              setShowNotification(true);
+              setNotificationShift(shift);
+              markNotificationShown(notificationKey);
+            }
           }
           return;
         }
