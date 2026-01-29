@@ -87,6 +87,15 @@ export default function SaveScheduleModal({
       return;
     }
 
+    if (!user?.id) {
+      toast({
+        title: "Not signed in",
+        description: "Please sign in again and try saving.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const templateData = JSON.parse(JSON.stringify({
@@ -97,10 +106,12 @@ export default function SaveScheduleModal({
 
       // Check for existing schedule with same week_start for this company (to prevent duplicates)
       const weekStartStr = weekStart.toISOString();
-      const { data: existingSchedules } = await supabase
+      const { data: existingSchedules, error: existingSchedulesError } = await supabase
         .from('schedule_templates')
         .select('id, name, template_data')
         .eq('company_id', companyId);
+
+      if (existingSchedulesError) throw existingSchedulesError;
       
       // Find if there's already a schedule for this week
       const duplicateSchedule = existingSchedules?.find(schedule => {
@@ -155,7 +166,7 @@ export default function SaveScheduleModal({
             description: description.trim() || null,
             template_data: templateData,
             company_id: companyId,
-            created_by: user?.id
+            created_by: user.id
           }]);
 
         if (error) throw error;

@@ -107,18 +107,41 @@ export default function SavedSchedulesCard({
     if (!scheduleToDelete) return;
     
     try {
-      const { error } = await supabase
-        .from('schedule_templates')
-        .delete()
-        .eq('id', scheduleToDelete.id);
+      const weekStart = scheduleToDelete.template_data?.week_start;
+
+      // If duplicates exist for the same week, delete all for that week to avoid "ghost" schedules.
+      // (User typically expects the week to disappear entirely.)
+      const deleteQuery = weekStart
+        ? supabase
+            .from('schedule_templates')
+            .delete()
+            .eq('company_id', companyId)
+            // PostgREST JSON filter
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            .eq('template_data->>week_start', weekStart)
+        : supabase
+            .from('schedule_templates')
+            .delete()
+            .eq('id', scheduleToDelete.id);
+
+      const { error } = await deleteQuery;
 
       if (error) throw error;
+
+      // Optimistic UI update
+      setSavedSchedules((prev) =>
+        weekStart
+          ? prev.filter((s) => s.template_data?.week_start !== weekStart)
+          : prev.filter((s) => s.id !== scheduleToDelete.id)
+      );
       
       toast({
         title: "Schedule Deleted",
         description: `"${scheduleToDelete.name}" has been deleted.`
       });
       
+      // Re-fetch to ensure UI matches DB
       fetchSavedSchedules();
     } catch (error) {
       console.error('Error deleting schedule:', error);
