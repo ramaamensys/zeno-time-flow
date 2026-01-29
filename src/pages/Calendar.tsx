@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarHeader } from "@/components/calendar/CalendarHeader";
 import { MonthView } from "@/components/calendar/MonthView";
 import { WeekView } from "@/components/calendar/WeekView";
 import { DayView } from "@/components/calendar/DayView";
@@ -13,7 +12,7 @@ import { useCalendarShiftNotification } from "@/hooks/useCalendarShiftNotificati
 import { usePersistentTimeClock } from "@/hooks/usePersistentTimeClock";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
-import { Clock, Calendar as CalendarIcon } from "lucide-react";
+import { Clock, Calendar as CalendarIcon, ListTodo } from "lucide-react";
 import { useUserRole } from "@/hooks/useUserRole";
 
 interface Shift {
@@ -50,13 +49,15 @@ const Calendar = () => {
   const { toast } = useToast();
   const { role, isLoading: roleLoading } = useUserRole();
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [tasks, setTasks] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"month" | "week" | "day">("month");
   const [employeeId, setEmployeeId] = useState<string | null>(null);
 
-  // Check if user is super_admin - they get a standard calendar without employee link
+  // Check if user is super_admin or manager - they get a standard calendar without employee link
   const isSuperAdmin = role === 'super_admin';
+  const isManager = role === 'manager' || role === 'operations_manager';
 
   // Shift notification hook
   const { 
@@ -72,10 +73,10 @@ const Calendar = () => {
   // Time clock hook to check if already clocked in
   const { activeEntry } = usePersistentTimeClock();
 
-  // Fetch employee ID - skip for super_admin
+  // Fetch employee ID - skip for super_admin and managers
   useEffect(() => {
     const fetchEmployeeId = async () => {
-      if (!user || isSuperAdmin) {
+      if (!user || isSuperAdmin || isManager) {
         setIsLoading(false);
         return;
       }
@@ -92,12 +93,52 @@ const Calendar = () => {
     };
     
     fetchEmployeeId();
-  }, [user, isSuperAdmin]);
+  }, [user, isSuperAdmin, isManager]);
 
-  // Fetch shifts for the current employee - skip for super_admin
+  // Fetch tasks for managers (tasks assigned to them)
+  useEffect(() => {
+    const fetchManagerTasks = async () => {
+      if (!user || !isManager) return;
+      
+      setIsLoading(true);
+      try {
+        const monthStart = startOfMonth(currentDate);
+        const monthEnd = endOfMonth(currentDate);
+
+        const { data, error } = await supabase
+          .from('calendar_events')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('event_type', 'task')
+          .gte('start_time', monthStart.toISOString())
+          .lte('start_time', monthEnd.toISOString())
+          .order('start_time', { ascending: true });
+
+        if (error) {
+          toast({
+            title: "Error fetching tasks",
+            description: error.message,
+            variant: "destructive",
+          });
+        } else {
+          setTasks(data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching tasks:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (isManager) {
+      fetchManagerTasks();
+    }
+  }, [user, isManager, currentDate, toast]);
+
+  // Fetch shifts for the current employee - skip for super_admin and managers
   useEffect(() => {
     const fetchShifts = async () => {
-      if (isSuperAdmin) {
+      if (isSuperAdmin || isManager) {
         setIsLoading(false);
         return;
       }
@@ -161,9 +202,9 @@ const Calendar = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [employeeId, currentDate, toast, isSuperAdmin]);
+  }, [employeeId, currentDate, toast, isSuperAdmin, isManager]);
 
-  // Convert shifts to calendar event format
+  // Convert shifts to calendar event format (for employees)
   const shiftEvents: CalendarEvent[] = shifts.map(shift => ({
     id: shift.id,
     title: shift.company?.name || 'Shift',
@@ -178,6 +219,9 @@ const Calendar = () => {
     completed: shift.status === 'completed',
     parent_task_id: null,
   }));
+
+  // Get the events to display based on role
+  const calendarEvents = isManager ? tasks : shiftEvents;
 
   // Handler for viewing shift details (read-only)
   const handleViewShift = (event: CalendarEvent) => {
@@ -207,9 +251,9 @@ const Calendar = () => {
     );
   }
 
-  // Super admin sees standard calendar without employee requirement
-  // Non-super admins need an employee record to see shifts
-  if (!isSuperAdmin && !employeeId) {
+  // Super admin and managers see standard calendar without employee requirement
+  // Non-super admins/managers need an employee record to see shifts
+  if (!isSuperAdmin && !isManager && !employeeId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 p-6">
         <Card className="max-w-md mx-auto">
@@ -228,7 +272,7 @@ const Calendar = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 relative">
       {/* Shift Reminder Notification - only for employees */}
-      {!isSuperAdmin && showNotification && notificationShift && (
+      {!isSuperAdmin && !isManager && showNotification && notificationShift && (
         <ShiftReminderNotification
           shift={notificationShift}
           onStartShift={startShift}
@@ -242,8 +286,8 @@ const Calendar = () => {
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-purple-400/10 to-pink-400/10 rounded-full blur-3xl pointer-events-none" />
       
       <div className="relative z-10 space-y-6 p-6">
-        {/* Shift Alert Banner - shows when notification was dismissed OR when shift is upcoming */}
-        {!isSuperAdmin && !showNotification && !activeEntry && (dismissedShift || upcomingShift) && (
+        {/* Shift Alert Banner - shows when notification was dismissed OR when shift is upcoming (employees only) */}
+        {!isSuperAdmin && !isManager && !showNotification && !activeEntry && (dismissedShift || upcomingShift) && (
           <ShiftAlertBanner
             shift={dismissedShift || upcomingShift!}
             onStartShift={startShiftFromBanner}
@@ -252,8 +296,18 @@ const Calendar = () => {
 
         <DailyQuote />
         
-        {/* Info Card - different message for super_admin */}
-        {!isSuperAdmin && (
+        {/* Info Card - different message for each role */}
+        {isManager && (
+          <Card className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200/50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <ListTodo className="h-5 w-5 text-purple-600" />
+              <p className="text-sm text-purple-800">
+                This calendar shows tasks assigned to you by organization managers and super admins.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+        {!isSuperAdmin && !isManager && (
           <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200/50">
             <CardContent className="p-4 flex items-center gap-3">
               <Clock className="h-5 w-5 text-blue-600" />
@@ -337,7 +391,7 @@ const Calendar = () => {
         {view === "month" && (
           <MonthView
             currentDate={currentDate}
-            events={shiftEvents}
+            events={calendarEvents}
             onDateClick={handleDateClick}
             onEditEvent={handleViewShift}
           />
@@ -346,7 +400,7 @@ const Calendar = () => {
         {view === "week" && (
           <WeekView
             currentDate={currentDate}
-            events={shiftEvents}
+            events={calendarEvents}
             onTimeSlotClick={handleTimeSlotClick}
             onEditEvent={handleViewShift}
           />
@@ -355,7 +409,7 @@ const Calendar = () => {
         {view === "day" && (
           <DayView
             currentDate={currentDate}
-            events={shiftEvents}
+            events={calendarEvents}
             onTimeSlotClick={handleTimeSlotClick}
             onEditEvent={handleViewShift}
           />
