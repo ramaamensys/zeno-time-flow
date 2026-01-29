@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar, Edit, Trash2, Clock, Users, Copy, ArrowRight } from "lucide-react";
+import { Calendar, Edit, Trash2, Clock, Users, Copy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -217,7 +217,11 @@ export default function SavedSchedulesCard({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {savedSchedules.map((schedule) => (
-                <Card key={schedule.id} className="border hover:shadow-md transition-shadow">
+                <Card 
+                  key={schedule.id} 
+                  className="border hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => onEditSchedule(schedule)}
+                >
                   <CardContent className="p-4">
                     <div className="space-y-3">
                       <div className="flex items-start justify-between">
@@ -252,22 +256,19 @@ export default function SavedSchedulesCard({
                             variant="default" 
                             size="sm" 
                             className="flex-1"
-                            onClick={() => onLoadSchedule(schedule)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditSchedule(schedule);
+                            }}
                           >
-                            <ArrowRight className="h-4 w-4 mr-1" />
-                            Load
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
                           </Button>
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => onEditSchedule(schedule)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setScheduleToDelete(schedule);
                               setDeleteDialogOpen(true);
                             }}
@@ -280,7 +281,10 @@ export default function SavedSchedulesCard({
                             variant="secondary" 
                             size="sm" 
                             className="w-full"
-                            onClick={() => onCopyToCurrentWeek(schedule)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onCopyToCurrentWeek(schedule);
+                            }}
                           >
                             <Copy className="h-4 w-4 mr-1" />
                             Copy to {currentWeekLabel || 'Current Week'}

@@ -215,6 +215,7 @@ export default function SaveScheduleModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter schedule name"
+              autoFocus
             />
           </div>
           
