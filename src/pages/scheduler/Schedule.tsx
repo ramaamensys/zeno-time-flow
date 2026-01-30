@@ -18,7 +18,7 @@ import SlotEditModal from "@/components/scheduler/SlotEditModal";
 import EditEmployeeModal from "@/components/scheduler/EditEmployeeModal";
 import SaveScheduleModal from "@/components/scheduler/SaveScheduleModal";
 import SavedSchedulesCard, { SavedSchedule } from "@/components/scheduler/SavedSchedulesCard";
-
+import AssignShiftModal from "@/components/scheduler/AssignShiftModal";
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function SchedulerSchedule() {
@@ -42,7 +42,7 @@ export default function SchedulerSchedule() {
   const [showEditShift, setShowEditShift] = useState(false);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [preSelectedDate, setPreSelectedDate] = useState<Date | undefined>();
-  const [preSelectedSlot, setPreSelectedSlot] = useState<{ id: string; startHour: number; endHour: number } | undefined>();
+  const [preSelectedSlot, setPreSelectedSlot] = useState<{ id: string; name: string; time: string; startHour: number; endHour: number } | undefined>();
   const [draggedEmployee, setDraggedEmployee] = useState<string | null>(null);
   const [draggedShift, setDraggedShift] = useState<Shift | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -53,7 +53,7 @@ export default function SchedulerSchedule() {
   const [editingTemplate, setEditingTemplate] = useState<{ id: string; name: string; description: string | null } | null>(null);
   const [savedSchedulesRefresh, setSavedSchedulesRefresh] = useState(0);
   const [showScheduleShifts, setShowScheduleShifts] = useState(false); // Only show shifts when template is loaded or creating new
-  
+  const [showAssignShiftModal, setShowAssignShiftModal] = useState(false);
   const { toast } = useToast();
   
   // Database hooks
@@ -215,9 +215,11 @@ export default function SchedulerSchedule() {
   const handleAddShift = (dayIndex: number, slotId: string) => {
     const date = weekDates[dayIndex];
     const slot = shiftSlots.find(s => s.id === slotId);
-    setPreSelectedDate(date);
-    setPreSelectedSlot(slot);
-    setShowCreateShift(true);
+    if (slot) {
+      setPreSelectedDate(date);
+      setPreSelectedSlot(slot);
+      setShowAssignShiftModal(true);
+    }
   };
 
   const handleEditShift = (shift: Shift) => {
@@ -1221,6 +1223,25 @@ export default function SchedulerSchedule() {
         existingTemplate={editingTemplate}
         onSaved={handleScheduleSaved}
       />
+
+      {preSelectedDate && preSelectedSlot && (
+        <AssignShiftModal
+          open={showAssignShiftModal}
+          onOpenChange={(open) => {
+            setShowAssignShiftModal(open);
+            if (!open) {
+              setPreSelectedDate(undefined);
+              setPreSelectedSlot(undefined);
+            }
+          }}
+          companyId={selectedCompany}
+          date={preSelectedDate}
+          slot={preSelectedSlot}
+          onShiftCreated={() => {
+            setShowScheduleShifts(true);
+          }}
+        />
+      )}
     </div>
   );
 }
