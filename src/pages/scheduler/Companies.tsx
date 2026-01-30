@@ -39,6 +39,13 @@ export default function Companies() {
         .select('role')
         .eq('user_id', user.id);
       
+      // Also check if user is in employees table
+      const { data: employeeData } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+      
       if (data && data.length > 0) {
         const roles = data.map(item => item.role);
         if (roles.includes('super_admin')) {
@@ -49,9 +56,13 @@ export default function Companies() {
           setUserRole('manager');
         } else if (roles.includes('admin')) {
           setUserRole('admin');
+        } else if (roles.includes('employee') || employeeData) {
+          setUserRole('employee');
         } else {
           setUserRole('user');
         }
+      } else if (employeeData) {
+        setUserRole('employee');
       }
     };
 
