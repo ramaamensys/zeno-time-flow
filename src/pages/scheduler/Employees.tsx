@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Phone, Mail, Building } from "lucide-react";
+import { Plus, Search, MoreHorizontal, Edit, Trash2, Phone, Mail, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCompanies, useDepartments, useEmployees, Employee } from "@/hooks/useSchedulerDatabase";
+import { useUserRole } from "@/hooks/useUserRole";
 import CreateCompanyModal from "@/components/scheduler/CreateCompanyModal";
 import CreateEmployeeModal from "@/components/scheduler/CreateEmployeeModal";
 import EditEmployeeModal from "@/components/scheduler/EditEmployeeModal";
@@ -34,17 +35,25 @@ export default function SchedulerEmployees() {
   const [showEditEmployee, setShowEditEmployee] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
+  // User role hook
+  const { isCompanyManager, isSuperAdmin, isOrganizationManager } = useUserRole();
+
   // Database hooks
   const { companies, loading: companiesLoading } = useCompanies();
   const { departments, loading: departmentsLoading } = useDepartments(selectedCompany === "all" ? "" : selectedCompany);
   const { employees, loading: employeesLoading, deleteEmployee, updateEmployee } = useEmployees(selectedCompany === "all" ? "" : selectedCompany);
 
-  // Set "all" as default when companies load
+  // Set default company - for managers, auto-select their first company
   useEffect(() => {
     if (companies.length > 0 && !selectedCompany) {
-      setSelectedCompany("all");
+      if (isCompanyManager && companies.length === 1) {
+        // Managers typically have access to only their company
+        setSelectedCompany(companies[0].id);
+      } else {
+        setSelectedCompany("all");
+      }
     }
-  }, [companies, selectedCompany]);
+  }, [companies, selectedCompany, isCompanyManager]);
 
   const filteredEmployees = employees.filter(employee => {
     const fullName = `${employee.first_name} ${employee.last_name}`;
@@ -71,6 +80,21 @@ export default function SchedulerEmployees() {
     }
   };
 
+  // For managers, get the first company they have access to for adding employees
+  const getCompanyIdForNewEmployee = () => {
+    if (selectedCompany && selectedCompany !== "all") {
+      return selectedCompany;
+    }
+    // If "all" is selected but manager has companies, use the first one
+    if (companies.length > 0) {
+      return companies[0].id;
+    }
+    return "";
+  };
+
+  const canAddEmployee = getCompanyIdForNewEmployee() !== "";
+  const canAddCompany = isSuperAdmin || isOrganizationManager;
+
   const isLoading = companiesLoading || departmentsLoading || employeesLoading;
 
   const getStatusColor = (status: string) => {
@@ -91,11 +115,13 @@ export default function SchedulerEmployees() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setShowCreateCompany(true)}>
-            <Building className="h-4 w-4 mr-2" />
-            Add Company
-          </Button>
-          <Button onClick={() => setShowCreateEmployee(true)} disabled={!selectedCompany || selectedCompany === "all"}>
+          {canAddCompany && (
+            <Button variant="outline" onClick={() => setShowCreateCompany(true)}>
+              <Building className="h-4 w-4 mr-2" />
+              Add Company
+            </Button>
+          )}
+          <Button onClick={() => setShowCreateEmployee(true)} disabled={!canAddEmployee}>
             <Plus className="h-4 w-4 mr-2" />
             Add Employee
           </Button>
@@ -316,7 +342,7 @@ export default function SchedulerEmployees() {
       <CreateEmployeeModal 
         open={showCreateEmployee} 
         onOpenChange={setShowCreateEmployee}
-        companyId={selectedCompany}
+        companyId={getCompanyIdForNewEmployee()}
       />
 
       <EditEmployeeModal
