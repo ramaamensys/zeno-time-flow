@@ -134,8 +134,14 @@ export default function SchedulerUserManagement() {
             const schedulerRoles = rolesData.filter(r => r.app_type === 'scheduler').map(r => r.role);
             if (schedulerRoles.includes('super_admin')) {
               highestRole = 'super_admin';
+            } else if (schedulerRoles.includes('operations_manager')) {
+              highestRole = 'operations_manager';
+            } else if (schedulerRoles.includes('manager')) {
+              highestRole = 'manager';
             } else if (schedulerRoles.includes('admin')) {
               highestRole = 'admin';
+            } else if (schedulerRoles.includes('employee')) {
+              highestRole = 'employee';
             } else if (schedulerRoles.includes('user')) {
               highestRole = 'user';
             }
@@ -433,8 +439,9 @@ export default function SchedulerUserManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="user">User</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="manager">Company Manager</SelectItem>
+                  <SelectItem value="operations_manager">Organization Manager</SelectItem>
                   <SelectItem value="super_admin">Super Admin</SelectItem>
                 </SelectContent>
               </Select>

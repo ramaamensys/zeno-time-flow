@@ -52,6 +52,7 @@ export default function SchedulerSchedule() {
   const [showSaveScheduleModal, setShowSaveScheduleModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<{ id: string; name: string; description: string | null } | null>(null);
   const [savedSchedulesRefresh, setSavedSchedulesRefresh] = useState(0);
+  const [showScheduleShifts, setShowScheduleShifts] = useState(false); // Only show shifts when template is loaded or creating new
   
   const { toast } = useToast();
   
@@ -174,6 +175,10 @@ export default function SchedulerSchedule() {
   };
 
   const getShiftsForDayAndSlot = (dayIndex: number, slotId: string) => {
+    // Don't show shifts unless showScheduleShifts is true (template loaded or employee dragged)
+    // Exception: Employee view always shows their shifts
+    if (!showScheduleShifts && !isEmployeeView) return [];
+    
     const targetDate = weekDates[dayIndex];
     const slot = shiftSlots.find(s => s.id === slotId);
     
@@ -240,6 +245,9 @@ export default function SchedulerSchedule() {
     const shiftId = e.dataTransfer.getData('shiftId');
     
     if (employeeId && selectedCompany) {
+      // Enable showing shifts when employee is dragged
+      setShowScheduleShifts(true);
+      
       const date = weekDates[dayIndex];
       const slot = shiftSlots.find(s => s.id === slotId);
       
@@ -386,6 +394,9 @@ export default function SchedulerSchedule() {
   const handleLoadSchedule = async (template: any) => {
     if (!template.template_data) return;
     
+    // Enable showing shifts when loading a template
+    setShowScheduleShifts(true);
+    
     const { shiftSlots: savedSlots, shifts: savedShifts, week_start } = template.template_data;
     
     // Update shift slots if they were saved
@@ -443,6 +454,9 @@ export default function SchedulerSchedule() {
   // Handle editing a saved schedule - load it into the grid for editing
   const handleEditSavedSchedule = async (template: any) => {
     if (!template.template_data) return;
+    
+    // Enable showing shifts when editing a template
+    setShowScheduleShifts(true);
     
     const { shiftSlots: savedSlots, shifts: savedShifts, week_start } = template.template_data;
     
@@ -546,6 +560,7 @@ export default function SchedulerSchedule() {
     // Force state update with new Date object
     setSelectedWeek(new Date(nextWeekStart.getTime()));
     setIsEditMode(false); // Exit edit mode after saving
+    setShowScheduleShifts(false); // Reset to hide shifts for the new week
     
     toast({
       title: "Schedule Saved",
@@ -556,6 +571,9 @@ export default function SchedulerSchedule() {
   // Handle copying a saved schedule to the currently selected week
   const handleCopyScheduleToCurrentWeek = async (template: SavedSchedule) => {
     if (!template.template_data) return;
+    
+    // Enable showing shifts when copying a template
+    setShowScheduleShifts(true);
     
     const { shiftSlots: savedSlots, shifts: savedShifts } = template.template_data;
     
