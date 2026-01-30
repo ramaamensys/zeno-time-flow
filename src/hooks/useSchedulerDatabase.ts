@@ -50,13 +50,14 @@ export interface Employee {
   hire_date?: string;
   hourly_rate?: number;
   status: string;
-  company_id: string;
+  company_id: string | null;
   department_id?: string;
   position?: string;
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
   notes?: string;
   created_at: string;
+  user_id?: string | null;
 }
 
 export interface Shift {
