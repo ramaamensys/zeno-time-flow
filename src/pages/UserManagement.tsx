@@ -206,6 +206,23 @@ export default function UserManagement() {
 
       if (profilesError) throw profilesError;
 
+      // Load employee links once so we can reliably label employees even when app_type is inconsistent
+      const { data: employeeRows, error: employeesError } = await supabase
+        .from('employees')
+        .select('user_id, email, status')
+        .eq('status', 'active');
+
+      if (employeesError) throw employeesError;
+
+      const employeeUserIds = new Set(
+        (employeeRows ?? []).map((e) => e.user_id).filter(Boolean) as string[]
+      );
+      const employeeEmails = new Set(
+        (employeeRows ?? [])
+          .map((e) => e.email?.toLowerCase())
+          .filter(Boolean) as string[]
+      );
+
       // Then get roles for each user
       const usersWithRoles = await Promise.all(
         profiles.map(async (profile) => {
@@ -213,6 +230,10 @@ export default function UserManagement() {
             .from('user_roles')
             .select('role')
             .eq('user_id', profile.user_id);
+
+          const isEmployee =
+            employeeUserIds.has(profile.user_id) ||
+            employeeEmails.has(profile.email?.toLowerCase());
 
           // Determine highest priority role
           let highestRole = 'user';
@@ -226,9 +247,14 @@ export default function UserManagement() {
               highestRole = 'manager';
             } else if (roles.includes('admin')) {
               highestRole = 'admin';
+            } else if (roles.includes('employee') || isEmployee) {
+              highestRole = 'employee';
             } else if (roles.includes('user')) {
               highestRole = 'user';
             }
+          } else if (isEmployee) {
+            // If user_roles rows are missing, still treat linked employees as employees
+            highestRole = 'employee';
           }
 
           return {
