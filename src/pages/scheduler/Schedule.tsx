@@ -33,7 +33,9 @@ export default function SchedulerSchedule() {
   
   const [selectedWeek, setSelectedWeek] = useState(new Date());
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
+  const [selectedOrganization, setSelectedOrganization] = useState<string>("");
   const [selectedCompany, setSelectedCompany] = useState<string>("");
+  const [organizations, setOrganizations] = useState<{ id: string; name: string }[]>([]);
   const [showCreateCompany, setShowCreateCompany] = useState(false);
   const [showCreateShift, setShowCreateShift] = useState(false);
   const [showCreateEmployee, setShowCreateEmployee] = useState(false);
@@ -64,6 +66,24 @@ export default function SchedulerSchedule() {
 
   const [employeeRecord, setEmployeeRecord] = useState<{ id: string; company_id: string } | null>(null);
   
+  // Fetch organizations for super admin
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('id, name')
+        .order('name');
+      
+      if (!error && data) {
+        setOrganizations(data);
+      }
+    };
+
+    if (userRole === 'super_admin') {
+      fetchOrganizations();
+    }
+  }, [userRole]);
+
   // Fetch user role for access control
   useEffect(() => {
     const fetchUserRole = async () => {
@@ -110,8 +130,13 @@ export default function SchedulerSchedule() {
 
   // Filter companies based on user role and access
   const availableCompanies = companies.filter(company => {
-    // Super admins can see all companies
-    if (userRole === 'super_admin') return true;
+    // Super admins can see all companies, but filter by selected organization
+    if (userRole === 'super_admin') {
+      if (selectedOrganization) {
+        return company.organization_id === selectedOrganization;
+      }
+      return true;
+    }
     
     // Operations managers can see companies they manage
     if (userRole === 'operations_manager') {
@@ -138,6 +163,17 @@ export default function SchedulerSchedule() {
 
   // Use all available companies for scheduling (field_type filter removed)
   const schedulableCompanies = availableCompanies;
+
+  // Reset selected company when organization changes (for super admin)
+  useEffect(() => {
+    if (userRole === 'super_admin' && selectedOrganization) {
+      // Check if current company is still valid for the selected organization
+      const companyStillValid = availableCompanies.some(c => c.id === selectedCompany);
+      if (!companyStillValid) {
+        setSelectedCompany("");
+      }
+    }
+  }, [selectedOrganization, userRole, availableCompanies]);
 
   // Auto-select the first company if none is selected (and employee hasn't auto-selected theirs)
   useEffect(() => {
@@ -682,6 +718,23 @@ export default function SchedulerSchedule() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Organization dropdown - Only for super admins */}
+          {userRole === 'super_admin' && (
+            <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
+              <SelectTrigger className="w-[200px] bg-background">
+                <SelectValue placeholder="Select organization" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border shadow-lg z-50">
+                {organizations.map((org) => (
+                  <SelectItem key={org.id} value={org.id}>
+                    {org.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Company dropdown */}
           <Select value={selectedCompany} onValueChange={setSelectedCompany}>
             <SelectTrigger className="w-[200px] bg-background">
               <SelectValue placeholder="Select company" />

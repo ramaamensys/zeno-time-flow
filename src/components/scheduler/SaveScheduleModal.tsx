@@ -250,13 +250,15 @@ export default function SaveScheduleModal({
         
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Schedule Name</Label>
+            <Label htmlFor="scheduleName">Schedule Name</Label>
             <Input
-              id="name"
+              id="scheduleName"
+              name="scheduleName"
+              type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter schedule name"
-              autoFocus
+              autoComplete="off"
             />
           </div>
           
