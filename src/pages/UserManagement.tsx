@@ -153,6 +153,48 @@ export default function UserManagement() {
     checkAuthorizationAndLoadUsers();
     loadCompanies();
     loadOrganizations();
+
+    // Set up real-time subscriptions for auto-updates
+    const profilesSubscription = supabase
+      .channel('user_management_profiles')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'profiles'
+      }, () => {
+        loadUsers();
+      })
+      .subscribe();
+
+    const rolesSubscription = supabase
+      .channel('user_management_roles')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'user_roles'
+      }, () => {
+        loadUsers();
+        loadManagers();
+        loadOperationsManagers();
+      })
+      .subscribe();
+
+    const employeesSubscription = supabase
+      .channel('user_management_employees')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'employees'
+      }, () => {
+        loadUsers();
+      })
+      .subscribe();
+
+    return () => {
+      profilesSubscription.unsubscribe();
+      rolesSubscription.unsubscribe();
+      employeesSubscription.unsubscribe();
+    };
   }, [user]);
 
   const checkAuthorizationAndLoadUsers = async () => {

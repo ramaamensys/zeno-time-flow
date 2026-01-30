@@ -24,7 +24,7 @@ interface CompanyDetailModalProps {
   company: any;
 }
 
-interface OperationsManager {
+interface CompanyManager {
   user_id: string;
   full_name: string;
   email: string;
@@ -37,7 +37,7 @@ export default function CompanyDetailModal({
   company 
 }: CompanyDetailModalProps) {
   const [loading, setLoading] = useState(false);
-  const [operationsManager, setOperationsManager] = useState<OperationsManager | null>(null);
+  const [companyManager, setCompanyManager] = useState<CompanyManager | null>(null);
   const [showAddEmployee, setShowAddEmployee] = useState(false);
   const [showEditEmployee, setShowEditEmployee] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -49,7 +49,7 @@ export default function CompanyDetailModal({
 
   useEffect(() => {
     if (open && company) {
-      fetchOperationsManager();
+      fetchCompanyManager();
       refetch();
     }
   }, [open, company]);
@@ -61,21 +61,24 @@ export default function CompanyDetailModal({
     }
   }, [showAddEmployee, showEditEmployee]);
 
-  const fetchOperationsManager = async () => {
-    if (!company?.operations_manager_id) return;
+  const fetchCompanyManager = async () => {
+    if (!company?.company_manager_id) {
+      setCompanyManager(null);
+      return;
+    }
 
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('user_id, full_name, email, mobile_number')
-        .eq('user_id', company.operations_manager_id)
+        .eq('user_id', company.company_manager_id)
         .single();
 
       if (error) throw error;
-      setOperationsManager(data);
+      setCompanyManager(data);
     } catch (error) {
-      console.error('Error fetching operations manager:', error);
+      console.error('Error fetching company manager:', error);
     } finally {
       setLoading(false);
     }
@@ -186,12 +189,12 @@ export default function CompanyDetailModal({
               </CardContent>
             </Card>
 
-            {/* Operations Manager */}
+            {/* Company Manager */}
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <UserCheck className="w-5 h-5" />
-                  Operations Manager
+                  Manager
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -199,24 +202,24 @@ export default function CompanyDetailModal({
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
-                ) : operationsManager ? (
+                ) : companyManager ? (
                   <div className="flex items-center gap-4">
                     <Avatar className="h-12 w-12">
                       <AvatarFallback>
-                        {operationsManager.full_name?.split(' ').map(n => n[0]).join('') || 'OM'}
+                        {companyManager.full_name?.split(' ').map(n => n[0]).join('') || 'M'}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <h3 className="font-semibold">{operationsManager.full_name}</h3>
+                      <h3 className="font-semibold">{companyManager.full_name}</h3>
                       <div className="flex flex-col gap-1 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Mail className="w-3 h-3" />
-                          {operationsManager.email}
+                          {companyManager.email}
                         </span>
-                        {operationsManager.mobile_number && (
+                        {companyManager.mobile_number && (
                           <span className="flex items-center gap-1">
                             <Phone className="w-3 h-3" />
-                            {operationsManager.mobile_number}
+                            {companyManager.mobile_number}
                           </span>
                         )}
                       </div>
@@ -225,7 +228,7 @@ export default function CompanyDetailModal({
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <User className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>No operations manager assigned</p>
+                    <p>No manager assigned</p>
                   </div>
                 )}
               </CardContent>
