@@ -248,10 +248,10 @@ export default function UserManagement() {
 
       if (profilesError) throw profilesError;
 
-      // Load employee links once so we can reliably label employees even when app_type is inconsistent
+      // Load all employee records (including those created by org managers/managers)
       const { data: employeeRows, error: employeesError } = await supabase
         .from('employees')
-        .select('user_id, email, status')
+        .select('id, user_id, email, first_name, last_name, status, created_at')
         .eq('status', 'active');
 
       if (employeesError) throw employeesError;
@@ -265,7 +265,12 @@ export default function UserManagement() {
           .filter(Boolean) as string[]
       );
 
-      // Then get roles for each user
+      // Create a map of employees by email for quick lookup
+      const employeesByEmail = new Map(
+        (employeeRows ?? []).map((e) => [e.email?.toLowerCase(), e])
+      );
+
+      // Then get roles for each profile
       const usersWithRoles = await Promise.all(
         profiles.map(async (profile) => {
           const { data: rolesData } = await supabase
@@ -307,7 +312,38 @@ export default function UserManagement() {
         })
       );
 
-      setUsers(usersWithRoles);
+      // Find employees that don't have profiles yet (created by org managers/managers without auth accounts)
+      const profileEmails = new Set(
+        profiles.map(p => p.email?.toLowerCase()).filter(Boolean)
+      );
+      const profileUserIds = new Set(
+        profiles.map(p => p.user_id).filter(Boolean)
+      );
+
+      const employeesWithoutProfiles = (employeeRows ?? []).filter(emp => {
+        // Skip if employee already has a matching profile by user_id or email
+        if (emp.user_id && profileUserIds.has(emp.user_id)) return false;
+        if (emp.email && profileEmails.has(emp.email.toLowerCase())) return false;
+        return true;
+      });
+
+      // Create virtual profile entries for employees without profiles
+      const virtualProfiles = employeesWithoutProfiles.map(emp => ({
+        id: emp.id,
+        user_id: emp.user_id || emp.id, // Use employee id as fallback
+        full_name: `${emp.first_name} ${emp.last_name}`.trim(),
+        email: emp.email,
+        created_at: emp.created_at,
+        status: 'active',
+        role: 'employee',
+        manager_name: null,
+        manager_id: null
+      }));
+
+      // Combine profiles with virtual profiles
+      const allUsers = [...usersWithRoles, ...virtualProfiles];
+
+      setUsers(allUsers);
     } catch (error) {
       console.error('Error loading users:', error);
       toast({
@@ -865,6 +901,25 @@ export default function UserManagement() {
     }
   };
 
+  const formatRoleLabel = (role: string) => {
+    switch (role) {
+      case 'super_admin':
+        return 'Super Admin';
+      case 'operations_manager':
+        return 'Organization Manager';
+      case 'manager':
+        return 'Company Manager';
+      case 'employee':
+        return 'Employee';
+      case 'admin':
+        return 'Admin';
+      case 'user':
+        return 'User';
+      default:
+        return role.replace('_', ' ');
+    }
+  };
+
   // Filter users based on search term, role, and status
   const filteredUsers = users.filter((user) => {
     const matchesSearch = 
@@ -1245,7 +1300,7 @@ export default function UserManagement() {
                   </TableCell>
                   <TableCell>
                     <Badge variant={getRoleBadgeVariant(userProfile.role)}>
-                      {userProfile.role.replace('_', ' ')}
+                      {formatRoleLabel(userProfile.role)}
                     </Badge>
                   </TableCell>
                   <TableCell>
