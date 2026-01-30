@@ -865,6 +865,25 @@ export default function UserManagement() {
     }
   };
 
+  const formatRoleDisplay = (role: string) => {
+    switch (role) {
+      case 'super_admin':
+        return 'Super Admin';
+      case 'operations_manager':
+        return 'Organization Manager';
+      case 'manager':
+        return 'Company Manager';
+      case 'employee':
+        return 'Employee';
+      case 'admin':
+        return 'Admin';
+      case 'user':
+        return 'User';
+      default:
+        return role.replace('_', ' ');
+    }
+  };
+
   // Filter users based on search term, role, and status
   const filteredUsers = users.filter((user) => {
     const matchesSearch = 
@@ -1126,7 +1145,7 @@ export default function UserManagement() {
                                   <div className="text-xs text-muted-foreground">{userItem.email}</div>
                                 </div>
                                 <Badge variant={getRoleBadgeVariant(userItem.role)} className="text-xs">
-                                  {userItem.role === 'admin' ? 'Admin (Unassigned)' : userItem.role.replace('_', ' ')}
+                                  {userItem.role === 'admin' ? 'Admin (Unassigned)' : formatRoleDisplay(userItem.role)}
                                 </Badge>
                               </label>
                             </div>
@@ -1245,7 +1264,7 @@ export default function UserManagement() {
                   </TableCell>
                   <TableCell>
                     <Badge variant={getRoleBadgeVariant(userProfile.role)}>
-                      {userProfile.role.replace('_', ' ')}
+                      {formatRoleDisplay(userProfile.role)}
                     </Badge>
                   </TableCell>
                   <TableCell>
