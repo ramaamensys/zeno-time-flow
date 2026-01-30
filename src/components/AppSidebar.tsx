@@ -12,6 +12,7 @@ import {
   Clock,
   UserCheck,
   LayoutDashboard,
+  CalendarClock,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -120,6 +121,7 @@ export function AppSidebar() {
     { title: "Companies", url: "/scheduler/companies", icon: Building },
     { title: "Schedule", url: "/scheduler/schedule", icon: Calendar },
     { title: "Employees", url: "/scheduler/employees", icon: UserCheck },
+    { title: "Employee Schedule", url: "/scheduler/employee-schedule", icon: CalendarClock },
   ];
 
   // Management items based on role
