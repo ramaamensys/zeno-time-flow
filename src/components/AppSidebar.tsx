@@ -77,8 +77,8 @@ export function AppSidebar() {
           setUserAppType('both');
         } else if (roles.includes('operations_manager')) {
           setUserRole('operations_manager');
-          const appType = appTypes[0] || 'calendar';
-          setUserAppType(appType === 'calendar' ? 'calendar_plus' : 'scheduler');
+          // Organization Managers need full scheduler access
+          setUserAppType('scheduler');
         } else if (roles.includes('manager')) {
           setUserRole('manager');
          // Company Managers are part of the Scheduler app (they manage employees + schedules)
