@@ -23,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCompanies, useDepartments, useEmployees, Employee } from "@/hooks/useSchedulerDatabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import CreateCompanyModal from "@/components/scheduler/CreateCompanyModal";
-import SimpleEmployeeModal from "@/components/scheduler/SimpleEmployeeModal";
+import AddEmployeeModal from "@/components/scheduler/AddEmployeeModal";
 import EditEmployeeModal from "@/components/scheduler/EditEmployeeModal";
 
 export default function SchedulerEmployees() {
@@ -339,7 +339,7 @@ export default function SchedulerEmployees() {
         onOpenChange={setShowCreateCompany} 
       />
       
-      <SimpleEmployeeModal 
+      <AddEmployeeModal 
         open={showCreateEmployee} 
         onOpenChange={setShowCreateEmployee}
         companyId={getCompanyIdForNewEmployee()}

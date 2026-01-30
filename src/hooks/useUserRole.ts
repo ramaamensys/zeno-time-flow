@@ -17,52 +17,72 @@ export const useUserRole = () => {
   const [allRoles, setAllRoles] = useState<UserRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      if (!user) {
-        setIsLoading(false);
-        return;
-      }
+  const fetchUserRole = async () => {
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('role, app_type')
-          .eq('user_id', user.id);
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role, app_type')
+        .eq('user_id', user.id);
 
-        if (error) {
-          console.error('Error fetching user role:', error);
-          setRole(null);
-        } else if (data && data.length > 0) {
-          const roles = data.map(r => r.role as UserRole);
-          setAllRoles(roles);
-          
-          // Determine primary role based on hierarchy priority
-          if (roles.includes('super_admin')) {
-            setRole('super_admin');
-          } else if (roles.includes('operations_manager')) {
-            setRole('operations_manager'); // Organization Manager
-          } else if (roles.includes('manager')) {
-            setRole('manager'); // Company Manager
-          } else if (roles.includes('admin')) {
-            setRole('admin');
-          } else if (roles.includes('employee')) {
-            setRole('employee');
-          } else {
-            setRole('user');
-          }
-        } else {
-          setRole(null);
-        }
-      } catch (error) {
-        console.error('Error in fetchUserRole:', error);
+      if (error) {
+        console.error('Error fetching user role:', error);
         setRole(null);
-      } finally {
-        setIsLoading(false);
+      } else if (data && data.length > 0) {
+        const roles = data.map(r => r.role as UserRole);
+        setAllRoles(roles);
+        
+        // Determine primary role based on hierarchy priority
+        if (roles.includes('super_admin')) {
+          setRole('super_admin');
+        } else if (roles.includes('operations_manager')) {
+          setRole('operations_manager'); // Organization Manager
+        } else if (roles.includes('manager')) {
+          setRole('manager'); // Company Manager
+        } else if (roles.includes('admin')) {
+          setRole('admin');
+        } else if (roles.includes('employee')) {
+          setRole('employee');
+        } else {
+          setRole('user');
+        }
+      } else {
+        setRole(null);
       }
-    };
+    } catch (error) {
+      console.error('Error in fetchUserRole:', error);
+      setRole(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchUserRole();
+
+    // Set up real-time subscription for user_roles changes
+    if (user) {
+      const subscription = supabase
+        .channel(`user_roles_changes_${user.id}`)
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'user_roles',
+          filter: `user_id=eq.${user.id}`
+        }, () => {
+          // Refetch roles when changes occur
+          fetchUserRole();
+        })
+        .subscribe();
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
   }, [user]);
 
   // Super Admin, Organization Manager (operations_manager), and Company Manager (manager) have admin privileges

@@ -8,8 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEmployees, Employee } from "@/hooks/useSchedulerDatabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
-import { Building, User, UserPlus, Phone, Mail, MapPin, UserCheck, Edit, Trash2, MoreHorizontal } from "lucide-react";
-import SimpleEmployeeModal from "./SimpleEmployeeModal";
+import { Building, User, UserPlus, Phone, Mail, MapPin, UserCheck, Edit, Trash2, MoreHorizontal, UserMinus } from "lucide-react";
+import AddEmployeeModal from "./AddEmployeeModal";
 import EditEmployeeModal from "./EditEmployeeModal";
 import {
   DropdownMenu,
@@ -105,6 +105,22 @@ export default function CompanyDetailModal({
     } catch (error) {
       console.error('Failed to delete employee:', error);
       toast.error("Failed to delete employee");
+    }
+  };
+
+  const handleRemoveEmployee = async (employee: Employee) => {
+    const fullName = `${employee.first_name} ${employee.last_name}`;
+    if (!confirm(`Are you sure you want to remove ${fullName} from this company? They will become unassigned but their account will remain.`)) {
+      return;
+    }
+
+    try {
+      await updateEmployee(employee.id, { company_id: null });
+      toast.success(`${fullName} has been removed from this company`);
+      refetch();
+    } catch (error) {
+      console.error('Failed to remove employee:', error);
+      toast.error("Failed to remove employee from company");
     }
   };
 
@@ -267,6 +283,13 @@ export default function CompanyDetailModal({
                                   Edit Employee
                                 </DropdownMenuItem>
                                 <DropdownMenuItem 
+                                  className="text-orange-600"
+                                  onClick={() => handleRemoveEmployee(employee)}
+                                >
+                                  <UserMinus className="h-4 w-4 mr-2" />
+                                  Remove Employee
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
                                   className="text-destructive"
                                   onClick={() => handleDeleteEmployee(employee)}
                                 >
@@ -302,7 +325,7 @@ export default function CompanyDetailModal({
         </DialogContent>
       </Dialog>
 
-      <SimpleEmployeeModal
+      <AddEmployeeModal
         open={showAddEmployee}
         onOpenChange={setShowAddEmployee}
         companyId={company?.id}
