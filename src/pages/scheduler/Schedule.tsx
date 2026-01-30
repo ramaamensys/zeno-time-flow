@@ -534,24 +534,10 @@ export default function SchedulerSchedule() {
     setSavedSchedulesRefresh(prev => prev + 1);
     setEditingTemplate(null);
     
-    // Clear the current schedule after saving (shifts are now preserved in the saved template)
-    // Delete all current shifts from the database for this week
-    // Note: Some shifts may have time_clock references, so we handle errors gracefully
-    const currentShiftIds = shifts.map(s => s.id);
-    for (const shiftId of currentShiftIds) {
-      try {
-        // First, unlink any time_clock entries referencing this shift
-        await supabase
-          .from('time_clock')
-          .update({ shift_id: null })
-          .eq('shift_id', shiftId);
-        
-        await deleteShift(shiftId);
-      } catch (e) {
-        console.error('Failed to delete shift:', shiftId, e);
-        // Continue with other shifts even if one fails
-      }
-    }
+    // IMPORTANT: DO NOT delete shifts after saving!
+    // Shifts must remain in the database so employees can see their scheduled shifts.
+    // The schedule_templates table stores a copy/template for future use,
+    // but the actual shifts table is the source of truth for employee schedules.
     
     // Auto-advance to next week - create a completely new week date
     const currentWeekStart = getWeekStart(selectedWeek);
@@ -566,7 +552,7 @@ export default function SchedulerSchedule() {
     
     toast({
       title: "Schedule Saved",
-      description: `Schedule saved! Now viewing week of ${nextWeekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`
+      description: `Schedule saved! Employees can now view their shifts. Now viewing week of ${nextWeekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`
     });
   };
 
