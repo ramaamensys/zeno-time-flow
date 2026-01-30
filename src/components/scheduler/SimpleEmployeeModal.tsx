@@ -27,13 +27,14 @@ export default function SimpleEmployeeModal({
     firstName: "",
     lastName: "",
     email: "",
-    phone: ""
+    phone: "",
+    password: ""
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim()) {
+    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || !formData.password.trim()) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -45,10 +46,16 @@ export default function SimpleEmployeeModal({
       return;
     }
 
+    // Password validation
+    if (formData.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Check if email already exists
+      // Check if email already exists in employees
       const { data: existingEmployee } = await supabase
         .from('employees')
         .select('email')
@@ -61,7 +68,25 @@ export default function SimpleEmployeeModal({
         return;
       }
 
-      // Create employee
+      // First create the user account via edge function
+      const { data: userData, error: userError } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: formData.email.trim(),
+          full_name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
+          role: 'employee',
+          password: formData.password,
+          app_type: 'scheduler'
+        }
+      });
+
+      if (userError) {
+        console.error('Error creating user:', userError);
+        toast.error("Failed to create user account");
+        setLoading(false);
+        return;
+      }
+
+      // Create employee record linked to the user
       const employeeData = {
         first_name: formData.firstName.trim(),
         last_name: formData.lastName.trim(),
@@ -70,12 +95,13 @@ export default function SimpleEmployeeModal({
         company_id: companyId,
         position: "Employee",
         status: "active" as const,
-        hire_date: new Date().toISOString().split('T')[0] // Today's date
+        hire_date: new Date().toISOString().split('T')[0],
+        user_id: userData?.user?.id || null
       };
 
       await createEmployee(employeeData);
 
-      toast.success(`Employee added to ${companyName} successfully!`);
+      toast.success(`Employee added to ${companyName} successfully! Welcome email sent.`);
       resetForm();
       onOpenChange(false);
     } catch (error) {
@@ -91,7 +117,8 @@ export default function SimpleEmployeeModal({
       firstName: "",
       lastName: "",
       email: "",
-      phone: ""
+      phone: "",
+      password: ""
     });
   };
 
@@ -141,6 +168,18 @@ export default function SimpleEmployeeModal({
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               placeholder="Enter email address"
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="password">Password *</Label>
+            <Input
+              id="password"
+              type="password"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              placeholder="Enter password (min 6 characters)"
               required
             />
           </div>

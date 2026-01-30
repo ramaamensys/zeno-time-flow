@@ -138,6 +138,12 @@ export default function SchedulerUserManagement() {
 
           // Determine highest priority role for scheduler
           let highestRole = 'user';
+          
+          // If user is in employees table, they are at minimum an employee
+          if (isEmployeeInScheduler) {
+            highestRole = 'employee';
+          }
+          
           if (rolesData && rolesData.length > 0) {
             const schedulerRoles = rolesData.filter(r => r.app_type === 'scheduler').map(r => r.role);
             const allRoles = rolesData.map(r => r.role);
@@ -145,6 +151,7 @@ export default function SchedulerUserManagement() {
             // Check scheduler roles first, then fall back to any role
             const rolesToCheck = schedulerRoles.length > 0 ? schedulerRoles : allRoles;
             
+            // Only override employee role if user has a higher role
             if (rolesToCheck.includes('super_admin')) {
               highestRole = 'super_admin';
             } else if (rolesToCheck.includes('operations_manager')) {
@@ -153,14 +160,11 @@ export default function SchedulerUserManagement() {
               highestRole = 'manager';
             } else if (rolesToCheck.includes('admin')) {
               highestRole = 'admin';
-            } else if (rolesToCheck.includes('employee') || isEmployeeInScheduler) {
+            } else if (rolesToCheck.includes('employee')) {
               highestRole = 'employee';
-            } else if (rolesToCheck.includes('user')) {
+            } else if (!isEmployeeInScheduler && rolesToCheck.includes('user')) {
               highestRole = 'user';
             }
-          } else if (isEmployeeInScheduler) {
-            // User is in employees table but has no roles - treat as employee
-            highestRole = 'employee';
           }
 
           return {
