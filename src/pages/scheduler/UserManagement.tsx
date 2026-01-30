@@ -70,6 +70,53 @@ export default function SchedulerUserManagement() {
     checkAuthorizationAndLoadUsers();
   }, [user]);
 
+  // Set up real-time subscriptions for employees and profiles changes
+  useEffect(() => {
+    if (!isAuthorized) return;
+
+    // Subscribe to employees table changes
+    const employeesSubscription = supabase
+      .channel('user_management_employees')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'employees'
+      }, () => {
+        loadUsers();
+      })
+      .subscribe();
+
+    // Subscribe to profiles table changes
+    const profilesSubscription = supabase
+      .channel('user_management_profiles')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'profiles'
+      }, () => {
+        loadUsers();
+      })
+      .subscribe();
+
+    // Subscribe to user_roles table changes
+    const rolesSubscription = supabase
+      .channel('user_management_roles')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'user_roles'
+      }, () => {
+        loadUsers();
+      })
+      .subscribe();
+
+    return () => {
+      employeesSubscription.unsubscribe();
+      profilesSubscription.unsubscribe();
+      rolesSubscription.unsubscribe();
+    };
+  }, [isAuthorized]);
+
   const checkAuthorizationAndLoadUsers = async () => {
     if (!user) return;
 

@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEmployees, useDepartments, Employee } from "@/hooks/useSchedulerDatabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Trash2 } from "lucide-react";
 
 interface EditEmployeeModalProps {
@@ -71,6 +72,27 @@ export default function EditEmployeeModal({
     }
   }, [employee]);
 
+  // Sync employee changes with profiles table for User Management
+  const syncProfileUpdate = async (employeeEmail: string, updates: { full_name?: string; email?: string; status?: string }) => {
+    try {
+      // Find profile by email and update it
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('email', employeeEmail)
+        .single();
+
+      if (profile) {
+        await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('user_id', profile.user_id);
+      }
+    } catch (error) {
+      console.error('Error syncing profile update:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -94,6 +116,13 @@ export default function EditEmployeeModal({
         notes: formData.notes || undefined,
         status: formData.status
       });
+
+      // Sync with profiles table for User Management
+      await syncProfileUpdate(employee.email, {
+        full_name: `${formData.first_name} ${formData.last_name}`,
+        email: formData.email,
+        status: formData.status === 'active' ? 'active' : 'deleted'
+      });
       
       onOpenChange(false);
     } catch (error) {
@@ -113,6 +142,9 @@ export default function EditEmployeeModal({
 
     setDeleting(true);
     try {
+      // Sync with profiles table - mark as deleted
+      await syncProfileUpdate(employee.email, { status: 'deleted' });
+      
       await deleteEmployee(employee.id);
       onOpenChange(false);
     } catch (error) {
