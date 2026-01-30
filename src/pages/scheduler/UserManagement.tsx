@@ -134,24 +134,21 @@ export default function SchedulerUserManagement() {
           const hasSchedulerAccess = rolesData?.some(r => r.app_type === 'scheduler') || false;
           const isEmployeeInScheduler = employeeUserIds.has(profile.user_id);
           
+          // Include user if they have scheduler access OR are in employees table
           if (!hasSchedulerAccess && !isEmployeeInScheduler) return null;
 
-          // Determine highest priority role for scheduler
-          let highestRole = 'user';
-          
-          // If user is in employees table, they are at minimum an employee
-          if (isEmployeeInScheduler) {
-            highestRole = 'employee';
-          }
+          // Determine role - default based on employee status first
+          let highestRole = isEmployeeInScheduler ? 'employee' : 'user';
           
           if (rolesData && rolesData.length > 0) {
+            // Prioritize scheduler-specific roles, then check all roles
             const schedulerRoles = rolesData.filter(r => r.app_type === 'scheduler').map(r => r.role);
             const allRoles = rolesData.map(r => r.role);
             
-            // Check scheduler roles first, then fall back to any role
+            // Use scheduler roles if available, otherwise all roles
             const rolesToCheck = schedulerRoles.length > 0 ? schedulerRoles : allRoles;
             
-            // Only override employee role if user has a higher role
+            // Determine highest priority role
             if (rolesToCheck.includes('super_admin')) {
               highestRole = 'super_admin';
             } else if (rolesToCheck.includes('operations_manager')) {
@@ -160,10 +157,8 @@ export default function SchedulerUserManagement() {
               highestRole = 'manager';
             } else if (rolesToCheck.includes('admin')) {
               highestRole = 'admin';
-            } else if (rolesToCheck.includes('employee')) {
+            } else if (rolesToCheck.includes('employee') || isEmployeeInScheduler) {
               highestRole = 'employee';
-            } else if (!isEmployeeInScheduler && rolesToCheck.includes('user')) {
-              highestRole = 'user';
             }
           }
 
@@ -176,6 +171,7 @@ export default function SchedulerUserManagement() {
 
       // Filter out null values (users without scheduler access)
       const schedulerUsers = usersWithRoles.filter(user => user !== null);
+      console.log('Loaded scheduler users:', schedulerUsers.map(u => ({ email: u.email, role: u.role })));
       setUsers(schedulerUsers);
     } catch (error) {
       console.error('Error loading users:', error);

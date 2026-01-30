@@ -56,7 +56,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
     });
 
-    // Verify the caller has super_admin role
+    // Verify the caller has appropriate role (super_admin, operations_manager, or manager)
     const { data: { user }, error: userError } = await userSupabase.auth.getUser();
     if (userError || !user) {
       console.error('Failed to get user:', userError);
@@ -66,19 +66,24 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Check if user has super_admin role
+    // Check if user has appropriate role to create users
     const { data: roles, error: roleError } = await userSupabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id);
 
-    if (roleError || !roles?.some(r => r.role === 'super_admin')) {
+    const allowedRoles = ['super_admin', 'operations_manager', 'manager'];
+    const hasPermission = roles?.some(r => allowedRoles.includes(r.role));
+
+    if (roleError || !hasPermission) {
       console.error('User is not authorized:', { userId: user.id, roles });
-      return new Response(JSON.stringify({ error: 'Insufficient permissions - super admin required' }), {
+      return new Response(JSON.stringify({ error: 'Insufficient permissions - admin, org manager, or company manager required' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+    
+    console.log('User authorized with role:', roles?.map(r => r.role).join(', '));
 
     const { email, full_name, role, password, app_type = 'calendar', manager_id }: CreateUserRequest = await req.json();
 
