@@ -5,10 +5,18 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
-import { useEmployees } from "@/hooks/useSchedulerDatabase";
+import { useEmployees, Employee } from "@/hooks/useSchedulerDatabase";
+import { useUserRole } from "@/hooks/useUserRole";
 import { toast } from "sonner";
-import { Building, User, UserPlus, Phone, Mail, MapPin, UserCheck } from "lucide-react";
+import { Building, User, UserPlus, Phone, Mail, MapPin, UserCheck, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import SimpleEmployeeModal from "./SimpleEmployeeModal";
+import EditEmployeeModal from "./EditEmployeeModal";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface CompanyDetailModalProps {
   open: boolean;
@@ -31,7 +39,13 @@ export default function CompanyDetailModal({
   const [loading, setLoading] = useState(false);
   const [operationsManager, setOperationsManager] = useState<OperationsManager | null>(null);
   const [showAddEmployee, setShowAddEmployee] = useState(false);
-  const { employees, loading: employeesLoading, refetch } = useEmployees(company?.id);
+  const [showEditEmployee, setShowEditEmployee] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const { employees, loading: employeesLoading, refetch, updateEmployee, deleteEmployee } = useEmployees(company?.id);
+  const { isSuperAdmin, isOrganizationManager, isCompanyManager } = useUserRole();
+
+  // Check if current user can manage employees
+  const canManageEmployees = isSuperAdmin || isOrganizationManager || isCompanyManager;
 
   useEffect(() => {
     if (open && company) {
@@ -40,12 +54,12 @@ export default function CompanyDetailModal({
     }
   }, [open, company]);
 
-  // Listen for new employees being added
+  // Listen for new employees being added or edited
   useEffect(() => {
-    if (open && !showAddEmployee) {
+    if (open && !showAddEmployee && !showEditEmployee) {
       refetch();
     }
-  }, [showAddEmployee]);
+  }, [showAddEmployee, showEditEmployee]);
 
   const fetchOperationsManager = async () => {
     if (!company?.operations_manager_id) return;
@@ -73,6 +87,27 @@ export default function CompanyDetailModal({
     // Employees will be refetched automatically when modal closes
   };
 
+  const handleEditEmployee = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setShowEditEmployee(true);
+  };
+
+  const handleDeleteEmployee = async (employee: Employee) => {
+    const fullName = `${employee.first_name} ${employee.last_name}`;
+    if (!confirm(`Are you sure you want to delete ${fullName}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deleteEmployee(employee.id);
+      toast.success(`${fullName} has been deleted`);
+      refetch();
+    } catch (error) {
+      console.error('Failed to delete employee:', error);
+      toast.error("Failed to delete employee");
+    }
+  };
+
   if (!company) return null;
 
   return (
@@ -98,10 +133,12 @@ export default function CompanyDetailModal({
                   </div>
                 </div>
               </div>
-              <Button onClick={() => setShowAddEmployee(true)}>
-                <UserPlus className="w-4 h-4 mr-2" />
-                Add Employee
-              </Button>
+              {canManageEmployees && (
+                <Button onClick={() => setShowAddEmployee(true)}>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Add Employee
+                </Button>
+              )}
             </DialogTitle>
           </DialogHeader>
 
@@ -217,6 +254,28 @@ export default function CompanyDetailModal({
                               {employee.status}
                             </Badge>
                           </div>
+                          {canManageEmployees && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditEmployee(employee)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit Employee
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="text-destructive"
+                                  onClick={() => handleDeleteEmployee(employee)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete Employee
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </div>
                       </Card>
                     ))}
@@ -225,14 +284,16 @@ export default function CompanyDetailModal({
                   <div className="text-center py-8 text-muted-foreground">
                     <User className="w-12 h-12 mx-auto mb-2 opacity-50" />
                     <p>No employees added yet</p>
-                    <Button 
-                      variant="outline" 
-                      className="mt-4"
-                      onClick={() => setShowAddEmployee(true)}
-                    >
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Add First Employee
-                    </Button>
+                    {canManageEmployees && (
+                      <Button 
+                        variant="outline" 
+                        className="mt-4"
+                        onClick={() => setShowAddEmployee(true)}
+                      >
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Add First Employee
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -246,6 +307,15 @@ export default function CompanyDetailModal({
         onOpenChange={setShowAddEmployee}
         companyId={company?.id}
         companyName={company?.name}
+      />
+
+      <EditEmployeeModal
+        open={showEditEmployee}
+        onOpenChange={setShowEditEmployee}
+        employee={selectedEmployee}
+        companyId={company?.id}
+        onUpdate={updateEmployee}
+        onDelete={deleteEmployee}
       />
     </>
   );

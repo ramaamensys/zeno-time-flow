@@ -115,12 +115,14 @@ export default function SchedulerUserManagement() {
 
       if (profilesError) throw profilesError;
 
-      // Get all employees (to check if user is linked to scheduler via employees table)
+      // Get all employees with their user_ids (to check if user is linked to scheduler via employees table)
       const { data: allEmployees } = await supabase
         .from('employees')
-        .select('user_id');
+        .select('user_id, email');
       
+      // Create sets for quick lookup
       const employeeUserIds = new Set(allEmployees?.map(e => e.user_id).filter(Boolean) || []);
+      const employeeEmails = new Set(allEmployees?.map(e => e.email?.toLowerCase()).filter(Boolean) || []);
 
       // Get users with scheduler access
       const usersWithRoles = await Promise.all(
@@ -130,36 +132,38 @@ export default function SchedulerUserManagement() {
             .select('role, app_type')
             .eq('user_id', profile.user_id);
 
-          // Check if user has scheduler access via roles OR is an employee in the employees table
+          // Check if user has scheduler access via roles
           const hasSchedulerAccess = rolesData?.some(r => r.app_type === 'scheduler') || false;
-          const isEmployeeInScheduler = employeeUserIds.has(profile.user_id);
           
-          // Include user if they have scheduler access OR are in employees table
-          if (!hasSchedulerAccess && !isEmployeeInScheduler) return null;
+          // Check if user is an employee (by user_id OR email match)
+          const isEmployeeByUserId = employeeUserIds.has(profile.user_id);
+          const isEmployeeByEmail = employeeEmails.has(profile.email?.toLowerCase());
+          const isEmployeeInScheduler = isEmployeeByUserId || isEmployeeByEmail;
+          
+          // Check if user has employee role in user_roles table (regardless of app_type)
+          const hasEmployeeRole = rolesData?.some(r => r.role === 'employee') || false;
+          
+          // Include user if they have scheduler access, are in employees table, or have employee role
+          if (!hasSchedulerAccess && !isEmployeeInScheduler && !hasEmployeeRole) return null;
 
-          // Determine role - default based on employee status first
-          let highestRole = isEmployeeInScheduler ? 'employee' : 'user';
+          // Get all roles from user_roles table
+          const allRoles = rolesData?.map(r => r.role) || [];
           
-          if (rolesData && rolesData.length > 0) {
-            // Prioritize scheduler-specific roles, then check all roles
-            const schedulerRoles = rolesData.filter(r => r.app_type === 'scheduler').map(r => r.role);
-            const allRoles = rolesData.map(r => r.role);
-            
-            // Use scheduler roles if available, otherwise all roles
-            const rolesToCheck = schedulerRoles.length > 0 ? schedulerRoles : allRoles;
-            
-            // Determine highest priority role
-            if (rolesToCheck.includes('super_admin')) {
-              highestRole = 'super_admin';
-            } else if (rolesToCheck.includes('operations_manager')) {
-              highestRole = 'operations_manager';
-            } else if (rolesToCheck.includes('manager')) {
-              highestRole = 'manager';
-            } else if (rolesToCheck.includes('admin')) {
-              highestRole = 'admin';
-            } else if (rolesToCheck.includes('employee') || isEmployeeInScheduler) {
-              highestRole = 'employee';
-            }
+          // Determine role based on hierarchy - employees table takes priority for 'employee' role
+          let highestRole = 'user';
+          
+          // Check for management roles first (these always take priority)
+          if (allRoles.includes('super_admin')) {
+            highestRole = 'super_admin';
+          } else if (allRoles.includes('operations_manager')) {
+            highestRole = 'operations_manager';
+          } else if (allRoles.includes('manager')) {
+            highestRole = 'manager';
+          } else if (allRoles.includes('admin')) {
+            highestRole = 'admin';
+          } else if (isEmployeeInScheduler || hasEmployeeRole) {
+            // User is an employee if they're in employees table OR have employee role
+            highestRole = 'employee';
           }
 
           return {
