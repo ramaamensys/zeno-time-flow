@@ -64,21 +64,55 @@ export default function SaveScheduleModal({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  const [existingScheduleForWeek, setExistingScheduleForWeek] = useState<{ id: string; name: string; description: string | null } | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Reset form when modal opens
+  // Check for existing schedule for current week and reset form when modal opens
   useEffect(() => {
     if (open) {
-      if (existingTemplate) {
-        setName(existingTemplate.name);
-        setDescription(existingTemplate.description || "");
-      } else {
-        setName(`Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`);
-        setDescription("");
-      }
+      const checkExistingSchedule = async () => {
+        if (existingTemplate) {
+          // If editing a template directly, use that
+          setName(existingTemplate.name);
+          setDescription(existingTemplate.description || "");
+          setExistingScheduleForWeek(null);
+          return;
+        }
+
+        // Check if there's already a schedule for this week
+        const weekStartStr = weekStart.toISOString();
+        const { data: existingSchedules } = await supabase
+          .from('schedule_templates')
+          .select('id, name, description, template_data')
+          .eq('company_id', companyId);
+
+        const matchingSchedule = existingSchedules?.find(schedule => {
+          const scheduleData = typeof schedule.template_data === 'string' 
+            ? JSON.parse(schedule.template_data) 
+            : schedule.template_data;
+          return scheduleData?.week_start === weekStartStr;
+        });
+
+        if (matchingSchedule) {
+          setName(matchingSchedule.name);
+          setDescription(matchingSchedule.description || "");
+          setExistingScheduleForWeek({
+            id: matchingSchedule.id,
+            name: matchingSchedule.name,
+            description: matchingSchedule.description
+          });
+        } else {
+          // Default name based on week
+          setName(`Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`);
+          setDescription("");
+          setExistingScheduleForWeek(null);
+        }
+      };
+
+      checkExistingSchedule();
     }
-  }, [open]);
+  }, [open, existingTemplate, weekStart, companyId]);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -194,17 +228,21 @@ export default function SaveScheduleModal({
     }
   };
 
+  // Determine if we're updating (either explicit template or detected week match)
+  const isUpdating = existingTemplate || existingScheduleForWeek;
+  const scheduleLabel = existingTemplate?.name || existingScheduleForWeek?.name || name;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Save className="h-5 w-5" />
-            {existingTemplate ? "Update Schedule" : "Save Schedule"}
+            {isUpdating ? "Update Schedule" : "Save Schedule"}
           </DialogTitle>
           <DialogDescription>
-            {existingTemplate 
-              ? "Update the saved schedule with current shifts"
+            {isUpdating 
+              ? `Update "${scheduleLabel}" with current shifts`
               : "Save the current week's schedule for future use"
             }
           </DialogDescription>
