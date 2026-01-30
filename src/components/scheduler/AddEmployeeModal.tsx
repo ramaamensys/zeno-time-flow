@@ -3,12 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useEmployees, Employee } from "@/hooks/useSchedulerDatabase";
+import { useEmployees, useDepartments, Employee } from "@/hooks/useSchedulerDatabase";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { UserPlus, Users } from "lucide-react";
+import { UserPlus } from "lucide-react";
 
 interface AddEmployeeModalProps {
   open: boolean;
@@ -23,71 +23,48 @@ export default function AddEmployeeModal({
   companyId, 
   companyName 
 }: AddEmployeeModalProps) {
-  const { createEmployee, updateEmployee } = useEmployees();
+  const { createEmployee } = useEmployees();
+  const { departments } = useDepartments(companyId);
   const [loading, setLoading] = useState(false);
-  const [employeeType, setEmployeeType] = useState<"existing" | "new">("new");
-  const [unassignedEmployees, setUnassignedEmployees] = useState<Employee[]>([]);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
-  const [loadingUnassigned, setLoadingUnassigned] = useState(false);
   
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
+    first_name: "",
+    last_name: "",
     email: "",
+    password: "",
     phone: "",
-    password: ""
+    hire_date: "",
+    hourly_rate: "",
+    department_id: "none",
+    position: "",
+    emergency_contact_name: "",
+    emergency_contact_phone: "",
+    notes: "",
+    status: "active"
   });
 
-  // Fetch unassigned employees when modal opens or type changes
-  useEffect(() => {
-    if (open && employeeType === "existing") {
-      fetchUnassignedEmployees();
-    }
-  }, [open, employeeType]);
-
-  const fetchUnassignedEmployees = async () => {
-    setLoadingUnassigned(true);
-    try {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .is('company_id', null)
-        .order('first_name', { ascending: true });
-
-      if (error) throw error;
-      setUnassignedEmployees(data || []);
-    } catch (error) {
-      console.error('Error fetching unassigned employees:', error);
-      toast.error('Failed to load unassigned employees');
-    } finally {
-      setLoadingUnassigned(false);
-    }
+  const resetForm = () => {
+    setFormData({
+      first_name: "",
+      last_name: "",
+      email: "",
+      password: "",
+      phone: "",
+      hire_date: "",
+      hourly_rate: "",
+      department_id: "none",
+      position: "",
+      emergency_contact_name: "",
+      emergency_contact_phone: "",
+      notes: "",
+      status: "active"
+    });
   };
 
-  const handleAssignExisting = async () => {
-    if (!selectedEmployeeId) {
-      toast.error("Please select an employee");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await updateEmployee(selectedEmployeeId, { company_id: companyId });
-      toast.success("Employee assigned to company successfully!");
-      resetForm();
-      onOpenChange(false);
-    } catch (error) {
-      console.error('Error assigning employee:', error);
-      toast.error("Failed to assign employee");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateNew = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || !formData.password.trim()) {
+    if (!formData.first_name.trim() || !formData.last_name.trim() || !formData.email.trim() || !formData.password.trim()) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -125,7 +102,7 @@ export default function AddEmployeeModal({
       const { data: userData, error: userError } = await supabase.functions.invoke('create-user', {
         body: {
           email: formData.email.trim(),
-          full_name: `${formData.firstName.trim()} ${formData.lastName.trim()}`,
+          full_name: `${formData.first_name.trim()} ${formData.last_name.trim()}`,
           role: 'employee',
           password: formData.password,
           app_type: 'scheduler'
@@ -141,14 +118,19 @@ export default function AddEmployeeModal({
 
       // Create employee record linked to the user
       const employeeData = {
-        first_name: formData.firstName.trim(),
-        last_name: formData.lastName.trim(),
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
         email: formData.email.trim(),
-        phone: formData.phone.trim(),
+        phone: formData.phone.trim() || undefined,
         company_id: companyId,
-        position: "Employee",
-        status: "active" as const,
-        hire_date: new Date().toISOString().split('T')[0],
+        position: formData.position.trim() || "Employee",
+        status: formData.status as "active" | "inactive" | "terminated",
+        hire_date: formData.hire_date || new Date().toISOString().split('T')[0],
+        hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : undefined,
+        department_id: formData.department_id !== "none" ? formData.department_id : undefined,
+        emergency_contact_name: formData.emergency_contact_name.trim() || undefined,
+        emergency_contact_phone: formData.emergency_contact_phone.trim() || undefined,
+        notes: formData.notes.trim() || undefined,
         user_id: userData?.user?.id || null
       };
 
@@ -165,180 +147,206 @@ export default function AddEmployeeModal({
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      password: ""
-    });
-    setEmployeeType("new");
-    setSelectedEmployeeId("");
-  };
-
   return (
     <Dialog open={open} onOpenChange={(open) => {
       onOpenChange(open);
       if (!open) resetForm();
     }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="w-5 h-5" />
-            Add Employee - {companyName}
+            Add New Employee
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Employee Type Selection */}
-          <RadioGroup 
-            value={employeeType} 
-            onValueChange={(value: "existing" | "new") => setEmployeeType(value)}
-            className="flex gap-4"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="existing" id="existing" />
-              <Label htmlFor="existing" className="flex items-center gap-2 cursor-pointer">
-                <Users className="w-4 h-4" />
-                Existing Employee
-              </Label>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="first_name">First Name *</Label>
+              <Input
+                id="first_name"
+                value={formData.first_name}
+                onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))}
+                required
+              />
             </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="new" id="new" />
-              <Label htmlFor="new" className="flex items-center gap-2 cursor-pointer">
-                <UserPlus className="w-4 h-4" />
-                New Employee
-              </Label>
+
+            <div className="space-y-2">
+              <Label htmlFor="last_name">Last Name *</Label>
+              <Input
+                id="last_name"
+                value={formData.last_name}
+                onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))}
+                required
+              />
             </div>
-          </RadioGroup>
+          </div>
 
-          {/* Existing Employee Selection */}
-          {employeeType === "existing" && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="existingEmployee">Select Unassigned Employee</Label>
-                {loadingUnassigned ? (
-                  <div className="flex items-center justify-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                  </div>
-                ) : unassignedEmployees.length > 0 ? (
-                  <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Select an employee..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {unassignedEmployees.map((emp) => (
-                        <SelectItem key={emp.id} value={emp.id}>
-                          {emp.first_name} {emp.last_name} ({emp.email})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className="text-sm text-muted-foreground mt-2 p-4 bg-muted rounded-md">
-                    No unassigned employees available. Create a new employee instead.
-                  </p>
-                )}
-              </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email *</Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              required
+            />
+          </div>
 
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleAssignExisting} 
-                  disabled={loading || !selectedEmployeeId || loadingUnassigned}
-                >
-                  {loading ? "Assigning..." : "Assign to Company"}
-                </Button>
-              </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password *</Label>
+            <Input
+              id="password"
+              type="password"
+              value={formData.password}
+              onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+              placeholder="Enter password (min 6 characters)"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                value={formData.phone}
+                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                placeholder="(555) 123-4567"
+              />
             </div>
-          )}
 
-          {/* New Employee Form */}
-          {employeeType === "new" && (
-            <form onSubmit={handleCreateNew} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="hire_date">Hire Date</Label>
+              <Input
+                id="hire_date"
+                type="date"
+                value={formData.hire_date}
+                onChange={(e) => setFormData(prev => ({ ...prev, hire_date: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="department">Department</Label>
+              <Select
+                value={formData.department_id}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, department_id: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="none">Select department</SelectItem>
+                  {departments.map((department) => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="position">Position</Label>
+              <Input
+                id="position"
+                value={formData.position}
+                onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
+                placeholder="e.g., Manager, Cashier, Cook"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="hourly_rate">Hourly Rate ($)</Label>
+              <Input
+                id="hourly_rate"
+                type="number"
+                min="0"
+                step="0.01"
+                value={formData.hourly_rate}
+                onChange={(e) => setFormData(prev => ({ ...prev, hourly_rate: e.target.value }))}
+                placeholder="15.00"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="terminated">Terminated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Emergency Contact</Label>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="firstName">First Name *</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="emergency_contact_name">Name</Label>
                   <Input
-                    id="firstName"
-                    value={formData.firstName}
-                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                    placeholder="Enter first name"
-                    required
+                    id="emergency_contact_name"
+                    value={formData.emergency_contact_name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, emergency_contact_name: e.target.value }))}
+                    placeholder="Emergency contact name"
                   />
                 </div>
 
-                <div>
-                  <Label htmlFor="lastName">Last Name *</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="emergency_contact_phone">Phone</Label>
                   <Input
-                    id="lastName"
-                    value={formData.lastName}
-                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                    placeholder="Enter last name"
-                    required
+                    id="emergency_contact_phone"
+                    value={formData.emergency_contact_phone}
+                    onChange={(e) => setFormData(prev => ({ ...prev, emergency_contact_phone: e.target.value }))}
+                    placeholder="(555) 123-4567"
                   />
                 </div>
               </div>
+            </div>
 
-              <div>
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="Enter email address"
-                  required
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Additional notes about the employee..."
+                rows={3}
+              />
+            </div>
+          </div>
 
-              <div>
-                <Label htmlFor="password">Password *</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Enter password (min 6 characters)"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="Enter phone number"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? "Adding..." : "Add Employee"}
-                </Button>
-              </div>
-            </form>
-          )}
-        </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={loading || !formData.first_name || !formData.last_name || !formData.email || !formData.password}
+            >
+              {loading ? "Adding..." : "Add Employee"}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

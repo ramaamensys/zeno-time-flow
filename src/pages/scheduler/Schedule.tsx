@@ -130,12 +130,13 @@ export default function SchedulerSchedule() {
 
   // Filter companies based on user role and access
   const availableCompanies = companies.filter(company => {
-    // Super admins can see all companies, but filter by selected organization
+    // Super admins: companies only show AFTER selecting an organization
     if (userRole === 'super_admin') {
-      if (selectedOrganization) {
-        return company.organization_id === selectedOrganization;
+      // Only show companies if organization is selected
+      if (!selectedOrganization) {
+        return false;
       }
-      return true;
+      return company.organization_id === selectedOrganization;
     }
     
     // Operations managers can see companies they manage

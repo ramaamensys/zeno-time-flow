@@ -363,20 +363,27 @@ export default function EmployeeSchedule() {
               </Select>
             )}
 
-            {/* Company Filter */}
-            {companies.length > 0 && (
+            {/* Company Filter - Only show if more than one company available */}
+            {companies.length > 1 && (
               <Select value={selectedCompany} onValueChange={setSelectedCompany}>
                 <SelectTrigger className="w-[200px]">
                   <Building className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="All Companies" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background border shadow-lg z-50">
                   <SelectItem value="all">All Companies</SelectItem>
                   {companies.map(company => (
                     <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            )}
+            {/* Show company name if only one company (company manager) */}
+            {companies.length === 1 && (
+              <Badge variant="secondary" className="px-3 py-1.5">
+                <Building className="h-4 w-4 mr-2" />
+                {companies[0].name}
+              </Badge>
             )}
           </div>
         </CardContent>
