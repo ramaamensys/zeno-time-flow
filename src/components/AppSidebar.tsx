@@ -158,10 +158,15 @@ export function AppSidebar() {
     userRole === 'operations_manager' || userRole === 'manager' ||
     userAppType === 'scheduler' || userAppType === 'both';
 
-  const schedulerItemsForRole =
-    userRole === 'manager'
-      ? schedulerAdminItems.filter((item) => item.title !== 'Companies')
-      : schedulerAdminItems;
+  const schedulerItemsForRole = (() => {
+    if (userRole === 'manager') {
+      return schedulerAdminItems.filter((item) => item.title !== 'Companies');
+    }
+    if (userRole === 'operations_manager') {
+      return schedulerAdminItems.filter((item) => item.title !== 'Schedule');
+    }
+    return schedulerAdminItems;
+  })();
 
   return (
     <Sidebar className={collapsed ? "w-14" : "w-60"} collapsible="icon">
