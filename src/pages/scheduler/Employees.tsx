@@ -36,13 +36,13 @@ export default function SchedulerEmployees() {
 
   // Database hooks
   const { companies, loading: companiesLoading } = useCompanies();
-  const { departments, loading: departmentsLoading } = useDepartments(selectedCompany);
-  const { employees, loading: employeesLoading, deleteEmployee, updateEmployee } = useEmployees(selectedCompany);
+  const { departments, loading: departmentsLoading } = useDepartments(selectedCompany === "all" ? "" : selectedCompany);
+  const { employees, loading: employeesLoading, deleteEmployee, updateEmployee } = useEmployees(selectedCompany === "all" ? "" : selectedCompany);
 
-  // Set first company as default when companies load
+  // Set "all" as default when companies load
   useEffect(() => {
     if (companies.length > 0 && !selectedCompany) {
-      setSelectedCompany(companies[0].id);
+      setSelectedCompany("all");
     }
   }, [companies, selectedCompany]);
 
@@ -95,7 +95,7 @@ export default function SchedulerEmployees() {
             <Building className="h-4 w-4 mr-2" />
             Add Company
           </Button>
-          <Button onClick={() => setShowCreateEmployee(true)} disabled={!selectedCompany}>
+          <Button onClick={() => setShowCreateEmployee(true)} disabled={!selectedCompany || selectedCompany === "all"}>
             <Plus className="h-4 w-4 mr-2" />
             Add Employee
           </Button>
@@ -162,6 +162,7 @@ export default function SchedulerEmployees() {
                   <SelectValue placeholder="Select company" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All Employees</SelectItem>
                   {companies.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name}
@@ -219,8 +220,7 @@ export default function SchedulerEmployees() {
               ) : filteredEmployees.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    {!selectedCompany ? 'Select a company to view employees' : 
-                     searchTerm ? 'No employees found matching your search' : 
+                    {searchTerm ? 'No employees found matching your search' : 
                      'No employees found. Add some employees to get started.'}
                   </TableCell>
                 </TableRow>
