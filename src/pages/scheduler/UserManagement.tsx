@@ -383,13 +383,16 @@ export default function SchedulerUserManagement() {
   };
 
   // Filter users based on search term, role, and status
-  const filteredUsers = users.filter((user) => {
+  const filteredUsers = users.filter((userItem) => {
     const matchesSearch = 
-      user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      userItem.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      userItem.email.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesRole = selectedRole === "all" || user.role === selectedRole;
-    const matchesStatus = selectedStatus === "all" || user.status === selectedStatus;
+    // Normalize role comparison - handle both 'employee' in user_roles and users linked via employees table
+    const userRole = userItem.role?.toLowerCase() || 'user';
+    const filterRole = selectedRole?.toLowerCase() || 'all';
+    const matchesRole = filterRole === "all" || userRole === filterRole;
+    const matchesStatus = selectedStatus === "all" || userItem.status === selectedStatus;
     
     return matchesSearch && matchesRole && matchesStatus;
   });
