@@ -91,6 +91,8 @@ export default function SchedulerSchedule() {
 
   const [employeeRecord, setEmployeeRecord] = useState<{ id: string; company_id: string } | null>(null);
   
+  // Public employee data for employee view (to show coworker names)
+  const [publicEmployees, setPublicEmployees] = useState<{ id: string; first_name: string; last_name: string }[]>([]);
   // Fetch organizations for super admin
   useEffect(() => {
     const fetchOrganizations = async () => {
@@ -152,6 +154,24 @@ export default function SchedulerSchedule() {
 
     fetchUserRole();
   }, [user]);
+
+  // Fetch public employees data for employee view (to show coworker names)
+  useEffect(() => {
+    const fetchPublicEmployees = async () => {
+      if (!employeeRecord?.company_id || userRole !== 'employee') return;
+      
+      const { data, error } = await supabase
+        .from('employees_public')
+        .select('id, first_name, last_name')
+        .eq('company_id', employeeRecord.company_id);
+      
+      if (!error && data) {
+        setPublicEmployees(data.filter(e => e.id && e.first_name && e.last_name) as { id: string; first_name: string; last_name: string }[]);
+      }
+    };
+    
+    fetchPublicEmployees();
+  }, [employeeRecord?.company_id, userRole]);
 
   // Grace period for marking shifts as missed (15 minutes)
   const GRACE_PERIOD_MINUTES = 15;
@@ -353,8 +373,17 @@ export default function SchedulerSchedule() {
   };
 
   const getEmployeeName = (employeeId: string) => {
+    // First check the regular employees list (for managers)
     const employee = employees.find(e => e.id === employeeId);
-    return employee ? `${employee.first_name} ${employee.last_name}` : 'Unknown';
+    if (employee) {
+      return `${employee.first_name} ${employee.last_name}`;
+    }
+    // For employee view, check public employees list (coworkers)
+    const publicEmployee = publicEmployees.find(e => e.id === employeeId);
+    if (publicEmployee) {
+      return `${publicEmployee.first_name} ${publicEmployee.last_name}`;
+    }
+    return 'Unknown';
   };
 
   const handleAddShift = (dayIndex: number, slotId: string) => {
