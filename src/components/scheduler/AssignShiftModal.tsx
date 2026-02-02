@@ -20,6 +20,7 @@ interface AssignShiftModalProps {
     startHour: number;
     endHour: number;
   };
+  preSelectedDepartmentId?: string;
   onShiftCreated?: () => void;
 }
 
@@ -29,6 +30,7 @@ export default function AssignShiftModal({
   companyId, 
   date,
   slot,
+  preSelectedDepartmentId,
   onShiftCreated
 }: AssignShiftModalProps) {
   const { createShift } = useShifts();
@@ -57,7 +59,7 @@ export default function AssignShiftModal({
     if (open && slot) {
       setFormData({
         employee_id: "",
-        department_id: "",
+        department_id: preSelectedDepartmentId || "",
         start_time: formatHourToTime(slot.startHour),
         end_time: formatHourToTime(slot.endHour),
         break_minutes: 30,
@@ -66,7 +68,7 @@ export default function AssignShiftModal({
         status: "scheduled"
       });
     }
-  }, [open, slot]);
+  }, [open, slot, preSelectedDepartmentId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,7 +141,7 @@ export default function AssignShiftModal({
                 setFormData(prev => ({
                   ...prev,
                   employee_id: value,
-                  department_id: employee?.department_id || prev.department_id,
+                  department_id: prev.department_id || employee?.department_id || "",
                   hourly_rate: employee?.hourly_rate?.toString() || prev.hourly_rate
                 }));
               }}
@@ -148,12 +150,14 @@ export default function AssignShiftModal({
                 <SelectValue placeholder="Select an employee to assign" />
               </SelectTrigger>
               <SelectContent>
-                {employees.map((employee) => (
-                  <SelectItem key={employee.id} value={employee.id}>
-                    {employee.first_name} {employee.last_name} 
-                    {employee.position && ` - ${employee.position}`}
-                  </SelectItem>
-                ))}
+                {employees
+                  .filter(emp => !preSelectedDepartmentId || emp.department_id === preSelectedDepartmentId)
+                  .map((employee) => (
+                    <SelectItem key={employee.id} value={employee.id}>
+                      {employee.first_name} {employee.last_name} 
+                      {employee.position && ` - ${employee.position}`}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>

@@ -233,6 +233,11 @@ export default function SchedulerSchedule() {
       
       if (!sameDate) return false;
       
+      // Filter by department if selected (not "all")
+      if (selectedDepartment && selectedDepartment !== "all") {
+        if (shift.department_id !== selectedDepartment) return false;
+      }
+      
       // For normal shifts (end > start), check if hour is within range
       if (slot.endHour > slot.startHour) {
         return shiftHour >= slot.startHour && shiftHour < slot.endHour;
@@ -284,6 +289,18 @@ export default function SchedulerSchedule() {
     const shiftId = e.dataTransfer.getData('shiftId');
     
     if (employeeId && selectedCompany) {
+      // Require department selection when departments exist
+      if (departments.length > 0 && (!selectedDepartment || selectedDepartment === "all")) {
+        toast({
+          title: "Department Required",
+          description: "Please select a department before scheduling shifts.",
+          variant: "destructive"
+        });
+        setDraggedEmployee(null);
+        setDraggedShift(null);
+        return;
+      }
+      
       // Enable showing shifts when employee is dragged
       setShowScheduleShifts(true);
       
@@ -303,6 +320,8 @@ export default function SchedulerSchedule() {
         }
 
         const employee = employees.find(e => e.id === employeeId);
+        // Use selected department, or fall back to employee's department
+        const departmentId = selectedDepartment !== "all" ? selectedDepartment : employee?.department_id;
         
         if (shiftId && draggedShift) {
           // Moving existing shift to new slot
@@ -310,13 +329,14 @@ export default function SchedulerSchedule() {
             start_time: startDateTime.toISOString(),
             end_time: endDateTime.toISOString(),
             employee_id: employeeId,
+            department_id: departmentId,
           });
         } else {
           // Creating new shift
           createShift({
             employee_id: employeeId,
             company_id: selectedCompany,
-            department_id: employee?.department_id || undefined,
+            department_id: departmentId || undefined,
             start_time: startDateTime.toISOString(),
             end_time: endDateTime.toISOString(),
             break_minutes: 30,
@@ -880,7 +900,10 @@ export default function SchedulerSchedule() {
           )}
 
           {/* Company dropdown */}
-          <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+          <Select value={selectedCompany} onValueChange={(value) => {
+            setSelectedCompany(value);
+            setSelectedDepartment("all"); // Reset department when company changes
+          }}>
             <SelectTrigger className="w-[200px] bg-background">
               <SelectValue placeholder="Select company" />
             </SelectTrigger>
@@ -892,6 +915,23 @@ export default function SchedulerSchedule() {
               ))}
             </SelectContent>
           </Select>
+
+          {/* Department dropdown - Only show when company is selected */}
+          {selectedCompany && departments.length > 0 && (
+            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+              <SelectTrigger className="w-[180px] bg-background">
+                <SelectValue placeholder="Select department *" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border shadow-lg z-50">
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map((dept) => (
+                  <SelectItem key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
 
@@ -1423,6 +1463,7 @@ export default function SchedulerSchedule() {
           companyId={selectedCompany}
           date={preSelectedDate}
           slot={preSelectedSlot}
+          preSelectedDepartmentId={selectedDepartment !== "all" ? selectedDepartment : undefined}
           onShiftCreated={() => {
             setShowScheduleShifts(true);
           }}
