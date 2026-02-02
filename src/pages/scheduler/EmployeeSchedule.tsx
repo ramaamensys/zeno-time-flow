@@ -156,7 +156,7 @@ export default function EmployeeSchedule() {
         .from('shifts')
         .select(`
           *,
-          employee:employees(id, first_name, last_name, email),
+          employee:employees!shifts_employee_id_fkey(id, first_name, last_name, email),
           company:companies(id, name, organization_id),
           department:departments(name)
         `)

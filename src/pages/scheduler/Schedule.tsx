@@ -1111,59 +1111,100 @@ export default function SchedulerSchedule() {
                             const startTime = new Date(shift.start_time);
                             const endTime = new Date(shift.end_time);
                             const isMyShift = employeeRecord && shift.employee_id === employeeRecord.id;
+                            const isMissed = (shift as any).is_missed === true;
+                            const hasReplacement = !!(shift as any).replacement_employee_id;
+                            const replacementName = hasReplacement ? getEmployeeName((shift as any).replacement_employee_id) : null;
+                            const replacementStarted = !!(shift as any).replacement_started_at;
                             
                             return (
                                 <div
                                   key={shift.id}
-                                  className={`group relative flex items-center gap-2 p-2 rounded border ${
-                                    isMyShift 
-                                      ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700 ring-2 ring-green-500/50' 
-                                      : isEmployeeView
-                                        ? 'bg-muted/50 border-muted-foreground/20'
-                                        : 'bg-primary/10 border-primary/20'
+                                  className={`group relative flex flex-col gap-1 p-2 rounded border ${
+                                    isMissed 
+                                      ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700'
+                                      : isMyShift 
+                                        ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700 ring-2 ring-green-500/50' 
+                                        : isEmployeeView
+                                          ? 'bg-muted/50 border-muted-foreground/20'
+                                          : 'bg-primary/10 border-primary/20'
                                   } ${isEditMode && canManageShifts ? 'cursor-move hover:bg-primary/20' : 'cursor-default'}`}
                                   onClick={isEditMode && canManageShifts ? () => handleEditShift(shift) : undefined}
-                                  draggable={isEditMode && canManageShifts}
-                                  onDragStart={isEditMode && canManageShifts ? (e) => handleDragStart(e, shift.employee_id, shift) : undefined}
+                                  draggable={isEditMode && canManageShifts && !isMissed}
+                                  onDragStart={isEditMode && canManageShifts && !isMissed ? (e) => handleDragStart(e, shift.employee_id, shift) : undefined}
                                   onDragEnd={isEditMode && canManageShifts ? handleDragEnd : undefined}
                                 >
-                                  <Avatar className={`h-6 w-6 ${isMyShift ? 'ring-2 ring-green-500' : ''}`}>
-                                    <AvatarFallback className={`text-xs ${isMyShift ? 'bg-green-500 text-white' : ''}`}>
-                                      {employeeName.split(' ').map(n => n[0]).join('')}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div className="flex-1 min-w-0">
-                                    <div className={`text-xs font-medium truncate ${isMyShift ? 'text-green-700 dark:text-green-300' : ''}`}>
-                                      {employeeName}
-                                      {isMyShift && isEmployeeView && (
-                                        <span className="ml-1 text-[10px] font-normal text-green-600 dark:text-green-400">(You)</span>
-                                      )}
+                                  {/* Original Employee Row */}
+                                  <div className="flex items-center gap-2">
+                                    <Avatar className={`h-6 w-6 ${isMyShift ? 'ring-2 ring-green-500' : ''} ${isMissed ? 'opacity-50' : ''}`}>
+                                      <AvatarFallback className={`text-xs ${isMyShift ? 'bg-green-500 text-white' : ''} ${isMissed ? 'bg-red-300' : ''}`}>
+                                        {employeeName.split(' ').map(n => n[0]).join('')}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 min-w-0">
+                                      <div className={`text-xs font-medium truncate ${
+                                        isMissed 
+                                          ? 'line-through text-red-600 dark:text-red-400' 
+                                          : isMyShift 
+                                            ? 'text-green-700 dark:text-green-300' 
+                                            : ''
+                                      }`}>
+                                        {employeeName}
+                                        {isMyShift && isEmployeeView && (
+                                          <span className="ml-1 text-[10px] font-normal text-green-600 dark:text-green-400">(You)</span>
+                                        )}
+                                      </div>
                                     </div>
+                                    {isMissed && !hasReplacement && (
+                                      <Badge variant="destructive" className="text-[10px] h-4 px-1">Missed</Badge>
+                                    )}
+                                    {isEditMode && canManageShifts && (
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100">
+                                            <MoreHorizontal className="h-3 w-3" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleEditShift(shift);
+                                          }}>
+                                            <Edit className="h-4 w-4 mr-2" />
+                                            Edit Shift
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteShift(shift.id);
+                                          }}>
+                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            Delete Shift
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    )}
                                   </div>
-                                  {isEditMode && canManageShifts && (
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100">
-                                          <MoreHorizontal className="h-3 w-3" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleEditShift(shift);
-                                        }}>
-                                          <Edit className="h-4 w-4 mr-2" />
-                                          Edit Shift
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={(e) => {
-                                          e.stopPropagation();
-                                          deleteShift(shift.id);
-                                        }}>
-                                          <Trash2 className="h-4 w-4 mr-2" />
-                                          Delete Shift
-                                        </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
+                                  
+                                  {/* Replacement Employee Row (if applicable) */}
+                                  {hasReplacement && replacementName && (
+                                    <div className="flex items-center gap-2 pt-1 border-t border-dashed mt-1">
+                                      <Avatar className="h-5 w-5 ring-1 ring-green-400">
+                                        <AvatarFallback className="text-[10px] bg-green-500 text-white">
+                                          {replacementName.split(' ').map(n => n[0]).join('')}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="text-[10px] font-medium text-green-700 dark:text-green-400 truncate">
+                                          {replacementName}
+                                        </div>
+                                      </div>
+                                      <Badge variant="secondary" className={`text-[9px] h-3.5 px-1 ${
+                                        replacementStarted 
+                                          ? 'bg-green-500/20 text-green-700' 
+                                          : 'bg-yellow-500/20 text-yellow-700'
+                                      }`}>
+                                        {replacementStarted ? 'Active' : 'Pending'}
+                                      </Badge>
+                                    </div>
                                   )}
                                 </div>
                             );
