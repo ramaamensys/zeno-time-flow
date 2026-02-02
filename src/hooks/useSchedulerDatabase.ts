@@ -72,6 +72,27 @@ export interface Shift {
   status: string;
   hourly_rate?: number;
   created_at: string;
+  // Missed shift tracking fields
+  is_missed?: boolean;
+  missed_at?: string;
+  replacement_employee_id?: string;
+  replacement_approved_at?: string;
+  replacement_started_at?: string;
+}
+
+export interface ShiftReplacementRequest {
+  id: string;
+  shift_id: string;
+  original_employee_id: string;
+  replacement_employee_id: string;
+  company_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requested_at: string;
+  reviewed_at?: string;
+  reviewed_by?: string;
+  reviewer_notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export function useOrganizations() {

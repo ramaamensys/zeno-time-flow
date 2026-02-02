@@ -728,6 +728,94 @@ export type Database = {
           },
         ]
       }
+      shift_replacement_requests: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          original_employee_id: string
+          replacement_employee_id: string
+          requested_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewer_notes: string | null
+          shift_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          original_employee_id: string
+          replacement_employee_id: string
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_notes?: string | null
+          shift_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          original_employee_id?: string
+          replacement_employee_id?: string
+          requested_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_notes?: string | null
+          shift_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_replacement_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_replacement_requests_original_employee_id_fkey"
+            columns: ["original_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_replacement_requests_original_employee_id_fkey"
+            columns: ["original_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_replacement_requests_replacement_employee_id_fkey"
+            columns: ["replacement_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_replacement_requests_replacement_employee_id_fkey"
+            columns: ["replacement_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_replacement_requests_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shifts: {
         Row: {
           break_minutes: number | null
@@ -739,7 +827,12 @@ export type Database = {
           end_time: string
           hourly_rate: number | null
           id: string
+          is_missed: boolean | null
+          missed_at: string | null
           notes: string | null
+          replacement_approved_at: string | null
+          replacement_employee_id: string | null
+          replacement_started_at: string | null
           start_time: string
           status: string
           updated_at: string
@@ -754,7 +847,12 @@ export type Database = {
           end_time: string
           hourly_rate?: number | null
           id?: string
+          is_missed?: boolean | null
+          missed_at?: string | null
           notes?: string | null
+          replacement_approved_at?: string | null
+          replacement_employee_id?: string | null
+          replacement_started_at?: string | null
           start_time: string
           status?: string
           updated_at?: string
@@ -769,7 +867,12 @@ export type Database = {
           end_time?: string
           hourly_rate?: number | null
           id?: string
+          is_missed?: boolean | null
+          missed_at?: string | null
           notes?: string | null
+          replacement_approved_at?: string | null
+          replacement_employee_id?: string | null
+          replacement_started_at?: string | null
           start_time?: string
           status?: string
           updated_at?: string
@@ -799,6 +902,20 @@ export type Database = {
           {
             foreignKeyName: "shifts_employee_id_fkey"
             columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_replacement_employee_id_fkey"
+            columns: ["replacement_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_replacement_employee_id_fkey"
+            columns: ["replacement_employee_id"]
             isOneToOne: false
             referencedRelation: "employees_public"
             referencedColumns: ["id"]
