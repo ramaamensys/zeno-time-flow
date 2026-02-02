@@ -117,12 +117,6 @@ export default function SchedulerEmployees() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {canAddCompany && (
-            <Button variant="outline" onClick={() => setShowCreateCompany(true)}>
-              <Building className="h-4 w-4 mr-2" />
-              Add Company
-            </Button>
-          )}
           <Button onClick={() => setShowCreateEmployee(true)} disabled={!canAddEmployee}>
             <Plus className="h-4 w-4 mr-2" />
             Add Employee
