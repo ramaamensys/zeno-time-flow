@@ -159,14 +159,23 @@ export default function SchedulerSchedule() {
   useEffect(() => {
     const fetchPublicEmployees = async () => {
       if (!employeeRecord?.company_id || userRole !== 'employee') return;
-      
-      const { data, error } = await supabase
-        .from('employees_public')
-        .select('id, first_name, last_name')
-        .eq('company_id', employeeRecord.company_id);
-      
-      if (!error && data) {
-        setPublicEmployees(data.filter(e => e.id && e.first_name && e.last_name) as { id: string; first_name: string; last_name: string }[]);
+
+      // Use a SECURITY DEFINER RPC so employee users can resolve coworker names
+      // without relying on base-table SELECT permissions or view/RLS behavior.
+      const { data, error } = await (supabase as any)
+        .rpc('get_company_employee_names', { _company_id: employeeRecord.company_id });
+
+      if (error) {
+        console.error('Error fetching coworker names:', error);
+        return;
+      }
+
+      if (Array.isArray(data)) {
+        setPublicEmployees(
+          data
+            .filter((e: any) => e?.id && e?.first_name && e?.last_name)
+            .map((e: any) => ({ id: e.id, first_name: e.first_name, last_name: e.last_name }))
+        );
       }
     };
     

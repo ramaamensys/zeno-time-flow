@@ -1308,6 +1308,14 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_company_employee_names: {
+        Args: { _company_id: string }
+        Returns: {
+          first_name: string
+          id: string
+          last_name: string
+        }[]
+      }
       get_company_organization_id: {
         Args: { _company_id: string }
         Returns: string
