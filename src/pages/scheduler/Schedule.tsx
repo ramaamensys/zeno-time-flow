@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Calendar, ChevronLeft, ChevronRight, Plus, Users, Clock, Building, Edit, Trash2, MoreHorizontal, Download, Printer, Save } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Plus, Users, Clock, Building, Edit, Trash2, MoreHorizontal, Download, Printer, Save, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCompanies, useDepartments, useEmployees, useShifts, Shift, Employee } from "@/hooks/useSchedulerDatabase";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +20,7 @@ import EditEmployeeModal from "@/components/scheduler/EditEmployeeModal";
 import SaveScheduleModal from "@/components/scheduler/SaveScheduleModal";
 import SavedSchedulesCard, { SavedSchedule } from "@/components/scheduler/SavedSchedulesCard";
 import AssignShiftModal from "@/components/scheduler/AssignShiftModal";
+import MissedShiftRequestModal from "@/components/scheduler/MissedShiftRequestModal";
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function SchedulerSchedule() {
@@ -56,6 +58,17 @@ export default function SchedulerSchedule() {
   const [savedSchedulesRefresh, setSavedSchedulesRefresh] = useState(0);
   const [showScheduleShifts, setShowScheduleShifts] = useState(false); // Only show shifts when template is loaded or creating new
   const [showAssignShiftModal, setShowAssignShiftModal] = useState(false);
+  const [missedShiftToRequest, setMissedShiftToRequest] = useState<{
+    id: string;
+    employee_id: string;
+    company_id: string;
+    start_time: string;
+    end_time: string;
+    employeeName: string;
+    companyName?: string;
+    departmentName?: string;
+  } | null>(null);
+  const [myPendingRequests, setMyPendingRequests] = useState<string[]>([]);
   const { toast } = useToast();
   
   // Check if selectedCompany is a valid UUID (not empty or "all")
@@ -139,6 +152,23 @@ export default function SchedulerSchedule() {
 
     fetchUserRole();
   }, [user]);
+
+  // Fetch my pending replacement requests
+  useEffect(() => {
+    const fetchMyRequests = async () => {
+      if (!employeeRecord?.id) return;
+      
+      const { data: requests } = await supabase
+        .from('shift_replacement_requests')
+        .select('shift_id')
+        .eq('replacement_employee_id', employeeRecord.id)
+        .eq('status', 'pending');
+      
+      setMyPendingRequests(requests?.map(r => r.shift_id) || []);
+    };
+
+    fetchMyRequests();
+  }, [employeeRecord?.id]);
 
   // Filter companies based on user role and access
   const availableCompanies = companies.filter(company => {
@@ -1116,23 +1146,53 @@ export default function SchedulerSchedule() {
                             const replacementName = hasReplacement ? getEmployeeName((shift as any).replacement_employee_id) : null;
                             const replacementStarted = !!(shift as any).replacement_started_at;
                             
+                            // Check if this is a coworker's missed shift that employee can request
+                            const isCoworkerMissedShift = isEmployeeView && isMissed && !isMyShift && !hasReplacement && employeeRecord;
+                            const hasPendingRequest = myPendingRequests.includes(shift.id);
+                            const canRequestShift = isCoworkerMissedShift && !hasPendingRequest;
+                            
+                            // Get company and department names for the request modal
+                            const company = schedulableCompanies.find(c => c.id === shift.company_id);
+                            const department = departments.find(d => d.id === shift.department_id);
+                            
+                            const handleShiftClick = () => {
+                              if (isEditMode && canManageShifts) {
+                                handleEditShift(shift);
+                              } else if (canRequestShift) {
+                                setMissedShiftToRequest({
+                                  id: shift.id,
+                                  employee_id: shift.employee_id,
+                                  company_id: shift.company_id || '',
+                                  start_time: shift.start_time,
+                                  end_time: shift.end_time,
+                                  employeeName,
+                                  companyName: company?.name,
+                                  departmentName: department?.name
+                                });
+                              }
+                            };
+                            
                             return (
-                                <div
-                                  key={shift.id}
-                                  className={`group relative flex flex-col gap-1 p-2 rounded border ${
-                                    isMissed 
-                                      ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-700'
-                                      : isMyShift 
-                                        ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700 ring-2 ring-green-500/50' 
-                                        : isEmployeeView
-                                          ? 'bg-muted/50 border-muted-foreground/20'
-                                          : 'bg-primary/10 border-primary/20'
-                                  } ${isEditMode && canManageShifts ? 'cursor-move hover:bg-primary/20' : 'cursor-default'}`}
-                                  onClick={isEditMode && canManageShifts ? () => handleEditShift(shift) : undefined}
-                                  draggable={isEditMode && canManageShifts && !isMissed}
-                                  onDragStart={isEditMode && canManageShifts && !isMissed ? (e) => handleDragStart(e, shift.employee_id, shift) : undefined}
-                                  onDragEnd={isEditMode && canManageShifts ? handleDragEnd : undefined}
-                                >
+                              <TooltipProvider key={shift.id}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div
+                                      className={`group relative flex flex-col gap-1 p-2 rounded border ${
+                                        isMissed 
+                                          ? 'bg-destructive/10 border-destructive/30 dark:bg-destructive/20 dark:border-destructive/50'
+                                          : isMyShift 
+                                            ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700 ring-2 ring-green-500/50' 
+                                            : isEmployeeView
+                                              ? 'bg-muted/50 border-muted-foreground/20'
+                                              : 'bg-primary/10 border-primary/20'
+                                      } ${isEditMode && canManageShifts ? 'cursor-move hover:bg-primary/20' : ''} ${
+                                        canRequestShift ? 'cursor-pointer hover:bg-destructive/20 hover:border-destructive/50' : ''
+                                      } ${hasPendingRequest ? 'opacity-60' : ''}`}
+                                      onClick={handleShiftClick}
+                                      draggable={isEditMode && canManageShifts && !isMissed}
+                                      onDragStart={isEditMode && canManageShifts && !isMissed ? (e) => handleDragStart(e, shift.employee_id, shift) : undefined}
+                                      onDragEnd={isEditMode && canManageShifts ? handleDragEnd : undefined}
+                                    >
                                   {/* Original Employee Row */}
                                   <div className="flex items-center gap-2">
                                     <Avatar className={`h-6 w-6 ${isMyShift ? 'ring-2 ring-green-500' : ''} ${isMissed ? 'opacity-50' : ''}`}>
@@ -1154,59 +1214,70 @@ export default function SchedulerSchedule() {
                                         )}
                                       </div>
                                     </div>
-                                    {isMissed && !hasReplacement && (
-                                      <Badge variant="destructive" className="text-[10px] h-4 px-1">Missed</Badge>
-                                    )}
-                                    {isEditMode && canManageShifts && (
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100">
-                                            <MoreHorizontal className="h-3 w-3" />
-                                          </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                          <DropdownMenuItem onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleEditShift(shift);
-                                          }}>
-                                            <Edit className="h-4 w-4 mr-2" />
-                                            Edit Shift
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem onClick={(e) => {
-                                            e.stopPropagation();
-                                            deleteShift(shift.id);
-                                          }}>
-                                            <Trash2 className="h-4 w-4 mr-2" />
-                                            Delete Shift
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
+                                      {isMissed && !hasReplacement && (
+                                        <Badge variant="destructive" className="text-[10px] h-4 px-1">Missed</Badge>
+                                      )}
+                                      {hasPendingRequest && (
+                                        <Badge variant="secondary" className="text-[10px] h-4 px-1">Requested</Badge>
+                                      )}
+                                      {isEditMode && canManageShifts && (
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100">
+                                              <MoreHorizontal className="h-3 w-3" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleEditShift(shift);
+                                            }}>
+                                              <Edit className="h-4 w-4 mr-2" />
+                                              Edit Shift
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={(e) => {
+                                              e.stopPropagation();
+                                              deleteShift(shift.id);
+                                            }}>
+                                              <Trash2 className="h-4 w-4 mr-2" />
+                                              Delete Shift
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Replacement Employee Row (if applicable) */}
+                                    {hasReplacement && replacementName && (
+                                      <div className="flex items-center gap-2 pt-1 border-t border-dashed mt-1">
+                                        <Avatar className="h-5 w-5 ring-1 ring-green-400">
+                                          <AvatarFallback className="text-[10px] bg-green-500 text-white">
+                                            {replacementName.split(' ').map(n => n[0]).join('')}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-[10px] font-medium text-green-700 dark:text-green-400 truncate">
+                                            {replacementName}
+                                          </div>
+                                        </div>
+                                        <Badge variant="secondary" className={`text-[9px] h-3.5 px-1 ${
+                                          replacementStarted 
+                                            ? 'bg-green-500/20 text-green-700' 
+                                            : 'bg-yellow-500/20 text-yellow-700'
+                                        }`}>
+                                          {replacementStarted ? 'Active' : 'Pending'}
+                                        </Badge>
+                                      </div>
                                     )}
                                   </div>
-                                  
-                                  {/* Replacement Employee Row (if applicable) */}
-                                  {hasReplacement && replacementName && (
-                                    <div className="flex items-center gap-2 pt-1 border-t border-dashed mt-1">
-                                      <Avatar className="h-5 w-5 ring-1 ring-green-400">
-                                        <AvatarFallback className="text-[10px] bg-green-500 text-white">
-                                          {replacementName.split(' ').map(n => n[0]).join('')}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      <div className="flex-1 min-w-0">
-                                        <div className="text-[10px] font-medium text-green-700 dark:text-green-400 truncate">
-                                          {replacementName}
-                                        </div>
-                                      </div>
-                                      <Badge variant="secondary" className={`text-[9px] h-3.5 px-1 ${
-                                        replacementStarted 
-                                          ? 'bg-green-500/20 text-green-700' 
-                                          : 'bg-yellow-500/20 text-yellow-700'
-                                      }`}>
-                                        {replacementStarted ? 'Active' : 'Pending'}
-                                      </Badge>
-                                    </div>
-                                  )}
-                                </div>
+                                </TooltipTrigger>
+                                {canRequestShift && (
+                                  <TooltipContent>
+                                    <p>Click to request covering this shift</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
                             );
                           })}
                           {dayShifts.length === 0 && canManageShifts && isEditMode && (
@@ -1522,6 +1593,26 @@ export default function SchedulerSchedule() {
           preSelectedDepartmentId={selectedDepartment !== "all" ? selectedDepartment : undefined}
           onShiftCreated={() => {
             setShowScheduleShifts(true);
+          }}
+        />
+      )}
+
+      {/* Missed Shift Request Modal for Employees */}
+      {employeeRecord && (
+        <MissedShiftRequestModal
+          shift={missedShiftToRequest}
+          employeeId={employeeRecord.id}
+          onClose={() => setMissedShiftToRequest(null)}
+          onSuccess={() => {
+            // Refresh pending requests
+            supabase
+              .from('shift_replacement_requests')
+              .select('shift_id')
+              .eq('replacement_employee_id', employeeRecord.id)
+              .eq('status', 'pending')
+              .then(({ data }) => {
+                setMyPendingRequests(data?.map(r => r.shift_id) || []);
+              });
           }}
         />
       )}
