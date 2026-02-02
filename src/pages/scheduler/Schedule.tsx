@@ -648,6 +648,150 @@ export default function SchedulerSchedule() {
     }
   };
 
+  // Clear all shifts for the current week
+  const handleClearWeek = async () => {
+    if (!selectedCompany || shifts.length === 0) {
+      toast({
+        title: "No Shifts",
+        description: "There are no shifts to clear for this week.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Unlink time clock entries first to avoid foreign key issues
+      for (const shift of shifts) {
+        await supabase
+          .from('time_clock')
+          .update({ shift_id: null })
+          .eq('shift_id', shift.id);
+        
+        await deleteShift(shift.id);
+      }
+      
+      setShowScheduleShifts(false);
+      
+      toast({
+        title: "Week Cleared",
+        description: "All shifts for this week have been removed."
+      });
+    } catch (error) {
+      console.error('Error clearing week:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear week. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Duplicate current week to next week
+  const handleDuplicateWeek = async () => {
+    if (!selectedCompany || shifts.length === 0) {
+      toast({
+        title: "No Shifts",
+        description: "There are no shifts to duplicate.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Get next week's dates
+      const nextWeekStart = new Date(getWeekStart(selectedWeek));
+      nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+      const nextWeekDates = getWeekDates(nextWeekStart);
+      
+      // Create shifts for next week based on current week
+      for (const shift of shifts) {
+        const shiftDate = new Date(shift.start_time);
+        const dayIndex = (shiftDate.getDay() + 6) % 7; // Monday-based
+        
+        const startDateTime = new Date(nextWeekDates[dayIndex]);
+        startDateTime.setHours(shiftDate.getHours(), shiftDate.getMinutes(), 0, 0);
+        
+        const endDate = new Date(shift.end_time);
+        const endDateTime = new Date(nextWeekDates[dayIndex]);
+        endDateTime.setHours(endDate.getHours(), endDate.getMinutes(), 0, 0);
+        
+        // Handle overnight shifts
+        if (endDate.getDate() !== shiftDate.getDate()) {
+          endDateTime.setDate(endDateTime.getDate() + 1);
+        }
+        
+        await createShift({
+          employee_id: shift.employee_id,
+          company_id: selectedCompany,
+          department_id: shift.department_id || undefined,
+          start_time: startDateTime.toISOString(),
+          end_time: endDateTime.toISOString(),
+          break_minutes: shift.break_minutes || 0,
+          hourly_rate: shift.hourly_rate || undefined,
+          status: 'scheduled'
+        });
+      }
+      
+      // Navigate to next week
+      setSelectedWeek(nextWeekStart);
+      
+      toast({
+        title: "Week Duplicated",
+        description: `${shifts.length} shifts have been copied to next week.`
+      });
+    } catch (error) {
+      console.error('Error duplicating week:', error);
+      toast({
+        title: "Error",
+        description: "Failed to duplicate week. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Clear a specific day
+  const handleClearDay = async (dayIndex: number) => {
+    const targetDate = weekDates[dayIndex];
+    const dayShifts = shifts.filter(shift => {
+      const shiftDate = new Date(shift.start_time);
+      return (
+        shiftDate.getFullYear() === targetDate.getFullYear() &&
+        shiftDate.getMonth() === targetDate.getMonth() &&
+        shiftDate.getDate() === targetDate.getDate()
+      );
+    });
+
+    if (dayShifts.length === 0) {
+      toast({
+        title: "No Shifts",
+        description: "There are no shifts to clear for this day."
+      });
+      return;
+    }
+
+    try {
+      for (const shift of dayShifts) {
+        await supabase
+          .from('time_clock')
+          .update({ shift_id: null })
+          .eq('shift_id', shift.id);
+        await deleteShift(shift.id);
+      }
+      
+      toast({
+        title: "Day Cleared",
+        description: `${dayShifts.length} shifts removed from ${days[dayIndex]}.`
+      });
+    } catch (error) {
+      console.error('Error clearing day:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear day.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 p-6">
       <style dangerouslySetInnerHTML={{
@@ -800,16 +944,16 @@ export default function SchedulerSchedule() {
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
+                    <DropdownMenuContent align="end" className="bg-background border shadow-lg">
+                      <DropdownMenuItem onClick={handleDuplicateWeek} disabled={shifts.length === 0}>
                         <Plus className="h-4 w-4 mr-2" />
                         Duplicate Week
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Calendar className="h-4 w-4 mr-2" />
-                        Copy from Template
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={handleClearWeek} 
+                        disabled={shifts.length === 0}
+                        className="text-destructive focus:text-destructive"
+                      >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Clear Week
                       </DropdownMenuItem>
@@ -830,7 +974,8 @@ export default function SchedulerSchedule() {
                     <div className="text-xs text-muted-foreground">
                       {weekDates[index].getDate()}
                     </div>
-                    {/* Day edit button */}
+                    {/* Day edit button - only show for managers in edit mode */}
+                    {canManageShifts && isEditMode && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button 
@@ -841,21 +986,17 @@ export default function SchedulerSchedule() {
                           <MoreHorizontal className="h-3 w-3" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit Day Schedule
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Multiple Shifts
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
+                      <DropdownMenuContent align="end" className="bg-background border shadow-lg">
+                        <DropdownMenuItem 
+                          onClick={() => handleClearDay(index)}
+                          className="text-destructive focus:text-destructive"
+                        >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Clear Day
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    )}
                   </div>
                 ))}
 
