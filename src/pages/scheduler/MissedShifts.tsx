@@ -316,9 +316,9 @@ export default function MissedShifts() {
                                 {shift.replacement_employee?.first_name} {shift.replacement_employee?.last_name}
                                 <span className="text-muted-foreground ml-2">(Replacement)</span>
                               </p>
-                              {shift.replacement_started_at ? (
+                              {shift.replacement_started_at || shift.status === 'in_progress' ? (
                                 <Badge variant="secondary" className="bg-green-500/20 text-green-700 text-xs">
-                                  Started at {format(parseISO(shift.replacement_started_at), 'h:mm a')}
+                                  Clocked In {shift.replacement_started_at && `at ${format(parseISO(shift.replacement_started_at), 'h:mm a')}`}
                                 </Badge>
                               ) : (
                                 <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-700 text-xs">

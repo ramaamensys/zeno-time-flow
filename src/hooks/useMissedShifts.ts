@@ -112,20 +112,39 @@ export function useMissedShifts(companyId?: string, employeeCompanyId?: string) 
       if (error) throw error;
       
       // Fetch replacement employee info for shifts that have one
+      // Also check if replacement has clocked in via time_clock
       // Also filter out shifts where the current employee is the one who missed (can't replace yourself)
       const shiftsWithReplacements = await Promise.all(
         (data || [])
           .filter((shift: any) => shift.employee_id !== myEmployeeId) // Exclude own missed shifts
           .map(async (shift: any) => {
+            let enrichedShift = { ...shift };
+            
             if (shift.replacement_employee_id) {
+              // Fetch replacement employee details
               const { data: replEmployee } = await supabase
                 .from('employees')
                 .select('id, first_name, last_name, email')
                 .eq('id', shift.replacement_employee_id)
                 .single();
-              return { ...shift, replacement_employee: replEmployee };
+              enrichedShift.replacement_employee = replEmployee;
+              
+              // Check if replacement has clocked in (even if replacement_started_at wasn't set)
+              const { data: clockEntry } = await supabase
+                .from('time_clock')
+                .select('id, clock_in')
+                .eq('shift_id', shift.id)
+                .eq('employee_id', shift.replacement_employee_id)
+                .not('clock_in', 'is', null)
+                .maybeSingle();
+              
+              // If there's a clock entry, treat the shift as started
+              if (clockEntry?.clock_in && !shift.replacement_started_at) {
+                enrichedShift.replacement_started_at = clockEntry.clock_in;
+                enrichedShift.status = 'in_progress';
+              }
             }
-            return shift;
+            return enrichedShift;
           })
       );
       

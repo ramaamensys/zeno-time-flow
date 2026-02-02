@@ -1353,7 +1353,7 @@ export default function SchedulerSchedule() {
                                             ? 'bg-green-500/20 text-green-700' 
                                             : 'bg-yellow-500/20 text-yellow-700'
                                         }`}>
-                                          {isReplacementActive ? 'Working' : 'Ready'}
+                                          {isReplacementActive ? 'Clocked In' : 'Approved'}
                                         </Badge>
                                       </div>
                                     )}
