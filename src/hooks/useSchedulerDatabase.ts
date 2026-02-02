@@ -339,14 +339,20 @@ export function useEmployees(companyId?: string) {
   const fetchedCompanyRef = React.useRef<string | undefined>(undefined);
   const isMountedRef = React.useRef(true);
 
-  // Check if companyId is a valid UUID (not "all" or empty)
-  const isValidCompanyId = companyId && companyId !== 'all' && 
+  // Check if companyId is a valid UUID (not empty)
+  const isValidCompanyId = companyId && companyId !== '' && 
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyId);
+  
+  // "all" is a special case - fetch all employees
+  const fetchAll = companyId === 'all';
 
   const fetchEmployees = async (targetCompanyId: string | undefined, forceRefresh = false) => {
-    // Validate the target company ID
-    const isValid = targetCompanyId && targetCompanyId !== 'all' && 
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetCompanyId);
+    // Handle "all" case - fetch all employees without company filter
+    const shouldFetchAll = targetCompanyId === 'all';
+    
+    // Validate the target company ID (unless fetching all)
+    const isValid = shouldFetchAll || (targetCompanyId && targetCompanyId !== '' && 
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetCompanyId));
     
     if (!isValid) {
       if (isMountedRef.current) {
@@ -367,11 +373,17 @@ export function useEmployees(companyId?: string) {
         setLoading(true);
       }
       
-      const { data, error } = await (supabase as any)
+      let query = (supabase as any)
         .from('employees')
         .select('*')
-        .eq('company_id', targetCompanyId)
         .order('first_name', { ascending: true });
+      
+      // Only filter by company if not fetching all
+      if (!shouldFetchAll) {
+        query = query.eq('company_id', targetCompanyId);
+      }
+      
+      const { data, error } = await query;
 
       if (error) throw error;
       
@@ -463,19 +475,25 @@ export function useEmployees(companyId?: string) {
       fetchEmployees(companyId, false);
     }
     
-    // Set up real-time subscription if we have a valid company ID
+    // Set up real-time subscription if we have a valid company ID or fetching all
     let subscription: ReturnType<typeof supabase.channel> | null = null;
     
-    if (isValidCompanyId) {
-      const channelName = `employees_changes_${companyId}`;
+    if (isValidCompanyId || fetchAll) {
+      const channelName = fetchAll ? 'employees_changes_all' : `employees_changes_${companyId}`;
+      const subscriptionConfig: any = { 
+        event: '*', 
+        schema: 'public', 
+        table: 'employees'
+      };
+      
+      // Only add filter if not fetching all
+      if (!fetchAll && companyId) {
+        subscriptionConfig.filter = `company_id=eq.${companyId}`;
+      }
+      
       subscription = supabase
         .channel(channelName)
-        .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'employees',
-          filter: `company_id=eq.${companyId}`
-        }, (payload) => {
+        .on('postgres_changes', subscriptionConfig, (payload) => {
           if (payload.eventType === 'DELETE') {
             const deletedId = (payload.old as { id?: string })?.id;
             if (deletedId) {
@@ -494,7 +512,7 @@ export function useEmployees(companyId?: string) {
         subscription.unsubscribe();
       }
     };
-  }, [companyId, isValidCompanyId]);
+  }, [companyId, isValidCompanyId, fetchAll]);
 
   return {
     employees,

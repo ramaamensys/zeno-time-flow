@@ -40,9 +40,11 @@ export default function SchedulerEmployees() {
 
   // Database hooks
   const { companies, loading: companiesLoading } = useCompanies();
-  const { departments, loading: departmentsLoading } = useDepartments(selectedCompany === "all" ? "" : selectedCompany);
-  const { employees, loading: employeesLoading, deleteEmployee, updateEmployee } = useEmployees(selectedCompany === "all" ? "" : selectedCompany);
-
+  const { departments, loading: departmentsLoading } = useDepartments(selectedCompany === "all" ? undefined : selectedCompany);
+  
+  // For "all" employees, we need to fetch without company filter
+  // Pass "all" to signal we want all employees, undefined would skip fetching
+  const { employees, loading: employeesLoading, deleteEmployee, updateEmployee } = useEmployees(selectedCompany === "all" ? "all" : selectedCompany);
   // Set default company - for managers, auto-select their first company
   useEffect(() => {
     if (companies.length > 0 && !selectedCompany) {
