@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Calendar, Clock, MapPin, AlertTriangle } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Calendar, Clock, MapPin, AlertTriangle, CheckCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,51 +10,124 @@ interface EmployeeShiftsProps {
   employeeId: string;
 }
 
+const GRACE_PERIOD_MINUTES = 15;
+
 export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
   const [shifts, setShifts] = useState<any[]>([]);
+  const [approvedReplacements, setApprovedReplacements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [weekOffset, setWeekOffset] = useState(0);
   const [companyId, setCompanyId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchShifts = async () => {
-      setLoading(true);
-      
-      // First get the employee's company
-      const { data: employeeData } = await supabase
-        .from('employees')
-        .select('company_id')
-        .eq('id', employeeId)
-        .single();
-      
-      if (employeeData?.company_id) {
-        setCompanyId(employeeData.company_id);
-      }
-      
-      const today = addWeeks(new Date(), weekOffset);
-      const weekStart = startOfWeek(today, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
-      
-      const { data, error } = await supabase
-        .from('shifts')
-        .select(`
-          *,
-          companies(name),
-          departments(name)
-        `)
-        .eq('employee_id', employeeId)
-        .gte('start_time', weekStart.toISOString())
-        .lte('start_time', weekEnd.toISOString())
-        .order('start_time', { ascending: true });
-      
-      if (!error) {
-        setShifts(data || []);
-      }
-      setLoading(false);
-    };
+  // Check and mark missed shifts automatically
+  const checkAndMarkMissedShifts = useCallback(async () => {
+    if (!employeeId) return;
     
-    fetchShifts();
+    try {
+      const now = new Date();
+      const graceThreshold = new Date(now.getTime() - GRACE_PERIOD_MINUTES * 60 * 1000);
+      
+      // Find scheduled shifts that have passed the grace period without clock-in
+      const { data: overdueShifts, error: fetchError } = await supabase
+        .from('shifts')
+        .select('id, employee_id, company_id, start_time')
+        .eq('employee_id', employeeId)
+        .eq('status', 'scheduled')
+        .eq('is_missed', false)
+        .lt('start_time', graceThreshold.toISOString());
+      
+      if (fetchError || !overdueShifts || overdueShifts.length === 0) return;
+      
+      // Check each shift for time clock entry
+      for (const shift of overdueShifts) {
+        const { data: clockEntry } = await supabase
+          .from('time_clock')
+          .select('id')
+          .eq('shift_id', shift.id)
+          .not('clock_in', 'is', null)
+          .maybeSingle();
+        
+        // If no clock entry, mark as missed
+        if (!clockEntry) {
+          await supabase
+            .from('shifts')
+            .update({ 
+              is_missed: true, 
+              missed_at: now.toISOString(),
+              status: 'missed'
+            })
+            .eq('id', shift.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking missed shifts:', error);
+    }
+  }, [employeeId]);
+
+  // Fetch shifts and approved replacements
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    
+    // First get the employee's company
+    const { data: employeeData } = await supabase
+      .from('employees')
+      .select('company_id')
+      .eq('id', employeeId)
+      .single();
+    
+    if (employeeData?.company_id) {
+      setCompanyId(employeeData.company_id);
+    }
+    
+    const today = addWeeks(new Date(), weekOffset);
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+    
+    // Fetch own shifts
+    const { data: ownShifts, error } = await supabase
+      .from('shifts')
+      .select(`
+        *,
+        companies(name),
+        departments(name)
+      `)
+      .eq('employee_id', employeeId)
+      .gte('start_time', weekStart.toISOString())
+      .lte('start_time', weekEnd.toISOString())
+      .order('start_time', { ascending: true });
+    
+    if (!error) {
+      setShifts(ownShifts || []);
+    }
+    
+    // Fetch approved replacement shifts for this employee
+    const { data: replacementShifts } = await supabase
+      .from('shifts')
+      .select(`
+        *,
+        companies(name),
+        departments(name),
+        employee:employees!shifts_employee_id_fkey(first_name, last_name)
+      `)
+      .eq('replacement_employee_id', employeeId)
+      .not('replacement_approved_at', 'is', null)
+      .gte('start_time', weekStart.toISOString())
+      .lte('start_time', weekEnd.toISOString())
+      .order('start_time', { ascending: true });
+    
+    setApprovedReplacements(replacementShifts || []);
+    setLoading(false);
   }, [employeeId, weekOffset]);
+
+  useEffect(() => {
+    // Check for missed shifts first, then fetch data
+    checkAndMarkMissedShifts().then(() => fetchData());
+    
+    // Set up interval to check for missed shifts every minute
+    const intervalId = setInterval(checkAndMarkMissedShifts, 60000);
+    
+    return () => clearInterval(intervalId);
+  }, [checkAndMarkMissedShifts, fetchData]);
 
   const getShiftStatusBadge = (shift: any) => {
     const startTime = parseISO(shift.start_time);
@@ -106,11 +179,81 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
     return acc;
   }, {} as Record<string, any[]>);
 
+  // Group approved replacements by day
+  const replacementsByDay = approvedReplacements.reduce((acc, shift) => {
+    const dateKey = format(parseISO(shift.start_time), 'yyyy-MM-dd');
+    if (!acc[dateKey]) {
+      acc[dateKey] = [];
+    }
+    acc[dateKey].push(shift);
+    return acc;
+  }, {} as Record<string, any[]>);
+
   const weekStart = startOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
   const weekEnd = endOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
 
   return (
     <div className="space-y-6">
+    {/* Approved Replacement Shifts - Show at top */}
+    {approvedReplacements.length > 0 && (
+      <Card className="border-green-500/50 bg-green-500/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-green-700">
+            <CheckCircle className="h-5 w-5" />
+            Approved Coverage Shifts
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            These shifts have been approved for you to cover. You can clock in from your dashboard.
+          </p>
+          <div className="space-y-3">
+            {Object.entries(replacementsByDay).map(([dateKey, dayShifts]: [string, any[]]) => {
+              const date = parseISO(dateKey);
+              return (
+                <div key={dateKey}>
+                  <h4 className="font-medium mb-2 text-sm">
+                    {getDayLabel(date)} - {format(date, 'MMMM d, yyyy')}
+                  </h4>
+                  {dayShifts.map((shift: any) => (
+                    <div 
+                      key={shift.id}
+                      className="flex items-center justify-between p-4 border rounded-lg bg-green-500/10 border-green-500/30"
+                    >
+                      <div className="flex items-center gap-4">
+                        <Badge variant="secondary" className="gap-1 bg-green-100 text-green-700">
+                          <CheckCircle className="h-3 w-3" />
+                          Approved
+                        </Badge>
+                        <div className="flex items-center gap-2 text-lg font-medium">
+                          <Clock className="h-5 w-5 text-muted-foreground" />
+                          {format(parseISO(shift.start_time), 'h:mm a')} - {format(parseISO(shift.end_time), 'h:mm a')}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          <span>Covering for: {shift.employee?.first_name} {shift.employee?.last_name}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {shift.companies?.name && (
+                          <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <MapPin className="h-3 w-3" />
+                            {shift.companies.name}
+                          </span>
+                        )}
+                        {shift.departments?.name && (
+                          <Badge variant="outline">{shift.departments.name}</Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    )}
+
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">

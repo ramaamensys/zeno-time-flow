@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Clock, Calendar, CheckCircle, MapPin, Play, Square, Coffee, FileText, TrendingUp } from "lucide-react";
+import { Clock, Calendar, CheckCircle, MapPin, Play, Square, Coffee, FileText, TrendingUp, AlertTriangle, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isToday, pars
 import EmployeeShifts from "@/components/scheduler/EmployeeShifts";
 import EmployeeTasks from "@/components/scheduler/EmployeeTasks";
 import EmployeeHours from "@/components/scheduler/EmployeeHours";
+import { toast } from "sonner";
 
 export default function EmployeeDashboard() {
   const { user } = useAuth();
@@ -40,6 +41,8 @@ export default function EmployeeDashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [shifts, setShifts] = useState<any[]>([]);
   const [todayShift, setTodayShift] = useState<any>(null);
+  const [approvedReplacementShift, setApprovedReplacementShift] = useState<any>(null);
+  const [clockingInReplacement, setClockingInReplacement] = useState(false);
 
   // Check if currently on break - use the function from hook
   const onBreak = isOnBreak();
@@ -53,7 +56,7 @@ export default function EmployeeDashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch employee's shifts
+  // Fetch employee's shifts including approved replacement shifts
   useEffect(() => {
     const fetchShifts = async () => {
       if (!employee) return;
@@ -62,6 +65,7 @@ export default function EmployeeDashboard() {
       const weekStart = startOfWeek(today, { weekStartsOn: 1 });
       const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
       
+      // Fetch own shifts
       const { data } = await supabase
         .from('shifts')
         .select('*')
@@ -78,10 +82,77 @@ export default function EmployeeDashboard() {
         return isToday(shiftDate);
       });
       setTodayShift(todaysShift);
+      
+      // Fetch approved replacement shifts for today
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+      
+      const { data: replacementShifts } = await supabase
+        .from('shifts')
+        .select(`
+          *,
+          employee:employees!shifts_employee_id_fkey(first_name, last_name)
+        `)
+        .eq('replacement_employee_id', employee.id)
+        .not('replacement_approved_at', 'is', null)
+        .is('replacement_started_at', null) // Not yet started
+        .gte('start_time', todayStart.toISOString())
+        .lte('start_time', todayEnd.toISOString())
+        .order('start_time', { ascending: true });
+      
+      if (replacementShifts && replacementShifts.length > 0) {
+        setApprovedReplacementShift(replacementShifts[0]);
+      } else {
+        setApprovedReplacementShift(null);
+      }
     };
     
     fetchShifts();
   }, [employee]);
+
+  // Handle clock in for approved replacement shift
+  const handleReplacementClockIn = async () => {
+    if (!approvedReplacementShift || !employee) return;
+    
+    setClockingInReplacement(true);
+    try {
+      const now = new Date();
+      
+      // Update shift with replacement_started_at
+      const { error: shiftError } = await supabase
+        .from('shifts')
+        .update({
+          replacement_started_at: now.toISOString()
+        })
+        .eq('id', approvedReplacementShift.id);
+      
+      if (shiftError) throw shiftError;
+      
+      // Create time clock entry for the replacement shift
+      const { error: clockError } = await supabase
+        .from('time_clock')
+        .insert({
+          employee_id: employee.id,
+          shift_id: approvedReplacementShift.id,
+          clock_in: now.toISOString(),
+          notes: `Replacement shift - covering for ${approvedReplacementShift.employee?.first_name} ${approvedReplacementShift.employee?.last_name}`
+        });
+      
+      if (clockError) throw clockError;
+      
+      toast.success('Clocked in for replacement shift successfully!');
+      setApprovedReplacementShift(null);
+      refetchEntries();
+      refetchPersistent();
+    } catch (error) {
+      console.error('Error clocking in for replacement:', error);
+      toast.error('Failed to clock in for replacement shift');
+    } finally {
+      setClockingInReplacement(false);
+    }
+  };
 
   // Calculate hours for different periods
   const todayEntries = entries.filter(e => {
@@ -156,6 +227,40 @@ export default function EmployeeDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Approved Replacement Shift Alert - Show when there's an approved shift to work */}
+      {approvedReplacementShift && !activeEntry && (
+        <Card className="border-green-500 bg-green-500/10 animate-pulse">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <UserCheck className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-green-700">Approved Coverage Shift Ready!</h3>
+                  <p className="text-muted-foreground">
+                    Covering for {approvedReplacementShift.employee?.first_name} {approvedReplacementShift.employee?.last_name}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {format(parseISO(approvedReplacementShift.start_time), 'h:mm a')} - {format(parseISO(approvedReplacementShift.end_time), 'h:mm a')}
+                  </p>
+                </div>
+              </div>
+              <Button 
+                size="lg" 
+                className="gap-2 bg-green-600 hover:bg-green-700"
+                onClick={handleReplacementClockIn}
+                disabled={clockingInReplacement}
+              >
+                <Play className="h-5 w-5" />
+                {clockingInReplacement ? 'Clocking In...' : 'Clock In for Shift'}
+                <MapPin className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Clock In/Out Card */}
       <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
