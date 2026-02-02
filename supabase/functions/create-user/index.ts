@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,13 +8,44 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-interface CreateUserRequest {
-  email: string;
-  full_name: string;
-  role: string;
-  password: string;
-  app_type?: 'calendar' | 'scheduler';
-  manager_id?: string;
+// Input validation schema
+const CreateUserSchema = z.object({
+  email: z.string()
+    .email({ message: "Invalid email format" })
+    .max(255, { message: "Email must be less than 255 characters" })
+    .transform(val => val.toLowerCase().trim()),
+  full_name: z.string()
+    .min(1, { message: "Full name is required" })
+    .max(100, { message: "Full name must be less than 100 characters" })
+    .regex(/^[a-zA-Z\s\-'\.]+$/, { message: "Full name contains invalid characters" })
+    .transform(val => val.trim()),
+  role: z.enum(['user', 'admin', 'employee', 'candidate', 'manager', 'operations_manager'], {
+    errorMap: () => ({ message: "Invalid role specified" })
+  }),
+  password: z.string()
+    .min(8, { message: "Password must be at least 8 characters" })
+    .max(72, { message: "Password must be less than 72 characters" }),
+  app_type: z.enum(['calendar', 'scheduler']).default('calendar'),
+  manager_id: z.string().uuid({ message: "Invalid manager ID format" }).optional().nullable()
+});
+
+type CreateUserRequest = z.infer<typeof CreateUserSchema>;
+
+// Role hierarchy for authorization checks
+const ROLE_HIERARCHY: Record<string, string[]> = {
+  'super_admin': ['super_admin', 'operations_manager', 'manager', 'admin', 'user', 'employee', 'candidate'],
+  'operations_manager': ['manager', 'admin', 'user', 'employee', 'candidate'],
+  'manager': ['user', 'employee', 'candidate']
+};
+
+function canCreateRole(callerRoles: string[], targetRole: string): boolean {
+  for (const callerRole of callerRoles) {
+    const allowedRoles = ROLE_HIERARCHY[callerRole];
+    if (allowedRoles && allowedRoles.includes(targetRole)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -25,7 +57,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    // Verify authorization - only super_admin can create users
+    // Verify authorization - only authorized roles can create users
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       console.error('No authorization header provided');
@@ -73,7 +105,8 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('user_id', user.id);
 
     const allowedRoles = ['super_admin', 'operations_manager', 'manager'];
-    const hasPermission = roles?.some(r => allowedRoles.includes(r.role));
+    const callerRoles = roles?.map(r => r.role) || [];
+    const hasPermission = callerRoles.some(r => allowedRoles.includes(r));
 
     if (roleError || !hasPermission) {
       console.error('User is not authorized:', { userId: user.id, roles });
@@ -83,9 +116,46 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
     
-    console.log('User authorized with role:', roles?.map(r => r.role).join(', '));
+    console.log('User authorized with role:', callerRoles.join(', '));
 
-    const { email, full_name, role, password, app_type = 'calendar', manager_id }: CreateUserRequest = await req.json();
+    // Validate and parse request body
+    let requestBody: unknown;
+    try {
+      requestBody = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const validationResult = CreateUserSchema.safeParse(requestBody);
+    if (!validationResult.success) {
+      console.error('Validation failed:', validationResult.error.issues);
+      return new Response(JSON.stringify({ 
+        error: 'Invalid input', 
+        details: validationResult.error.issues.map(issue => ({
+          field: issue.path.join('.'),
+          message: issue.message
+        }))
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { email, full_name, role, password, app_type, manager_id } = validationResult.data;
+
+    // Verify caller can create users with the specified role
+    if (!canCreateRole(callerRoles, role)) {
+      console.error('User cannot create role:', { callerRoles, targetRole: role });
+      return new Response(JSON.stringify({ 
+        error: `Cannot create user with role '${role}' - insufficient permissions` 
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     console.log(`Creating user with email: ${email}, role: ${role}, app_type: ${app_type}`);
 
@@ -185,7 +255,8 @@ const handler = async (req: Request): Promise<Response> => {
     // Send welcome email
     try {
       console.log('Attempting to send welcome email...');
-      console.log('Email details:', { email, full_name, role, password: '***' });
+      // Log sanitized details (no password)
+      console.log('Email details:', { email, full_name, role, app_type });
       
       const emailResponse = await supabase.functions.invoke('send-welcome-email', {
         body: {
@@ -197,8 +268,6 @@ const handler = async (req: Request): Promise<Response> => {
         }
       });
 
-      console.log('Email response:', emailResponse);
-
       if (emailResponse.error) {
         console.error('Email function error:', emailResponse.error);
         // Don't throw, just log the error
@@ -207,7 +276,6 @@ const handler = async (req: Request): Promise<Response> => {
       }
     } catch (emailError) {
       console.error('Failed to send welcome email:', emailError);
-      console.error('Email error details:', JSON.stringify(emailError));
       // Don't fail user creation if email fails
     }
 
@@ -223,12 +291,12 @@ const handler = async (req: Request): Promise<Response> => {
       },
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in create-user function:", error);
+    const errorMessage = error instanceof Error ? error.message : "Failed to create user";
     return new Response(
       JSON.stringify({ 
-        error: error.message || "Failed to create user",
-        details: error 
+        error: errorMessage
       }),
       {
         status: 500,
