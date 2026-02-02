@@ -43,13 +43,15 @@ export function useCompanyEmployeeNames(companyId?: string | null) {
 
         if (rpcError) throw rpcError;
 
+        // Be tolerant of partial names (some rows may have missing/blank last_name)
+        // so we don't drop valid employees and end up rendering "Unknown" in the UI.
         const normalized: CompanyEmployeeName[] = Array.isArray(data)
           ? data
-              .filter((e: any) => e?.id && e?.first_name && e?.last_name)
+              .filter((e: any) => e?.id && (e?.first_name || e?.last_name))
               .map((e: any) => ({
                 id: String(e.id),
-                first_name: String(e.first_name),
-                last_name: String(e.last_name),
+                first_name: String(e?.first_name ?? "").trim(),
+                last_name: String(e?.last_name ?? "").trim(),
               }))
           : [];
 

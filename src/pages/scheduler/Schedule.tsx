@@ -130,9 +130,11 @@ export default function SchedulerSchedule() {
 
       const next: Record<string, string> = {};
       for (const row of data as any[]) {
-        if (row?.id && row?.first_name && row?.last_name) {
-          next[String(row.id)] = `${row.first_name} ${row.last_name}`.trim();
-        }
+        if (!row?.id) continue;
+        const first = String(row?.first_name ?? "").trim();
+        const last = String(row?.last_name ?? "").trim();
+        const full = `${first} ${last}`.trim();
+        if (full) next[String(row.id)] = full;
       }
       if (!cancelled && Object.keys(next).length > 0) {
         setFallbackNamesById((prev) => ({ ...prev, ...next }));
@@ -429,7 +431,8 @@ export default function SchedulerSchedule() {
     }
     const nameFromMap = employeeNamesById.get(employeeId);
     if (nameFromMap) return nameFromMap;
-    return 'Unknown';
+    // Last resort: avoid rendering "Unknown"/"U…" pills.
+    return 'Employee';
   };
 
   const handleAddShift = (dayIndex: number, slotId: string) => {
