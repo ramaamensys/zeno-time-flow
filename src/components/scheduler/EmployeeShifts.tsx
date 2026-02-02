@@ -19,7 +19,27 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [companyId, setCompanyId] = useState<string | null>(null);
 
-  // Check and mark missed shifts automatically - runs based on start_time + 15 min buffer
+  // Check if a shift should be considered missed (15 min past start, no clock-in, not already marked)
+  const isShiftEffectivelyMissed = useCallback((shift: any): boolean => {
+    // If already marked as missed in DB, it's missed
+    if (shift.is_missed || shift.status === 'missed') {
+      return true;
+    }
+    
+    // Only check scheduled shifts
+    if (shift.status !== 'scheduled') {
+      return false;
+    }
+    
+    const now = new Date();
+    const startTime = new Date(shift.start_time);
+    const graceThreshold = new Date(startTime.getTime() + GRACE_PERIOD_MINUTES * 60 * 1000);
+    
+    // If current time is past start_time + 15 minutes, consider it missed
+    return now > graceThreshold;
+  }, []);
+
+  // Try to mark missed shifts in DB (will only work for users with update permission)
   const checkAndMarkMissedShifts = useCallback(async (): Promise<boolean> => {
     if (!employeeId) return false;
     
@@ -28,7 +48,6 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
     try {
       const now = new Date();
       // Grace threshold = current time - 15 minutes
-      // If shift.start_time < graceThreshold, it means 15+ minutes have passed since start
       const graceThreshold = new Date(now.getTime() - GRACE_PERIOD_MINUTES * 60 * 1000);
       
       console.log('Checking for missed shifts. Grace threshold:', graceThreshold.toISOString());
@@ -63,9 +82,9 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
           .not('clock_in', 'is', null)
           .maybeSingle();
         
-        // If no clock entry, mark as missed immediately
+        // If no clock entry, try to mark as missed (may fail due to RLS)
         if (!clockEntry) {
-          console.log('Marking shift as missed:', shift.id, 'start_time:', shift.start_time);
+          console.log('Attempting to mark shift as missed:', shift.id, 'start_time:', shift.start_time);
           const { error: updateError } = await supabase
             .from('shifts')
             .update({ 
@@ -76,7 +95,7 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
             .eq('id', shift.id);
           
           if (updateError) {
-            console.error('Error updating shift:', updateError);
+            console.log('Could not update shift in DB (RLS may prevent this):', updateError.message);
           } else {
             markedAny = true;
           }
@@ -173,8 +192,8 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
     const endTime = parseISO(shift.end_time);
     const now = new Date();
     
-    // Check if shift is missed
-    if (shift.is_missed || shift.status === 'missed') {
+    // Check if shift is effectively missed (DB flag OR time-based detection)
+    if (isShiftEffectivelyMissed(shift)) {
       return <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" />Missed</Badge>;
     }
     if (shift.status === 'completed') {
@@ -198,8 +217,9 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
     return <Badge variant="outline">Upcoming</Badge>;
   };
 
+  // Use the real-time missed check for display purposes
   const isShiftMissed = (shift: any) => {
-    return shift.is_missed || shift.status === 'missed';
+    return isShiftEffectivelyMissed(shift);
   };
 
   const getDayLabel = (date: Date) => {
