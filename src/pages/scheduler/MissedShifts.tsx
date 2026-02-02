@@ -26,20 +26,39 @@ export default function MissedShifts() {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<ReplacementRequest | null>(null);
   const [rejectNotes, setRejectNotes] = useState("");
-  const [myEmployeeId, setMyEmployeeId] = useState<string | null>(null);
+  const [myCompanyId, setMyCompanyId] = useState<string | null>(null);
 
   const hasAccess = isSuperAdmin || isOrganizationManager || isCompanyManager;
+  
+  // Get current user's employee company (for filtering)
+  useEffect(() => {
+    const getMyCompanyId = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from('employees')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      setMyCompanyId(data?.company_id || null);
+    };
+    getMyCompanyId();
+  }, [user]);
   
   const {
     missedShifts,
     replacementRequests,
     loading,
+    myEmployeeId,
     requestReplacement,
     approveRequest,
     rejectRequest,
     startReplacementShift,
     refetch
-  } = useMissedShifts(selectedCompany !== 'all' ? selectedCompany : undefined);
+  } = useMissedShifts(
+    selectedCompany !== 'all' ? selectedCompany : undefined,
+    // For employees, auto-filter to their company
+    isEmployee && !hasAccess ? myCompanyId || undefined : undefined
+  );
 
   // Load filters based on role
   useEffect(() => {
@@ -77,20 +96,6 @@ export default function MissedShifts() {
 
     loadFilters();
   }, [user, isSuperAdmin, isOrganizationManager, isCompanyManager]);
-
-  // Get current user's employee ID
-  useEffect(() => {
-    const getMyEmployeeId = async () => {
-      if (!user) return;
-      const { data } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      setMyEmployeeId(data?.id || null);
-    };
-    getMyEmployeeId();
-  }, [user]);
 
   // Filter companies by selected organization
   const filteredCompanies = selectedOrganization !== 'all'

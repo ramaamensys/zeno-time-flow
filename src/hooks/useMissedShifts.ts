@@ -62,17 +62,35 @@ export interface ReplacementRequest {
 
 const GRACE_PERIOD_MINUTES = 15;
 
-export function useMissedShifts(companyId?: string) {
+export function useMissedShifts(companyId?: string, employeeCompanyId?: string) {
   const { user } = useAuth();
   const [missedShifts, setMissedShifts] = useState<MissedShift[]>([]);
   const [replacementRequests, setReplacementRequests] = useState<ReplacementRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [myEmployeeId, setMyEmployeeId] = useState<string | null>(null);
+
+  // Get current user's employee ID once
+  useEffect(() => {
+    const getMyEmployee = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      setMyEmployeeId(data?.id || null);
+    };
+    getMyEmployee();
+  }, [user]);
 
   const fetchMissedShifts = async () => {
     if (!user) return;
     
     try {
       setLoading(true);
+      
+      // Determine which company to filter by
+      const filterCompanyId = companyId && companyId !== 'all' ? companyId : employeeCompanyId;
       
       let query = supabase
         .from('shifts')
@@ -84,8 +102,9 @@ export function useMissedShifts(companyId?: string) {
         .eq('is_missed', true)
         .order('missed_at', { ascending: false });
       
-      if (companyId && companyId !== 'all') {
-        query = query.eq('company_id', companyId);
+      // Filter by company - required for employees to only see their company's shifts
+      if (filterCompanyId) {
+        query = query.eq('company_id', filterCompanyId);
       }
       
       const { data, error } = await query;
@@ -93,18 +112,21 @@ export function useMissedShifts(companyId?: string) {
       if (error) throw error;
       
       // Fetch replacement employee info for shifts that have one
+      // Also filter out shifts where the current employee is the one who missed (can't replace yourself)
       const shiftsWithReplacements = await Promise.all(
-        (data || []).map(async (shift: any) => {
-          if (shift.replacement_employee_id) {
-            const { data: replEmployee } = await supabase
-              .from('employees')
-              .select('id, first_name, last_name, email')
-              .eq('id', shift.replacement_employee_id)
-              .single();
-            return { ...shift, replacement_employee: replEmployee };
-          }
-          return shift;
-        })
+        (data || [])
+          .filter((shift: any) => shift.employee_id !== myEmployeeId) // Exclude own missed shifts
+          .map(async (shift: any) => {
+            if (shift.replacement_employee_id) {
+              const { data: replEmployee } = await supabase
+                .from('employees')
+                .select('id, first_name, last_name, email')
+                .eq('id', shift.replacement_employee_id)
+                .single();
+              return { ...shift, replacement_employee: replEmployee };
+            }
+            return shift;
+          })
       );
       
       setMissedShifts(shiftsWithReplacements);
@@ -397,12 +419,13 @@ export function useMissedShifts(companyId?: string) {
     checkAndMarkMissedShifts();
     
     return () => clearInterval(intervalId);
-  }, [user, companyId]);
+  }, [user, companyId, employeeCompanyId, myEmployeeId]);
 
   return {
     missedShifts,
     replacementRequests,
     loading,
+    myEmployeeId,
     requestReplacement,
     approveRequest,
     rejectRequest,
