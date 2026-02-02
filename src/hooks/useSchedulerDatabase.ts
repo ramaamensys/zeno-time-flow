@@ -80,10 +80,13 @@ export function useOrganizations() {
 
   const fetchOrganizations = async () => {
     try {
+      // RLS policies will automatically filter based on user role:
+      // - Super admins see all organizations
+      // - Organization managers only see their assigned organization
       const { data, error } = await (supabase as any)
         .from('organizations')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('name', { ascending: true });
 
       if (error) throw error;
       setOrganizations(data || []);
@@ -175,10 +178,15 @@ export function useCompanies() {
 
   const fetchCompanies = async () => {
     try {
+      // RLS policies will automatically filter based on user role:
+      // - Super admins see all companies
+      // - Organization managers see companies in their organization
+      // - Company managers see only their assigned company
+      // - Employees see only their company
       const { data, error } = await (supabase as any)
         .from('companies')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('name', { ascending: true });
 
       if (error) throw error;
       setCompanies(data || []);
@@ -272,11 +280,15 @@ export function useDepartments(companyId?: string) {
     try {
       let query = (supabase as any).from('departments').select('*');
       
-      if (companyId) {
+      // Only filter by company_id if it's a valid UUID (not "all" or empty)
+      const isValidUuid = companyId && companyId !== 'all' && 
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyId);
+      
+      if (isValidUuid) {
         query = query.eq('company_id', companyId);
       }
       
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data, error } = await query.order('name', { ascending: true });
 
       if (error) throw error;
       setDepartments(data || []);
@@ -324,15 +336,20 @@ export function useEmployees(companyId?: string) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Check if companyId is a valid UUID (not "all" or empty)
+  const isValidCompanyId = companyId && companyId !== 'all' && 
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyId);
+
   const fetchEmployees = async () => {
     try {
       let query = (supabase as any).from('employees').select('*');
       
-      if (companyId) {
+      // Only filter by company_id if it's a valid UUID
+      if (isValidCompanyId) {
         query = query.eq('company_id', companyId);
       }
       
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data, error } = await query.order('first_name', { ascending: true });
 
       if (error) throw error;
       setEmployees(data || []);
@@ -412,33 +429,33 @@ export function useEmployees(companyId?: string) {
   useEffect(() => {
     fetchEmployees();
     
-    // Set up real-time subscription for employees with unique channel name
-    const channelName = companyId ? `employees_changes_${companyId}` : 'employees_changes_all';
-    const subscription = supabase
-      .channel(channelName)
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'employees',
-        // Note: Don't filter deletes - the row no longer exists so filter won't match
-        ...(companyId ? { filter: `company_id=eq.${companyId}` } : {})
-      }, (payload) => {
-        // For deletes, we need to handle them specially since the filter won't match
-        if (payload.eventType === 'DELETE') {
-          const deletedId = (payload.old as { id?: string })?.id;
-          if (deletedId) {
-            setEmployees(prev => prev.filter(e => e.id !== deletedId));
+    // Only set up real-time subscription if we have a valid company ID
+    if (isValidCompanyId) {
+      const channelName = `employees_changes_${companyId}`;
+      const subscription = supabase
+        .channel(channelName)
+        .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'employees',
+          filter: `company_id=eq.${companyId}`
+        }, (payload) => {
+          if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as { id?: string })?.id;
+            if (deletedId) {
+              setEmployees(prev => prev.filter(e => e.id !== deletedId));
+            }
+          } else {
+            fetchEmployees();
           }
-        } else {
-          fetchEmployees();
-        }
-      })
-      .subscribe();
+        })
+        .subscribe();
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [companyId]);
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+  }, [companyId, isValidCompanyId]);
 
   return {
     employees,
@@ -454,11 +471,16 @@ export function useShifts(companyId?: string, weekStart?: Date) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Check if companyId is a valid UUID (not "all" or empty)
+  const isValidCompanyId = companyId && companyId !== 'all' && 
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyId);
+
   const fetchShifts = async () => {
     try {
       let query = (supabase as any).from('shifts').select('*');
       
-      if (companyId) {
+      // Only filter by company_id if it's a valid UUID
+      if (isValidCompanyId) {
         query = query.eq('company_id', companyId);
       }
       
