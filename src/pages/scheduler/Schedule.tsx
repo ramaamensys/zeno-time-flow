@@ -187,13 +187,7 @@ export default function SchedulerSchedule() {
     }
   }, [schedulableCompanies, selectedCompany]);
 
-  // Refetch employees and shifts when company changes
-  useEffect(() => {
-    if (isValidCompanySelected) {
-      refetchEmployees();
-      refetchShifts();
-    }
-  }, [selectedCompany, isValidCompanySelected]);
+  // No need for manual refetch - hooks handle company changes internally
 
   function getWeekStart(date: Date) {
     const start = new Date(date);
