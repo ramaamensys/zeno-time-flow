@@ -334,22 +334,29 @@ export function useDepartments(companyId?: string) {
 
 export function useEmployees(companyId?: string) {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [currentCompanyId, setCurrentCompanyId] = useState<string | undefined>(undefined);
 
   // Check if companyId is a valid UUID (not "all" or empty)
   const isValidCompanyId = companyId && companyId !== 'all' && 
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyId);
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = async (forceRefresh = false) => {
     // Only fetch if we have a valid company ID - otherwise return empty array
     if (!isValidCompanyId) {
       setEmployees([]);
       setLoading(false);
       return;
     }
+
+    // Prevent duplicate fetches for the same company unless forced
+    if (!forceRefresh && currentCompanyId === companyId && employees.length > 0) {
+      return;
+    }
     
     try {
       setLoading(true);
+      setCurrentCompanyId(companyId);
       const { data, error } = await (supabase as any)
         .from('employees')
         .select('*')
@@ -432,7 +439,11 @@ export function useEmployees(companyId?: string) {
   };
 
   useEffect(() => {
-    fetchEmployees();
+    // Reset state when company changes
+    if (companyId !== currentCompanyId) {
+      setEmployees([]);
+      fetchEmployees();
+    }
     
     // Only set up real-time subscription if we have a valid company ID
     if (isValidCompanyId) {
@@ -451,7 +462,7 @@ export function useEmployees(companyId?: string) {
               setEmployees(prev => prev.filter(e => e.id !== deletedId));
             }
           } else {
-            fetchEmployees();
+            fetchEmployees(true);
           }
         })
         .subscribe();
@@ -460,7 +471,7 @@ export function useEmployees(companyId?: string) {
         subscription.unsubscribe();
       };
     }
-  }, [companyId, isValidCompanyId]);
+  }, [companyId]);
 
   return {
     employees,
@@ -468,7 +479,7 @@ export function useEmployees(companyId?: string) {
     createEmployee,
     updateEmployee,
     deleteEmployee,
-    refetch: fetchEmployees
+    refetch: () => fetchEmployees(true)
   };
 }
 
