@@ -153,6 +153,65 @@ export default function SchedulerSchedule() {
     fetchUserRole();
   }, [user]);
 
+  // Grace period for marking shifts as missed (15 minutes)
+  const GRACE_PERIOD_MINUTES = 15;
+
+  // Check and mark missed shifts automatically (runs every minute)
+  useEffect(() => {
+    const checkAndMarkMissedShifts = async () => {
+      if (!isValidCompanySelected) return;
+      
+      try {
+        const now = new Date();
+        const graceThreshold = new Date(now.getTime() - GRACE_PERIOD_MINUTES * 60 * 1000);
+        
+        // Find scheduled shifts that have passed the grace period without clock-in
+        const { data: overdueShifts, error: fetchError } = await supabase
+          .from('shifts')
+          .select('id, employee_id, company_id, start_time')
+          .eq('company_id', selectedCompany)
+          .eq('status', 'scheduled')
+          .eq('is_missed', false)
+          .lt('start_time', graceThreshold.toISOString());
+        
+        if (fetchError || !overdueShifts || overdueShifts.length === 0) return;
+        
+        // Check each shift for time clock entry
+        for (const shift of overdueShifts) {
+          const { data: clockEntry } = await supabase
+            .from('time_clock')
+            .select('id')
+            .eq('shift_id', shift.id)
+            .not('clock_in', 'is', null)
+            .maybeSingle();
+          
+          // If no clock entry, mark as missed
+          if (!clockEntry) {
+            await supabase
+              .from('shifts')
+              .update({ 
+                is_missed: true, 
+                missed_at: now.toISOString(),
+                status: 'missed'
+              })
+              .eq('id', shift.id);
+          }
+        }
+        
+        // Refetch shifts to update the display
+        refetchShifts();
+      } catch (error) {
+        console.error('Error checking missed shifts:', error);
+      }
+    };
+
+    // Run immediately and then every minute
+    checkAndMarkMissedShifts();
+    const intervalId = setInterval(checkAndMarkMissedShifts, 60000);
+    
+    return () => clearInterval(intervalId);
+  }, [selectedCompany, isValidCompanySelected, refetchShifts]);
+
   // Fetch my pending replacement requests
   useEffect(() => {
     const fetchMyRequests = async () => {
