@@ -13,6 +13,8 @@ import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, end
 interface Shift {
   id: string;
   employee_id: string;
+  replacement_employee_id?: string | null;
+  replacement_started_at?: string | null;
   company_id: string;
   department_id: string | null;
   start_time: string;
@@ -21,6 +23,12 @@ interface Shift {
   notes: string | null;
   break_minutes: number | null;
   employee?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  replacement_employee?: {
     id: string;
     first_name: string;
     last_name: string;
@@ -157,6 +165,7 @@ export default function EmployeeSchedule() {
         .select(`
           *,
           employee:employees!shifts_employee_id_fkey(id, first_name, last_name, email),
+          replacement_employee:employees!shifts_replacement_employee_id_fkey(id, first_name, last_name, email),
           company:companies(id, name, organization_id),
           department:departments(name)
         `)
@@ -245,27 +254,41 @@ export default function EmployeeSchedule() {
   };
 
   const getAttendanceStatus = (shift: Shift): { status: string; color: string } => {
-    const clockEntry = timeClockEntries.find(tc => tc.shift_id === shift.id);
+    // Prefer replacement clock entry if shift is covered
+    const clockEntry = timeClockEntries.find(tc =>
+      tc.shift_id === shift.id &&
+      (shift.replacement_employee_id ? tc.employee_id === shift.replacement_employee_id : true)
+    );
     const now = new Date();
     const shiftStart = parseISO(shift.start_time);
     const shiftEnd = parseISO(shift.end_time);
 
+    // Missed should never be shown as completed
+    if (shift.status === 'missed') {
+      return { status: 'Missed', color: 'bg-destructive' };
+    }
+
+    // Covered/approved but not started
+    if (shift.replacement_employee_id && !clockEntry?.clock_in && !shift.replacement_started_at) {
+      return { status: 'Coverage Approved', color: 'bg-amber-500' };
+    }
+
     if (!clockEntry) {
       if (now < shiftStart) {
-        return { status: 'Not Started', color: 'bg-gray-500' };
+        return { status: 'Not Started', color: 'bg-muted' };
       }
       if (now > shiftEnd) {
-        return { status: 'Absent', color: 'bg-red-500' };
+        return { status: 'Absent', color: 'bg-destructive' };
       }
-      return { status: 'Not Started', color: 'bg-gray-500' };
+      return { status: 'Not Started', color: 'bg-muted' };
     }
 
     if (clockEntry.clock_in && clockEntry.clock_out) {
-      return { status: 'Completed', color: 'bg-green-500' };
+      return { status: 'Completed', color: 'bg-emerald-600' };
     }
 
     if (clockEntry.break_start && !clockEntry.break_end) {
-      return { status: 'On Break', color: 'bg-yellow-500' };
+      return { status: 'On Break', color: 'bg-amber-500' };
     }
 
     if (clockEntry.clock_in) {
@@ -275,10 +298,14 @@ export default function EmployeeSchedule() {
       if (clockInTime > lateThreshold) {
         return { status: 'Late', color: 'bg-orange-500' };
       }
-      return { status: 'Started', color: 'bg-blue-500' };
+      // If this is a covered shift, reflect it
+      if (shift.replacement_employee_id) {
+        return { status: 'Covered (In Progress)', color: 'bg-sky-600' };
+      }
+      return { status: 'Started', color: 'bg-sky-600' };
     }
 
-    return { status: 'Not Started', color: 'bg-gray-500' };
+    return { status: 'Not Started', color: 'bg-muted' };
   };
 
   const formatTimeRange = (start: string, end: string) => {
@@ -446,8 +473,13 @@ export default function EmployeeSchedule() {
               <CardContent>
                 <div className="space-y-3">
                   {dayShifts.map(shift => {
-                    const clockEntry = timeClockEntries.find(tc => tc.shift_id === shift.id);
+                    const clockEntry = timeClockEntries.find(tc =>
+                      tc.shift_id === shift.id &&
+                      (shift.replacement_employee_id ? tc.employee_id === shift.replacement_employee_id : true)
+                    );
                     const attendance = getAttendanceStatus(shift);
+                    const effectiveEmployee = shift.replacement_employee_id ? shift.replacement_employee : shift.employee;
+                    const originalEmployee = shift.employee;
                     
                     return (
                       <div 
@@ -458,13 +490,21 @@ export default function EmployeeSchedule() {
                         <div className="flex items-center gap-4">
                           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                             <span className="text-sm font-medium text-primary">
-                              {shift.employee?.first_name?.[0]}{shift.employee?.last_name?.[0]}
+                              {effectiveEmployee?.first_name?.[0]}{effectiveEmployee?.last_name?.[0]}
                             </span>
                           </div>
                           <div>
                             <p className="font-medium">
-                              {shift.employee?.first_name} {shift.employee?.last_name}
+                              {effectiveEmployee?.first_name} {effectiveEmployee?.last_name}
+                              {shift.replacement_employee_id && (
+                                <span className="text-xs text-muted-foreground ml-2">(Replacement)</span>
+                              )}
                             </p>
+                            {shift.replacement_employee_id && originalEmployee && (
+                              <p className="text-xs text-muted-foreground">
+                                Original: {originalEmployee.first_name} {originalEmployee.last_name}
+                              </p>
+                            )}
                             <p className="text-sm text-muted-foreground">
                               {shift.company?.name}
                               {shift.department?.name && ` • ${shift.department.name}`}
@@ -527,7 +567,7 @@ export default function EmployeeSchedule() {
                               {clockEntry.total_hours.toFixed(2)} hrs
                             </Badge>
                           )}
-                          <Badge className={`${attendance.color} text-white`}>
+                          <Badge className={`${attendance.color} text-primary-foreground`}>
                             {attendance.status}
                           </Badge>
                         </div>

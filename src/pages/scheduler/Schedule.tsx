@@ -11,6 +11,7 @@ import { useCompanies, useDepartments, useEmployees, useShifts, Shift, Employee 
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useCompanyEmployeeNames } from "@/hooks/useCompanyEmployeeNames";
 import CreateCompanyModal from "@/components/scheduler/CreateCompanyModal";
 import CreateShiftModal from "@/components/scheduler/CreateShiftModal";
 import EditShiftModal from "@/components/scheduler/EditShiftModal";
@@ -90,9 +91,13 @@ export default function SchedulerSchedule() {
   const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift, refetch: refetchShifts } = useShifts(isValidCompanySelected ? selectedCompany : undefined, weekStart);
 
   const [employeeRecord, setEmployeeRecord] = useState<{ id: string; company_id: string } | null>(null);
-  
-  // Public employee data for employee view (to show coworker names)
-  const [publicEmployees, setPublicEmployees] = useState<{ id: string; first_name: string; last_name: string }[]>([]);
+
+  const companyIdForNames = useMemo(() => {
+    if (isValidCompanySelected) return selectedCompany;
+    return employeeRecord?.company_id || null;
+  }, [employeeRecord?.company_id, isValidCompanySelected, selectedCompany]);
+
+  const { namesById: employeeNamesById } = useCompanyEmployeeNames(companyIdForNames);
   // Fetch organizations for super admin
   useEffect(() => {
     const fetchOrganizations = async () => {
@@ -165,37 +170,7 @@ export default function SchedulerSchedule() {
     fetchUserRole();
   }, [user]);
 
-  // Fetch public employees data for employee view (to show coworker names)
-  useEffect(() => {
-    const fetchPublicEmployees = async () => {
-      if (!employeeRecord?.company_id) return;
-
-      // Managers/admins already have access to employee names via their normal queries.
-      if (userRole === 'super_admin' || userRole === 'operations_manager' || userRole === 'manager') {
-        return;
-      }
-
-      // Use a SECURITY DEFINER RPC so employee users can resolve coworker names
-      // without relying on base-table SELECT permissions or view/RLS behavior.
-      const { data, error } = await (supabase as any)
-        .rpc('get_company_employee_names', { _company_id: employeeRecord.company_id });
-
-      if (error) {
-        console.error('Error fetching coworker names:', error);
-        return;
-      }
-
-      if (Array.isArray(data)) {
-        setPublicEmployees(
-          data
-            .filter((e: any) => e?.id && e?.first_name && e?.last_name)
-            .map((e: any) => ({ id: e.id, first_name: e.first_name, last_name: e.last_name }))
-        );
-      }
-    };
-    
-    fetchPublicEmployees();
-  }, [employeeRecord?.company_id, userRole]);
+  // Note: coworker name resolution is handled via useCompanyEmployeeNames (SECURITY DEFINER RPC)
 
   // Grace period for marking shifts as missed (15 minutes)
   const GRACE_PERIOD_MINUTES = 15;
@@ -402,11 +377,8 @@ export default function SchedulerSchedule() {
     if (employee) {
       return `${employee.first_name} ${employee.last_name}`;
     }
-    // For employee view, check public employees list (coworkers)
-    const publicEmployee = publicEmployees.find(e => e.id === employeeId);
-    if (publicEmployee) {
-      return `${publicEmployee.first_name} ${publicEmployee.last_name}`;
-    }
+    const nameFromMap = employeeNamesById.get(employeeId);
+    if (nameFromMap) return nameFromMap;
     return 'Unknown';
   };
 

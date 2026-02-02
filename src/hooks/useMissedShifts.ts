@@ -16,6 +16,11 @@ export interface MissedShift {
   replacement_employee_id?: string;
   replacement_approved_at?: string;
   replacement_started_at?: string;
+  // Derived from time_clock for the replacement employee (for UI accuracy)
+  replacement_clock_in?: string;
+  replacement_clock_out?: string;
+  replacement_break_start?: string;
+  replacement_break_end?: string;
   notes?: string;
   employee?: {
     id: string;
@@ -132,16 +137,28 @@ export function useMissedShifts(companyId?: string, employeeCompanyId?: string) 
               // Check if replacement has clocked in (even if replacement_started_at wasn't set)
               const { data: clockEntry } = await supabase
                 .from('time_clock')
-                .select('id, clock_in')
+                .select('id, clock_in, clock_out, break_start, break_end')
                 .eq('shift_id', shift.id)
                 .eq('employee_id', shift.replacement_employee_id)
                 .not('clock_in', 'is', null)
                 .maybeSingle();
+
+              if (clockEntry) {
+                enrichedShift.replacement_clock_in = clockEntry.clock_in || undefined;
+                enrichedShift.replacement_clock_out = clockEntry.clock_out || undefined;
+                enrichedShift.replacement_break_start = clockEntry.break_start || undefined;
+                enrichedShift.replacement_break_end = clockEntry.break_end || undefined;
+              }
               
               // If there's a clock entry, treat the shift as started
               if (clockEntry?.clock_in && !shift.replacement_started_at) {
                 enrichedShift.replacement_started_at = clockEntry.clock_in;
                 enrichedShift.status = 'in_progress';
+              }
+
+              // If replacement clocked out, reflect completion in UI
+              if (clockEntry?.clock_out) {
+                enrichedShift.status = 'completed';
               }
             }
             return enrichedShift;
@@ -433,16 +450,51 @@ export function useMissedShifts(companyId?: string, employeeCompanyId?: string) 
   };
 
   useEffect(() => {
+    if (!user) return;
+
     fetchMissedShifts();
     fetchReplacementRequests();
-    
+
+    // Realtime refresh: ensures Missed Shifts updates immediately after clock-out / approvals
+    let refreshTimeout: any;
+    const scheduleRefresh = () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(() => {
+        fetchMissedShifts();
+        fetchReplacementRequests();
+      }, 400);
+    };
+
+    const channel = supabase
+      .channel(`missed_shifts_rt_${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'time_clock' },
+        scheduleRefresh
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'shifts' },
+        scheduleRefresh
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'shift_replacement_requests' },
+        scheduleRefresh
+      )
+      .subscribe();
+
     // Check for missed shifts every minute
     const intervalId = setInterval(checkAndMarkMissedShifts, 60000);
-    
+
     // Initial check
     checkAndMarkMissedShifts();
-    
-    return () => clearInterval(intervalId);
+
+    return () => {
+      clearInterval(intervalId);
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      channel.unsubscribe();
+    };
   }, [user, companyId, employeeCompanyId, myEmployeeId]);
 
   return {
