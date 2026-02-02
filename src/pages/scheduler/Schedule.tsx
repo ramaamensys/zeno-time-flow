@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Calendar, ChevronLeft, ChevronRight, Plus, Users, Clock, Building, Edit, Trash2, MoreHorizontal, Download, Printer, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,11 +62,19 @@ export default function SchedulerSchedule() {
   const isValidCompanySelected = selectedCompany && selectedCompany !== '' && selectedCompany !== 'all' && 
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedCompany);
   
+  // Memoize weekStart to prevent creating new Date objects on every render
+  const weekStart = React.useMemo(() => {
+    const start = new Date(selectedWeek);
+    start.setDate(start.getDate() - start.getDay() + 1); // Start from Monday
+    start.setHours(0, 0, 0, 0);
+    return start;
+  }, [selectedWeek]);
+  
   // Database hooks - only pass company ID when valid
   const { companies, loading: companiesLoading, refetch: refetchCompanies } = useCompanies();
   const { departments, loading: departmentsLoading } = useDepartments(isValidCompanySelected ? selectedCompany : undefined);
   const { employees, loading: employeesLoading, updateEmployee, deleteEmployee, refetch: refetchEmployees } = useEmployees(isValidCompanySelected ? selectedCompany : undefined);
-  const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift, refetch: refetchShifts } = useShifts(isValidCompanySelected ? selectedCompany : undefined, getWeekStart(selectedWeek));
+  const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift, refetch: refetchShifts } = useShifts(isValidCompanySelected ? selectedCompany : undefined, weekStart);
 
   const [employeeRecord, setEmployeeRecord] = useState<{ id: string; company_id: string } | null>(null);
   
