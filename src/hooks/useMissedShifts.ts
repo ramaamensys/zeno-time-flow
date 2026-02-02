@@ -348,8 +348,9 @@ export function useMissedShifts(companyId?: string, employeeCompanyId?: string) 
   };
 
   // Mark replacement as started (employee starts working the shift)
-  const startReplacementShift = async (shiftId: string) => {
-    if (!user) return;
+  // Returns true if successful, so callers can trigger their own refetches
+  const startReplacementShift = async (shiftId: string): Promise<boolean> => {
+    if (!user) return false;
     
     try {
       // Get employee record
@@ -361,7 +362,7 @@ export function useMissedShifts(companyId?: string, employeeCompanyId?: string) 
       
       if (!myEmployee) {
         toast.error('Employee record not found');
-        return;
+        return false;
       }
       
       // Verify this employee is the approved replacement
@@ -374,15 +375,17 @@ export function useMissedShifts(companyId?: string, employeeCompanyId?: string) 
       
       if (!shift) {
         toast.error('You are not approved to work this shift');
-        return;
+        return false;
       }
       
-      // Update shift with started timestamp
+      // Update shift with started timestamp AND change status to 'in_progress'
+      // This ensures managers and super users see the update immediately
       const now = new Date();
       const { error: updateShiftError } = await supabase
         .from('shifts')
         .update({
-          replacement_started_at: now.toISOString()
+          replacement_started_at: now.toISOString(),
+          status: 'in_progress' // Update status so it reflects across all views
         })
         .eq('id', shiftId);
       
@@ -402,9 +405,11 @@ export function useMissedShifts(companyId?: string, employeeCompanyId?: string) 
       
       toast.success('Shift started successfully');
       await fetchMissedShifts();
+      return true;
     } catch (error) {
       console.error('Error starting replacement shift:', error);
       toast.error('Failed to start shift');
+      return false;
     }
   };
 

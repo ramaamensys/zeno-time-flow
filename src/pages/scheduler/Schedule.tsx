@@ -1204,6 +1204,10 @@ export default function SchedulerSchedule() {
                             const hasReplacement = !!(shift as any).replacement_employee_id;
                             const replacementName = hasReplacement ? getEmployeeName((shift as any).replacement_employee_id) : null;
                             const replacementStarted = !!(shift as any).replacement_started_at;
+                            const shiftStatus = shift.status;
+                            
+                            // Determine if the shift is being actively covered
+                            const isReplacementActive = replacementStarted || shiftStatus === 'in_progress';
                             
                             // Check if this is a coworker's missed shift that employee can request
                             const isCoworkerMissedShift = isEmployeeView && isMissed && !isMyShift && !hasReplacement && employeeRecord;
@@ -1231,20 +1235,38 @@ export default function SchedulerSchedule() {
                               }
                             };
                             
+                            // Determine the card styling based on shift state
+                            const getShiftCardStyle = () => {
+                              // If replacement is active, show green (in progress) styling
+                              if (isReplacementActive) {
+                                return 'bg-green-50 border-green-300 dark:bg-green-900/20 dark:border-green-700';
+                              }
+                              // If missed but has pending replacement, show yellow/warning
+                              if (isMissed && hasReplacement && !isReplacementActive) {
+                                return 'bg-yellow-50 border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-700';
+                              }
+                              // If missed without replacement
+                              if (isMissed) {
+                                return 'bg-destructive/10 border-destructive/30 dark:bg-destructive/20 dark:border-destructive/50';
+                              }
+                              // Current user's shift
+                              if (isMyShift) {
+                                return 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700 ring-2 ring-green-500/50';
+                              }
+                              // Employee view of other's shifts
+                              if (isEmployeeView) {
+                                return 'bg-muted/50 border-muted-foreground/20';
+                              }
+                              // Default
+                              return 'bg-primary/10 border-primary/20';
+                            };
+                            
                             return (
                               <TooltipProvider key={shift.id}>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <div
-                                      className={`group relative flex flex-col gap-1 p-2 rounded border ${
-                                        isMissed 
-                                          ? 'bg-destructive/10 border-destructive/30 dark:bg-destructive/20 dark:border-destructive/50'
-                                          : isMyShift 
-                                            ? 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700 ring-2 ring-green-500/50' 
-                                            : isEmployeeView
-                                              ? 'bg-muted/50 border-muted-foreground/20'
-                                              : 'bg-primary/10 border-primary/20'
-                                      } ${isEditMode && canManageShifts ? 'cursor-move hover:bg-primary/20' : ''} ${
+                                      className={`group relative flex flex-col gap-1 p-2 rounded border ${getShiftCardStyle()} ${isEditMode && canManageShifts ? 'cursor-move hover:bg-primary/20' : ''} ${
                                         canRequestShift ? 'cursor-pointer hover:bg-destructive/20 hover:border-destructive/50' : ''
                                       } ${hasPendingRequest ? 'opacity-60' : ''}`}
                                       onClick={handleShiftClick}
@@ -1273,8 +1295,15 @@ export default function SchedulerSchedule() {
                                         )}
                                       </div>
                                     </div>
+                                      {/* Show status badge based on shift state */}
                                       {isMissed && !hasReplacement && (
                                         <Badge variant="destructive" className="text-[10px] h-4 px-1">Missed</Badge>
+                                      )}
+                                      {isMissed && hasReplacement && isReplacementActive && (
+                                        <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-green-500/20 text-green-700">Covered</Badge>
+                                      )}
+                                      {isMissed && hasReplacement && !isReplacementActive && (
+                                        <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-yellow-500/20 text-yellow-700">Coverage Approved</Badge>
                                       )}
                                       {hasPendingRequest && (
                                         <Badge variant="secondary" className="text-[10px] h-4 px-1">Requested</Badge>
@@ -1309,22 +1338,22 @@ export default function SchedulerSchedule() {
                                     {/* Replacement Employee Row (if applicable) */}
                                     {hasReplacement && replacementName && (
                                       <div className="flex items-center gap-2 pt-1 border-t border-dashed mt-1">
-                                        <Avatar className="h-5 w-5 ring-1 ring-green-400">
-                                          <AvatarFallback className="text-[10px] bg-green-500 text-white">
+                                        <Avatar className={`h-5 w-5 ${isReplacementActive ? 'ring-2 ring-green-500' : 'ring-1 ring-yellow-400'}`}>
+                                          <AvatarFallback className={`text-[10px] ${isReplacementActive ? 'bg-green-500' : 'bg-yellow-500'} text-white`}>
                                             {replacementName.split(' ').map(n => n[0]).join('')}
                                           </AvatarFallback>
                                         </Avatar>
                                         <div className="flex-1 min-w-0">
-                                          <div className="text-[10px] font-medium text-green-700 dark:text-green-400 truncate">
+                                          <div className={`text-[10px] font-medium truncate ${isReplacementActive ? 'text-green-700 dark:text-green-400' : 'text-yellow-700 dark:text-yellow-400'}`}>
                                             {replacementName}
                                           </div>
                                         </div>
                                         <Badge variant="secondary" className={`text-[9px] h-3.5 px-1 ${
-                                          replacementStarted 
+                                          isReplacementActive 
                                             ? 'bg-green-500/20 text-green-700' 
                                             : 'bg-yellow-500/20 text-yellow-700'
                                         }`}>
-                                          {replacementStarted ? 'Active' : 'Pending'}
+                                          {isReplacementActive ? 'Working' : 'Ready'}
                                         </Badge>
                                       </div>
                                     )}
