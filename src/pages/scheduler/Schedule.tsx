@@ -1381,7 +1381,7 @@ export default function SchedulerSchedule() {
                                         <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-green-500/20 text-green-700">Covered</Badge>
                                       )}
                                       {isMissed && hasReplacement && !isReplacementActive && (
-                                        <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-yellow-500/20 text-yellow-700">Coverage Approved</Badge>
+                                        <Badge variant="destructive" className="text-[10px] h-4 px-1">Missed</Badge>
                                       )}
                                       {hasPendingRequest && (
                                         <Badge variant="secondary" className="text-[10px] h-4 px-1">Requested</Badge>
