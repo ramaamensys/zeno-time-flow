@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Calendar, Clock, Users, Building, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +54,8 @@ interface TimeClockEntry {
   break_end: string | null;
   total_hours: number | null;
   notes: string | null;
+  created_at?: string;
+  updated_at?: string;
   employee?: {
     first_name: string;
     last_name: string;
@@ -87,6 +89,34 @@ export default function EmployeeSchedule() {
   const [selectedCompany, setSelectedCompany] = useState<string>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("weekly");
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  const timeClockEntriesByShiftEmployee = useMemo(() => {
+    const map = new Map<string, TimeClockEntry[]>();
+    for (const e of timeClockEntries) {
+      if (!e.shift_id) continue;
+      const key = `${e.shift_id}:${e.employee_id}`;
+      const arr = map.get(key) || [];
+      arr.push(e);
+      map.set(key, arr);
+    }
+    // Sort each list newest-first
+    for (const [key, arr] of map.entries()) {
+      arr.sort((a, b) => {
+        const aT = (a.clock_in || a.created_at || a.updated_at || "").toString();
+        const bT = (b.clock_in || b.created_at || b.updated_at || "").toString();
+        return bT.localeCompare(aT);
+      });
+      map.set(key, arr);
+    }
+    return map;
+  }, [timeClockEntries]);
+
+  const getRelevantClockEntry = (shift: Shift) => {
+    const employeeId = shift.replacement_employee_id || shift.employee_id;
+    const key = `${shift.id}:${employeeId}`;
+    const arr = timeClockEntriesByShiftEmployee.get(key);
+    return arr?.[0];
+  };
 
   // Check access - only managers and above can access
   const hasAccess = isSuperAdmin || isOrganizationManager || isCompanyManager;
@@ -254,17 +284,22 @@ export default function EmployeeSchedule() {
   };
 
   const getAttendanceStatus = (shift: Shift): { status: string; color: string } => {
-    // Prefer replacement clock entry if shift is covered
-    const clockEntry = timeClockEntries.find(tc =>
-      tc.shift_id === shift.id &&
-      (shift.replacement_employee_id ? tc.employee_id === shift.replacement_employee_id : true)
-    );
+    const clockEntry = getRelevantClockEntry(shift);
     const now = new Date();
     const shiftStart = parseISO(shift.start_time);
     const shiftEnd = parseISO(shift.end_time);
 
-    // Missed should never be shown as completed
     if (shift.status === 'missed') {
+      // If a replacement actually worked (clocked in), reflect their progress/completion.
+      if (shift.replacement_employee_id && clockEntry?.clock_in) {
+        if (clockEntry.clock_out) {
+          return { status: 'Completed', color: 'bg-emerald-600' };
+        }
+        if (clockEntry.break_start && !clockEntry.break_end) {
+          return { status: 'On Break', color: 'bg-amber-500' };
+        }
+        return { status: 'Covered (In Progress)', color: 'bg-sky-600' };
+      }
       return { status: 'Missed', color: 'bg-destructive' };
     }
 
@@ -473,10 +508,7 @@ export default function EmployeeSchedule() {
               <CardContent>
                 <div className="space-y-3">
                   {dayShifts.map(shift => {
-                    const clockEntry = timeClockEntries.find(tc =>
-                      tc.shift_id === shift.id &&
-                      (shift.replacement_employee_id ? tc.employee_id === shift.replacement_employee_id : true)
-                    );
+                    const clockEntry = getRelevantClockEntry(shift);
                     const attendance = getAttendanceStatus(shift);
                     const effectiveEmployee = shift.replacement_employee_id ? shift.replacement_employee : shift.employee;
                     const originalEmployee = shift.employee;

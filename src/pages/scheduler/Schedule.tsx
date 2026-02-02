@@ -91,6 +91,7 @@ export default function SchedulerSchedule() {
   const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift, refetch: refetchShifts } = useShifts(isValidCompanySelected ? selectedCompany : undefined, weekStart);
 
   const [employeeRecord, setEmployeeRecord] = useState<{ id: string; company_id: string } | null>(null);
+  const [fallbackNamesById, setFallbackNamesById] = useState<Record<string, string>>({});
 
   const companyIdForNames = useMemo(() => {
     if (isValidCompanySelected) return selectedCompany;
@@ -98,6 +99,50 @@ export default function SchedulerSchedule() {
   }, [employeeRecord?.company_id, isValidCompanySelected, selectedCompany]);
 
   const { namesById: employeeNamesById } = useCompanyEmployeeNames(companyIdForNames);
+
+  // Fallback name resolution: if RPC returns empty/missing for some IDs, try employees_public.
+  // This prevents persistent "Unknown" labels when the logged-in user's email doesn't exactly match.
+  useEffect(() => {
+    if (!user) return;
+
+    const missing = new Set<string>();
+    for (const s of shifts) {
+      if (s?.employee_id && !employeeNamesById.get(s.employee_id) && !fallbackNamesById[s.employee_id]) {
+        missing.add(s.employee_id);
+      }
+      const repl = (s as any)?.replacement_employee_id;
+      if (repl && !employeeNamesById.get(repl) && !fallbackNamesById[repl]) {
+        missing.add(repl);
+      }
+    }
+
+    const ids = Array.from(missing).filter(Boolean);
+    if (ids.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await (supabase as any)
+        .from('employees_public')
+        .select('id, first_name, last_name')
+        .in('id', ids);
+
+      if (cancelled || error || !Array.isArray(data)) return;
+
+      const next: Record<string, string> = {};
+      for (const row of data as any[]) {
+        if (row?.id && row?.first_name && row?.last_name) {
+          next[String(row.id)] = `${row.first_name} ${row.last_name}`.trim();
+        }
+      }
+      if (!cancelled && Object.keys(next).length > 0) {
+        setFallbackNamesById((prev) => ({ ...prev, ...next }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [employeeNamesById, fallbackNamesById, shifts, user]);
   // Fetch organizations for super admin
   useEffect(() => {
     const fetchOrganizations = async () => {
@@ -372,6 +417,11 @@ export default function SchedulerSchedule() {
   };
 
   const getEmployeeName = (employeeId: string) => {
+    if (!employeeId) return 'Unassigned';
+
+    const fallbackName = fallbackNamesById[employeeId];
+    if (fallbackName) return fallbackName;
+
     // First check the regular employees list (for managers)
     const employee = employees.find(e => e.id === employeeId);
     if (employee) {
