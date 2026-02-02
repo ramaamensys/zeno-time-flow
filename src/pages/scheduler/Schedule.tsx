@@ -113,12 +113,12 @@ export default function SchedulerSchedule() {
         }
       }
       
-      // Also check if user is an employee
+      // Also check if user is an employee (use maybeSingle to avoid 406 when no record)
       const { data: empData } = await supabase
         .from('employees')
         .select('id, company_id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       
       if (empData) {
         setEmployeeRecord(empData);
@@ -412,7 +412,8 @@ export default function SchedulerSchedule() {
     ));
   };
 
-  const isLoading = companiesLoading || departmentsLoading || shiftsLoading;
+  // Only show loading for employees sidebar - don't include shiftsLoading to avoid flicker
+  const isEmployeeSidebarLoading = employeesLoading;
 
   const handleOpenEditEmployee = (employee: Employee) => {
     setSelectedEmployee(employee);
@@ -1220,7 +1221,7 @@ export default function SchedulerSchedule() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                {isLoading ? (
+                {isEmployeeSidebarLoading ? (
                   <div className="text-center text-muted-foreground py-8">
                     Loading...
                   </div>

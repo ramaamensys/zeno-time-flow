@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -335,41 +335,57 @@ export function useDepartments(companyId?: string) {
 export function useEmployees(companyId?: string) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(false);
-  const [currentCompanyId, setCurrentCompanyId] = useState<string | undefined>(undefined);
+  // Use ref to track fetched company to avoid stale closure issues
+  const fetchedCompanyRef = React.useRef<string | undefined>(undefined);
+  const isMountedRef = React.useRef(true);
 
   // Check if companyId is a valid UUID (not "all" or empty)
   const isValidCompanyId = companyId && companyId !== 'all' && 
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyId);
 
-  const fetchEmployees = async (forceRefresh = false) => {
-    // Only fetch if we have a valid company ID - otherwise return empty array
-    if (!isValidCompanyId) {
-      setEmployees([]);
-      setLoading(false);
+  const fetchEmployees = async (targetCompanyId: string | undefined, forceRefresh = false) => {
+    // Validate the target company ID
+    const isValid = targetCompanyId && targetCompanyId !== 'all' && 
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetCompanyId);
+    
+    if (!isValid) {
+      if (isMountedRef.current) {
+        setEmployees([]);
+        setLoading(false);
+        fetchedCompanyRef.current = undefined;
+      }
       return;
     }
 
-    // Prevent duplicate fetches for the same company unless forced
-    if (!forceRefresh && currentCompanyId === companyId && employees.length > 0) {
+    // Skip if already fetched for this company (unless forced)
+    if (!forceRefresh && fetchedCompanyRef.current === targetCompanyId) {
       return;
     }
     
     try {
-      setLoading(true);
-      setCurrentCompanyId(companyId);
+      if (isMountedRef.current) {
+        setLoading(true);
+      }
+      
       const { data, error } = await (supabase as any)
         .from('employees')
         .select('*')
-        .eq('company_id', companyId)
+        .eq('company_id', targetCompanyId)
         .order('first_name', { ascending: true });
 
       if (error) throw error;
-      setEmployees(data || []);
+      
+      if (isMountedRef.current) {
+        setEmployees(data || []);
+        fetchedCompanyRef.current = targetCompanyId;
+      }
     } catch (error) {
       console.error('Error fetching employees:', error);
       toast.error('Failed to fetch employees');
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -439,16 +455,20 @@ export function useEmployees(companyId?: string) {
   };
 
   useEffect(() => {
-    // Reset state when company changes
-    if (companyId !== currentCompanyId) {
-      setEmployees([]);
-      fetchEmployees();
+    isMountedRef.current = true;
+    
+    // Only clear employees if switching to a different valid company or to invalid
+    if (companyId !== fetchedCompanyRef.current) {
+      // Don't reset to empty immediately - let fetch handle it to avoid flicker
+      fetchEmployees(companyId, false);
     }
     
-    // Only set up real-time subscription if we have a valid company ID
+    // Set up real-time subscription if we have a valid company ID
+    let subscription: ReturnType<typeof supabase.channel> | null = null;
+    
     if (isValidCompanyId) {
       const channelName = `employees_changes_${companyId}`;
-      const subscription = supabase
+      subscription = supabase
         .channel(channelName)
         .on('postgres_changes', { 
           event: '*', 
@@ -462,16 +482,19 @@ export function useEmployees(companyId?: string) {
               setEmployees(prev => prev.filter(e => e.id !== deletedId));
             }
           } else {
-            fetchEmployees(true);
+            fetchEmployees(companyId, true);
           }
         })
         .subscribe();
-
-      return () => {
-        subscription.unsubscribe();
-      };
     }
-  }, [companyId]);
+
+    return () => {
+      isMountedRef.current = false;
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  }, [companyId, isValidCompanyId]);
 
   return {
     employees,
@@ -479,7 +502,7 @@ export function useEmployees(companyId?: string) {
     createEmployee,
     updateEmployee,
     deleteEmployee,
-    refetch: () => fetchEmployees(true)
+    refetch: () => fetchEmployees(companyId, true)
   };
 }
 
