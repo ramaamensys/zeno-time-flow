@@ -121,20 +121,23 @@ export default function SchedulerSchedule() {
         .select('role')
         .eq('user_id', user.id);
       
+      let computedRole: string = 'user';
       if (data && data.length > 0) {
         const roles = data.map(item => item.role);
         if (roles.includes('super_admin')) {
-          setUserRole('super_admin');
+          computedRole = 'super_admin';
         } else if (roles.includes('operations_manager')) {
-          setUserRole('operations_manager');
+          computedRole = 'operations_manager';
         } else if (roles.includes('manager')) {
-          setUserRole('manager');
+          computedRole = 'manager';
         } else if (roles.includes('employee')) {
-          setUserRole('employee');
+          computedRole = 'employee';
         } else {
-          setUserRole('user');
+          computedRole = 'user';
         }
       }
+
+      setUserRole(computedRole);
       
       // Also check if user is an employee (use maybeSingle to avoid 406 when no record)
       const { data: empData } = await supabase
@@ -145,6 +148,13 @@ export default function SchedulerSchedule() {
       
       if (empData) {
         setEmployeeRecord(empData);
+
+        // Fallback: if the user has an employee record but no explicit 'employee' role
+        // in user_roles, treat them as employee for schedule display purposes.
+        if (computedRole === 'user') {
+          setUserRole('employee');
+        }
+
         // Auto-select employee's company
         if (!selectedCompany) {
           setSelectedCompany(empData.company_id);
@@ -158,7 +168,12 @@ export default function SchedulerSchedule() {
   // Fetch public employees data for employee view (to show coworker names)
   useEffect(() => {
     const fetchPublicEmployees = async () => {
-      if (!employeeRecord?.company_id || userRole !== 'employee') return;
+      if (!employeeRecord?.company_id) return;
+
+      // Managers/admins already have access to employee names via their normal queries.
+      if (userRole === 'super_admin' || userRole === 'operations_manager' || userRole === 'manager') {
+        return;
+      }
 
       // Use a SECURITY DEFINER RPC so employee users can resolve coworker names
       // without relying on base-table SELECT permissions or view/RLS behavior.
