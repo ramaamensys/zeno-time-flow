@@ -174,8 +174,13 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
                           }`}
                         >
                           <div className="flex items-center gap-4">
+                            {missed && (
+                              <Badge variant="destructive" className="gap-1 uppercase font-bold animate-pulse">
+                                <AlertTriangle className="h-3 w-3" />
+                                Missed
+                              </Badge>
+                            )}
                             <div className={`flex items-center gap-2 text-lg font-medium ${missed ? 'text-destructive' : ''}`}>
-                              {missed && <AlertTriangle className="h-5 w-5 text-destructive" />}
                               <Clock className={`h-5 w-5 ${missed ? 'text-destructive' : 'text-muted-foreground'}`} />
                               {format(parseISO(shift.start_time), 'h:mm a')} - {format(parseISO(shift.end_time), 'h:mm a')}
                             </div>
@@ -192,7 +197,7 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
                             {shift.departments?.name && (
                               <Badge variant="outline">{shift.departments.name}</Badge>
                             )}
-                            {getShiftStatusBadge(shift)}
+                            {!missed && getShiftStatusBadge(shift)}
                           </div>
                         </div>
                       );
