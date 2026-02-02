@@ -19,15 +19,21 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [companyId, setCompanyId] = useState<string | null>(null);
 
-  // Check and mark missed shifts automatically
-  const checkAndMarkMissedShifts = useCallback(async () => {
-    if (!employeeId) return;
+  // Check and mark missed shifts automatically - runs based on start_time + 15 min buffer
+  const checkAndMarkMissedShifts = useCallback(async (): Promise<boolean> => {
+    if (!employeeId) return false;
+    
+    let markedAny = false;
     
     try {
       const now = new Date();
+      // Grace threshold = current time - 15 minutes
+      // If shift.start_time < graceThreshold, it means 15+ minutes have passed since start
       const graceThreshold = new Date(now.getTime() - GRACE_PERIOD_MINUTES * 60 * 1000);
       
-      // Find scheduled shifts that have passed the grace period without clock-in
+      console.log('Checking for missed shifts. Grace threshold:', graceThreshold.toISOString());
+      
+      // Find ALL scheduled shifts for this employee that started more than 15 min ago
       const { data: overdueShifts, error: fetchError } = await supabase
         .from('shifts')
         .select('id, employee_id, company_id, start_time')
@@ -36,7 +42,17 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
         .eq('is_missed', false)
         .lt('start_time', graceThreshold.toISOString());
       
-      if (fetchError || !overdueShifts || overdueShifts.length === 0) return;
+      if (fetchError) {
+        console.error('Error fetching overdue shifts:', fetchError);
+        return false;
+      }
+      
+      if (!overdueShifts || overdueShifts.length === 0) {
+        console.log('No overdue shifts found');
+        return false;
+      }
+      
+      console.log('Found overdue shifts:', overdueShifts.length);
       
       // Check each shift for time clock entry
       for (const shift of overdueShifts) {
@@ -47,9 +63,10 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
           .not('clock_in', 'is', null)
           .maybeSingle();
         
-        // If no clock entry, mark as missed
+        // If no clock entry, mark as missed immediately
         if (!clockEntry) {
-          await supabase
+          console.log('Marking shift as missed:', shift.id, 'start_time:', shift.start_time);
+          const { error: updateError } = await supabase
             .from('shifts')
             .update({ 
               is_missed: true, 
@@ -57,11 +74,19 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
               status: 'missed'
             })
             .eq('id', shift.id);
+          
+          if (updateError) {
+            console.error('Error updating shift:', updateError);
+          } else {
+            markedAny = true;
+          }
         }
       }
     } catch (error) {
       console.error('Error checking missed shifts:', error);
     }
+    
+    return markedAny;
   }, [employeeId]);
 
   // Fetch shifts and approved replacements
@@ -121,10 +146,24 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
 
   useEffect(() => {
     // Check for missed shifts first, then fetch data
-    checkAndMarkMissedShifts().then(() => fetchData());
+    const runCheck = async () => {
+      const markedAny = await checkAndMarkMissedShifts();
+      await fetchData();
+      // If we marked any shifts, refetch again to ensure UI is updated
+      if (markedAny) {
+        await fetchData();
+      }
+    };
     
-    // Set up interval to check for missed shifts every minute
-    const intervalId = setInterval(checkAndMarkMissedShifts, 60000);
+    runCheck();
+    
+    // Set up interval to check for missed shifts every 30 seconds for quicker detection
+    const intervalId = setInterval(async () => {
+      const markedAny = await checkAndMarkMissedShifts();
+      if (markedAny) {
+        await fetchData();
+      }
+    }, 30000);
     
     return () => clearInterval(intervalId);
   }, [checkAndMarkMissedShifts, fetchData]);
