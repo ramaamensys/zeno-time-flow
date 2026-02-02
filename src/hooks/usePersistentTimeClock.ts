@@ -459,7 +459,7 @@ export const usePersistentTimeClock = () => {
     }
   }, [activeEntry]);
 
-  // Clock in
+  // Clock in - validates shift belongs to this employee
   const clockIn = useCallback(async (shiftId?: string) => {
     if (!employeeId) {
       toast.error('Employee record not found');
@@ -467,6 +467,25 @@ export const usePersistentTimeClock = () => {
     }
 
     try {
+      // If a shiftId is provided, verify it belongs to this employee
+      if (shiftId) {
+        const { data: shift, error: shiftError } = await supabase
+          .from('shifts')
+          .select('id, employee_id')
+          .eq('id', shiftId)
+          .single();
+        
+        if (shiftError || !shift) {
+          toast.error('Shift not found');
+          return;
+        }
+        
+        if (shift.employee_id !== employeeId) {
+          toast.error('You can only clock in for your own assigned shifts');
+          return;
+        }
+      }
+
       const clockInTime = new Date().toISOString();
       
       const { data, error } = await supabase
