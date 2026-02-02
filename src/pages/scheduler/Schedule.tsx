@@ -58,11 +58,15 @@ export default function SchedulerSchedule() {
   const [showAssignShiftModal, setShowAssignShiftModal] = useState(false);
   const { toast } = useToast();
   
-  // Database hooks
-  const { companies, loading: companiesLoading } = useCompanies();
-  const { departments, loading: departmentsLoading } = useDepartments(selectedCompany);
-  const { employees, loading: employeesLoading, updateEmployee, deleteEmployee } = useEmployees(selectedCompany);
-  const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift } = useShifts(selectedCompany, getWeekStart(selectedWeek));
+  // Check if selectedCompany is a valid UUID (not empty or "all")
+  const isValidCompanySelected = selectedCompany && selectedCompany !== '' && selectedCompany !== 'all' && 
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedCompany);
+  
+  // Database hooks - only pass company ID when valid
+  const { companies, loading: companiesLoading, refetch: refetchCompanies } = useCompanies();
+  const { departments, loading: departmentsLoading } = useDepartments(isValidCompanySelected ? selectedCompany : undefined);
+  const { employees, loading: employeesLoading, updateEmployee, deleteEmployee, refetch: refetchEmployees } = useEmployees(isValidCompanySelected ? selectedCompany : undefined);
+  const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift, refetch: refetchShifts } = useShifts(isValidCompanySelected ? selectedCompany : undefined, getWeekStart(selectedWeek));
 
   const [employeeRecord, setEmployeeRecord] = useState<{ id: string; company_id: string } | null>(null);
   
@@ -182,6 +186,14 @@ export default function SchedulerSchedule() {
       setSelectedCompany(schedulableCompanies[0].id);
     }
   }, [schedulableCompanies, selectedCompany]);
+
+  // Refetch employees and shifts when company changes
+  useEffect(() => {
+    if (isValidCompanySelected) {
+      refetchEmployees();
+      refetchShifts();
+    }
+  }, [selectedCompany, isValidCompanySelected]);
 
   function getWeekStart(date: Date) {
     const start = new Date(date);

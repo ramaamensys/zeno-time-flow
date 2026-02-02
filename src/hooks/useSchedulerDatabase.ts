@@ -341,15 +341,20 @@ export function useEmployees(companyId?: string) {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyId);
 
   const fetchEmployees = async () => {
+    // Only fetch if we have a valid company ID - otherwise return empty array
+    if (!isValidCompanyId) {
+      setEmployees([]);
+      setLoading(false);
+      return;
+    }
+    
     try {
-      let query = (supabase as any).from('employees').select('*');
-      
-      // Only filter by company_id if it's a valid UUID
-      if (isValidCompanyId) {
-        query = query.eq('company_id', companyId);
-      }
-      
-      const { data, error } = await query.order('first_name', { ascending: true });
+      setLoading(true);
+      const { data, error } = await (supabase as any)
+        .from('employees')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('first_name', { ascending: true });
 
       if (error) throw error;
       setEmployees(data || []);
@@ -476,13 +481,19 @@ export function useShifts(companyId?: string, weekStart?: Date) {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyId);
 
   const fetchShifts = async () => {
+    // Only fetch if we have a valid company ID - otherwise return empty array
+    if (!isValidCompanyId) {
+      setShifts([]);
+      setLoading(false);
+      return;
+    }
+    
     try {
-      let query = (supabase as any).from('shifts').select('*');
-      
-      // Only filter by company_id if it's a valid UUID
-      if (isValidCompanyId) {
-        query = query.eq('company_id', companyId);
-      }
+      setLoading(true);
+      let query = (supabase as any)
+        .from('shifts')
+        .select('*')
+        .eq('company_id', companyId);
       
       if (weekStart) {
         const weekEnd = new Date(weekStart);
