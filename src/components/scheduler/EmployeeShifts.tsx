@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Calendar, Clock, MapPin } from "lucide-react";
+import { Calendar, Clock, MapPin, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format, parseISO, isToday, isTomorrow, isPast, startOfWeek, endOfWeek, addWeeks } from "date-fns";
+import CompanyMissedShifts from "./CompanyMissedShifts";
 
 interface EmployeeShiftsProps {
   employeeId: string;
@@ -13,10 +14,22 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
   const [shifts, setShifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [weekOffset, setWeekOffset] = useState(0);
+  const [companyId, setCompanyId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchShifts = async () => {
       setLoading(true);
+      
+      // First get the employee's company
+      const { data: employeeData } = await supabase
+        .from('employees')
+        .select('company_id')
+        .eq('id', employeeId)
+        .single();
+      
+      if (employeeData?.company_id) {
+        setCompanyId(employeeData.company_id);
+      }
       
       const today = addWeeks(new Date(), weekOffset);
       const weekStart = startOfWeek(today, { weekStartsOn: 1 });
@@ -48,6 +61,10 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
     const endTime = parseISO(shift.end_time);
     const now = new Date();
     
+    // Check if shift is missed
+    if (shift.is_missed || shift.status === 'missed') {
+      return <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" />Missed</Badge>;
+    }
     if (shift.status === 'completed') {
       return <Badge variant="secondary">Completed</Badge>;
     }
@@ -67,6 +84,10 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
       return <Badge variant="outline">Tomorrow</Badge>;
     }
     return <Badge variant="outline">Upcoming</Badge>;
+  };
+
+  const isShiftMissed = (shift: any) => {
+    return shift.is_missed || shift.status === 'missed';
   };
 
   const getDayLabel = (date: Date) => {
@@ -89,6 +110,7 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
   const weekEnd = endOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 1 });
 
   return (
+    <div className="space-y-6">
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -140,33 +162,41 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
                     </span>
                   </h3>
                   <div className="space-y-3">
-                    {dayShifts.map((shift: any) => (
-                      <div 
-                        key={shift.id} 
-                        className="flex items-center justify-between p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2 text-lg font-medium">
-                            <Clock className="h-5 w-5 text-muted-foreground" />
-                            {format(parseISO(shift.start_time), 'h:mm a')} - {format(parseISO(shift.end_time), 'h:mm a')}
+                    {dayShifts.map((shift: any) => {
+                      const missed = isShiftMissed(shift);
+                      return (
+                        <div 
+                          key={shift.id} 
+                          className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
+                            missed 
+                              ? 'bg-destructive/10 border-destructive/30 hover:bg-destructive/20' 
+                              : 'bg-card hover:bg-muted/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className={`flex items-center gap-2 text-lg font-medium ${missed ? 'text-destructive' : ''}`}>
+                              {missed && <AlertTriangle className="h-5 w-5 text-destructive" />}
+                              <Clock className={`h-5 w-5 ${missed ? 'text-destructive' : 'text-muted-foreground'}`} />
+                              {format(parseISO(shift.start_time), 'h:mm a')} - {format(parseISO(shift.end_time), 'h:mm a')}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {shift.companies?.name && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {shift.companies.name}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            {shift.companies?.name && (
-                              <span className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                {shift.companies.name}
-                              </span>
+                          <div className="flex items-center gap-3">
+                            {shift.departments?.name && (
+                              <Badge variant="outline">{shift.departments.name}</Badge>
                             )}
+                            {getShiftStatusBadge(shift)}
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          {shift.departments?.name && (
-                            <Badge variant="outline">{shift.departments.name}</Badge>
-                          )}
-                          {getShiftStatusBadge(shift)}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -175,5 +205,11 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
         )}
       </CardContent>
     </Card>
+    
+    {/* Company Missed Shifts - Available for coverage */}
+    {companyId && (
+      <CompanyMissedShifts companyId={companyId} employeeId={employeeId} />
+    )}
+    </div>
   );
 }
