@@ -447,12 +447,34 @@ export default function UserManagement() {
 
   const updateUserRole = async (userId: string, newRole: 'employee' | 'manager' | 'operations_manager' | 'super_admin') => {
     try {
-      const { error } = await supabase
+      // First check if user already has a role entry
+      const { data: existingRoles, error: checkError } = await supabase
         .from('user_roles')
-        .update({ role: newRole })
+        .select('id, role')
         .eq('user_id', userId);
 
-      if (error) throw error;
+      if (checkError) throw checkError;
+
+      if (existingRoles && existingRoles.length > 0) {
+        // Update existing role
+        const { error: updateError } = await supabase
+          .from('user_roles')
+          .update({ role: newRole })
+          .eq('user_id', userId);
+
+        if (updateError) throw updateError;
+      } else {
+        // Insert new role if none exists
+        const { error: insertError } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: userId,
+            role: newRole,
+            app_type: 'scheduler'
+          });
+
+        if (insertError) throw insertError;
+      }
 
       toast({
         title: "Success",
@@ -460,11 +482,11 @@ export default function UserManagement() {
       });
 
       await loadUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating user role:', error);
       toast({
         title: "Error",
-        description: "Failed to update user role",
+        description: error.message || "Failed to update user role",
         variant: "destructive",
       });
     }
@@ -616,7 +638,20 @@ export default function UserManagement() {
     try {
       console.log('Deleting user:', userId, userEmail);
       
-      // 1. Clean up company assignments - remove from operations_manager_id and company_manager_id
+      // 1. Clean up organization assignments - remove from operations_manager_id and organization_manager_id
+      const { error: orgCleanupError } = await supabase
+        .from('organizations')
+        .update({ 
+          operations_manager_id: null,
+          organization_manager_id: null 
+        })
+        .or(`operations_manager_id.eq.${userId},organization_manager_id.eq.${userId}`);
+
+      if (orgCleanupError) {
+        console.error('Organization cleanup error:', orgCleanupError);
+      }
+
+      // 2. Clean up company assignments - remove from operations_manager_id and company_manager_id
       const { error: companyCleanupError } = await supabase
         .from('companies')
         .update({ 
@@ -627,26 +662,38 @@ export default function UserManagement() {
 
       if (companyCleanupError) {
         console.error('Company cleanup error:', companyCleanupError);
-        // Don't throw error, continue with other cleanup
       }
 
-      // 2. Delete employee records if any
+      // 3. Delete employee records by user_id
       const { error: employeeError } = await supabase
         .from('employees')
         .delete()
         .eq('user_id', userId);
 
-      if (employeeError) console.log('No employee record to clean up:', employeeError);
+      if (employeeError) console.log('No employee record to clean up by user_id:', employeeError);
 
-      // 3. Delete user roles
+      // 3b. Also try to delete by email (for virtual employees without user_id)
+      if (userEmail) {
+        const { error: employeeEmailError } = await supabase
+          .from('employees')
+          .delete()
+          .eq('email', userEmail);
+
+        if (employeeEmailError) console.log('No employee record to clean up by email:', employeeEmailError);
+      }
+
+      // 4. Delete user roles
       const { error: rolesError } = await supabase
         .from('user_roles')
         .delete()
         .eq('user_id', userId);
 
-      if (rolesError) throw rolesError;
+      if (rolesError) {
+        console.error('Error deleting user roles:', rolesError);
+        // Continue with deletion even if roles cleanup fails
+      }
 
-      // 4. Delete calendar events
+      // 5. Delete calendar events
       const { error: eventsError } = await supabase
         .from('calendar_events')
         .delete()
@@ -654,7 +701,7 @@ export default function UserManagement() {
 
       if (eventsError) console.log('No calendar events to clean up');
 
-      // 5. Delete other user-related data
+      // 6. Delete other user-related data
       const { error: habitsError } = await supabase
         .from('habits')
         .delete()
@@ -669,13 +716,16 @@ export default function UserManagement() {
 
       if (focusError) console.log('No focus sessions to clean up');
 
-      // 6. Finally mark profile as deleted (this maintains the record but marks it inactive)
+      // 7. Finally mark profile as deleted (this maintains the record but marks it inactive)
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ status: 'deleted' })
         .eq('user_id', userId);
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('Error marking profile as deleted:', profileError);
+        throw profileError;
+      }
 
       console.log('User deletion successful - all references cleaned up');
 
