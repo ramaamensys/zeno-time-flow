@@ -1680,7 +1680,7 @@ export default function SchedulerSchedule() {
                         <p className="mb-2">No employees found</p>
                         <Button 
                           size="sm" 
-                          onClick={() => navigate('/scheduler/user-management')}
+                          onClick={() => navigate('/user-management')}
                         >
                           <Users className="h-3 w-3 mr-1" />
                           Add Employee
