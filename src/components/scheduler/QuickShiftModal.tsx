@@ -5,15 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { format } from 'date-fns';
+import { Checkbox } from '@/components/ui/checkbox';
+import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
 import { Employee, Shift } from '@/hooks/useSchedulerDatabase';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Copy } from 'lucide-react';
 
 interface QuickShiftModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   employee: Employee | null;
   date: Date | null;
+  weekDates?: Date[];
   onSave: (shiftData: {
     employee_id: string;
     start_time: string;
@@ -21,6 +23,13 @@ interface QuickShiftModalProps {
     break_minutes: number;
     notes?: string;
   }) => void;
+  onSaveMultiple?: (shifts: Array<{
+    employee_id: string;
+    start_time: string;
+    end_time: string;
+    break_minutes: number;
+    notes?: string;
+  }>) => void;
   checkShiftConflict: (employeeId: string, startTime: Date, endTime: Date) => Shift | undefined;
 }
 
@@ -37,7 +46,9 @@ export default function QuickShiftModal({
   onOpenChange,
   employee,
   date,
+  weekDates,
   onSave,
+  onSaveMultiple,
   checkShiftConflict
 }: QuickShiftModalProps) {
   const [selectedPreset, setSelectedPreset] = useState<string>('Morning (6am - 2pm)');
@@ -46,6 +57,17 @@ export default function QuickShiftModal({
   const [breakMinutes, setBreakMinutes] = useState(30);
   const [notes, setNotes] = useState('');
   const [conflict, setConflict] = useState<Shift | undefined>();
+  const [copyToWeek, setCopyToWeek] = useState(false);
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+
+  // Calculate the week dates from the selected date if not provided
+  const computedWeekDates = weekDates || (() => {
+    if (!date) return [];
+    const weekStart = startOfWeek(date, { weekStartsOn: 1 }); // Monday
+    return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  })();
+
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   useEffect(() => {
     if (open) {
@@ -56,6 +78,8 @@ export default function QuickShiftModal({
       setBreakMinutes(30);
       setNotes('');
       setConflict(undefined);
+      setCopyToWeek(false);
+      setSelectedDays([]);
     }
   }, [open]);
 
@@ -89,15 +113,35 @@ export default function QuickShiftModal({
     }
   };
 
+  const toggleDay = (dayIndex: number) => {
+    setSelectedDays(prev => 
+      prev.includes(dayIndex) 
+        ? prev.filter(d => d !== dayIndex)
+        : [...prev, dayIndex]
+    );
+  };
+
+  const selectAllDays = () => {
+    if (!date) return;
+    // Select all days except the current one (since it will be created anyway)
+    const currentDayIndex = computedWeekDates.findIndex(d => isSameDay(d, date));
+    const allOtherDays = computedWeekDates
+      .map((_, i) => i)
+      .filter(i => i !== currentDayIndex);
+    setSelectedDays(allOtherDays);
+  };
+
   const handleSave = () => {
     if (!employee || !date) return;
 
-    const startDateTime = new Date(date);
     const [startH, startM] = startTime.split(':').map(Number);
+    const [endH, endM] = endTime.split(':').map(Number);
+
+    // Create the primary shift
+    const startDateTime = new Date(date);
     startDateTime.setHours(startH, startM, 0, 0);
 
     const endDateTime = new Date(date);
-    const [endH, endM] = endTime.split(':').map(Number);
     endDateTime.setHours(endH, endM, 0, 0);
 
     // Handle overnight shifts
@@ -105,18 +149,61 @@ export default function QuickShiftModal({
       endDateTime.setDate(endDateTime.getDate() + 1);
     }
 
-    onSave({
-      employee_id: employee.id,
-      start_time: startDateTime.toISOString(),
-      end_time: endDateTime.toISOString(),
-      break_minutes: breakMinutes,
-      notes: notes || undefined
-    });
+    if (copyToWeek && selectedDays.length > 0 && onSaveMultiple) {
+      // Create shifts for all selected days
+      const allShifts = [];
+      
+      // Add the current day first
+      allShifts.push({
+        employee_id: employee.id,
+        start_time: startDateTime.toISOString(),
+        end_time: endDateTime.toISOString(),
+        break_minutes: breakMinutes,
+        notes: notes || undefined
+      });
+
+      // Add shifts for selected days
+      for (const dayIndex of selectedDays) {
+        const targetDate = computedWeekDates[dayIndex];
+        if (!targetDate || isSameDay(targetDate, date)) continue;
+
+        const targetStart = new Date(targetDate);
+        targetStart.setHours(startH, startM, 0, 0);
+
+        const targetEnd = new Date(targetDate);
+        targetEnd.setHours(endH, endM, 0, 0);
+
+        if (endH < startH) {
+          targetEnd.setDate(targetEnd.getDate() + 1);
+        }
+
+        allShifts.push({
+          employee_id: employee.id,
+          start_time: targetStart.toISOString(),
+          end_time: targetEnd.toISOString(),
+          break_minutes: breakMinutes,
+          notes: notes || undefined
+        });
+      }
+
+      onSaveMultiple(allShifts);
+    } else {
+      // Save single shift
+      onSave({
+        employee_id: employee.id,
+        start_time: startDateTime.toISOString(),
+        end_time: endDateTime.toISOString(),
+        break_minutes: breakMinutes,
+        notes: notes || undefined
+      });
+    }
 
     onOpenChange(false);
   };
 
   if (!employee || !date) return null;
+
+  const currentDayIndex = computedWeekDates.findIndex(d => isSameDay(d, date));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -209,6 +296,64 @@ export default function QuickShiftModal({
             </Select>
           </div>
 
+          {/* Copy to Week Option */}
+          <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="copyToWeek" 
+                checked={copyToWeek}
+                onCheckedChange={(checked) => setCopyToWeek(checked === true)}
+              />
+              <Label htmlFor="copyToWeek" className="flex items-center gap-2 cursor-pointer">
+                <Copy className="h-4 w-4" />
+                Copy this shift to other days
+              </Label>
+            </div>
+
+            {copyToWeek && (
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">Select days to copy:</Label>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={selectAllDays}
+                    className="h-6 text-xs"
+                  >
+                    Select All
+                  </Button>
+                </div>
+                <div className="flex gap-1 flex-wrap">
+                  {computedWeekDates.map((weekDate, index) => {
+                    const isCurrentDay = index === currentDayIndex;
+                    const isSelected = selectedDays.includes(index);
+                    
+                    return (
+                      <Button
+                        key={index}
+                        type="button"
+                        variant={isCurrentDay ? "default" : isSelected ? "secondary" : "outline"}
+                        size="sm"
+                        className={`h-8 px-2 text-xs ${isCurrentDay ? 'cursor-not-allowed opacity-70' : ''}`}
+                        onClick={() => !isCurrentDay && toggleDay(index)}
+                        disabled={isCurrentDay}
+                      >
+                        {dayNames[index]} {format(weekDate, 'd')}
+                        {isCurrentDay && <span className="ml-1 text-[10px]">(current)</span>}
+                      </Button>
+                    );
+                  })}
+                </div>
+                {selectedDays.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Will create {selectedDays.length + 1} shifts total (including today)
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Notes */}
           <div className="space-y-2">
             <Label>Notes (optional)</Label>
@@ -226,7 +371,10 @@ export default function QuickShiftModal({
             Cancel
           </Button>
           <Button onClick={handleSave}>
-            Add Shift
+            {copyToWeek && selectedDays.length > 0 
+              ? `Add ${selectedDays.length + 1} Shifts`
+              : 'Add Shift'
+            }
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -628,7 +628,7 @@ export default function SchedulerSchedule() {
     if (!open) setSelectedEmployee(null);
   };
 
-  // Check for shift conflicts (overlapping shifts for the same employee)
+  // Check for shift conflicts (overlapping shifts for the same employee on the SAME day)
   const checkShiftConflict = useCallback((employeeId: string, startTime: Date, endTime: Date, excludeShiftId?: string): Shift | undefined => {
     return shifts.find(shift => {
       if (shift.employee_id !== employeeId) return false;
@@ -636,6 +636,14 @@ export default function SchedulerSchedule() {
       
       const existingStart = new Date(shift.start_time);
       const existingEnd = new Date(shift.end_time);
+      
+      // First check if the shifts are on the same day (compare year, month, day)
+      const sameDay = startTime.getFullYear() === existingStart.getFullYear() &&
+                      startTime.getMonth() === existingStart.getMonth() &&
+                      startTime.getDate() === existingStart.getDate();
+      
+      // If not on the same day, no conflict
+      if (!sameDay) return false;
       
       // Check for overlap: new shift starts before existing ends AND new shift ends after existing starts
       return startTime < existingEnd && endTime > existingStart;
@@ -708,6 +716,38 @@ export default function SchedulerSchedule() {
       status: 'scheduled'
     });
     setShowScheduleShifts(true);
+  };
+
+  // Handler for quick shift save multiple (copy to week feature)
+  const handleQuickShiftSaveMultiple = async (shifts: Array<{
+    employee_id: string;
+    start_time: string;
+    end_time: string;
+    break_minutes: number;
+    notes?: string;
+  }>) => {
+    const employee = employees.find(e => e.id === shifts[0]?.employee_id);
+    
+    // Create all shifts
+    for (const shiftData of shifts) {
+      await createShift({
+        employee_id: shiftData.employee_id,
+        company_id: selectedCompany,
+        department_id: selectedDepartment !== "all" ? selectedDepartment : employee?.department_id || undefined,
+        start_time: shiftData.start_time,
+        end_time: shiftData.end_time,
+        break_minutes: shiftData.break_minutes,
+        hourly_rate: employee?.hourly_rate || undefined,
+        notes: shiftData.notes,
+        status: 'scheduled'
+      });
+    }
+    
+    setShowScheduleShifts(true);
+    toast({
+      title: "Shifts Created",
+      description: `Successfully created ${shifts.length} shifts for the week.`
+    });
   };
 
   // Prepare shifts data for saving
@@ -1338,7 +1378,9 @@ export default function SchedulerSchedule() {
         onOpenChange={setShowQuickShiftModal}
         employee={quickShiftEmployee}
         date={quickShiftDate}
+        weekDates={weekDates}
         onSave={handleQuickShiftSave}
+        onSaveMultiple={handleQuickShiftSaveMultiple}
         checkShiftConflict={checkShiftConflict}
       />
     </div>
