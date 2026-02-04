@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { Calendar, ChevronLeft, ChevronRight, Plus, Users, Clock, Building, Edit, Trash2, MoreHorizontal, Download, Printer, Save, AlertTriangle } from "lucide-react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { Calendar, ChevronLeft, ChevronRight, Plus, Users, Clock, Building, Edit, Trash2, MoreHorizontal, Download, Printer, Save, AlertTriangle, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,11 +7,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCompanies, useDepartments, useEmployees, useShifts, Shift, Employee } from "@/hooks/useSchedulerDatabase";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanyEmployeeNames } from "@/hooks/useCompanyEmployeeNames";
+import { useEmployeeAvailability, AvailabilityStatus } from "@/hooks/useEmployeeAvailability";
 import CreateCompanyModal from "@/components/scheduler/CreateCompanyModal";
 import CreateShiftModal from "@/components/scheduler/CreateShiftModal";
 import EditShiftModal from "@/components/scheduler/EditShiftModal";
@@ -22,6 +24,8 @@ import SaveScheduleModal from "@/components/scheduler/SaveScheduleModal";
 import SavedSchedulesCard, { SavedSchedule } from "@/components/scheduler/SavedSchedulesCard";
 import AssignShiftModal from "@/components/scheduler/AssignShiftModal";
 import MissedShiftRequestModal from "@/components/scheduler/MissedShiftRequestModal";
+import EmployeeScheduleGrid from "@/components/scheduler/EmployeeScheduleGrid";
+import QuickShiftModal from "@/components/scheduler/QuickShiftModal";
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function SchedulerSchedule() {
@@ -70,6 +74,10 @@ export default function SchedulerSchedule() {
     departmentName?: string;
   } | null>(null);
   const [myPendingRequests, setMyPendingRequests] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<'employee' | 'slot'>('employee'); // New: Connecteam-style view toggle
+  const [showQuickShiftModal, setShowQuickShiftModal] = useState(false);
+  const [quickShiftEmployee, setQuickShiftEmployee] = useState<Employee | null>(null);
+  const [quickShiftDate, setQuickShiftDate] = useState<Date | null>(null);
   const { toast } = useToast();
   
   // Check if selectedCompany is a valid UUID (not empty or "all")
@@ -89,6 +97,12 @@ export default function SchedulerSchedule() {
   const { departments, loading: departmentsLoading } = useDepartments(isValidCompanySelected ? selectedCompany : undefined);
   const { employees, loading: employeesLoading, updateEmployee, deleteEmployee, refetch: refetchEmployees } = useEmployees(isValidCompanySelected ? selectedCompany : undefined);
   const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift, refetch: refetchShifts } = useShifts(isValidCompanySelected ? selectedCompany : undefined, weekStart);
+
+  // Availability hook for Connecteam-style scheduling
+  const { 
+    getAvailabilityStatus, 
+    setEmployeeAvailability 
+  } = useEmployeeAvailability(isValidCompanySelected ? selectedCompany : undefined, weekStart);
 
   const [employeeRecord, setEmployeeRecord] = useState<{ id: string; company_id: string } | null>(null);
   const [fallbackNamesById, setFallbackNamesById] = useState<Record<string, string>>({});
@@ -609,6 +623,88 @@ export default function SchedulerSchedule() {
   const handleEditEmployeeOpenChange = (open: boolean) => {
     setShowEditEmployee(open);
     if (!open) setSelectedEmployee(null);
+  };
+
+  // Check for shift conflicts (overlapping shifts for the same employee)
+  const checkShiftConflict = useCallback((employeeId: string, startTime: Date, endTime: Date, excludeShiftId?: string): Shift | undefined => {
+    return shifts.find(shift => {
+      if (shift.employee_id !== employeeId) return false;
+      if (excludeShiftId && shift.id === excludeShiftId) return false;
+      
+      const existingStart = new Date(shift.start_time);
+      const existingEnd = new Date(shift.end_time);
+      
+      // Check for overlap: new shift starts before existing ends AND new shift ends after existing starts
+      return startTime < existingEnd && endTime > existingStart;
+    });
+  }, [shifts]);
+
+  // Handler for employee grid drag & drop (Connecteam-style)
+  const handleEmployeeGridDrop = (e: React.DragEvent, employeeId: string, dayIndex: number) => {
+    e.preventDefault();
+    const draggedEmpId = e.dataTransfer.getData('employeeId');
+    const shiftId = e.dataTransfer.getData('shiftId');
+    
+    if (shiftId && draggedShift) {
+      // Moving an existing shift to a new day/employee
+      const date = weekDates[dayIndex];
+      const shiftStartDate = new Date(draggedShift.start_time);
+      const shiftEndDate = new Date(draggedShift.end_time);
+      
+      // Calculate new times keeping the same hours
+      const newStart = new Date(date);
+      newStart.setHours(shiftStartDate.getHours(), shiftStartDate.getMinutes(), 0, 0);
+      
+      const newEnd = new Date(date);
+      newEnd.setHours(shiftEndDate.getHours(), shiftEndDate.getMinutes(), 0, 0);
+      
+      // Handle overnight shifts
+      if (shiftEndDate.getDate() !== shiftStartDate.getDate()) {
+        newEnd.setDate(newEnd.getDate() + 1);
+      }
+      
+      updateShift(shiftId, {
+        employee_id: employeeId,
+        start_time: newStart.toISOString(),
+        end_time: newEnd.toISOString()
+      });
+    }
+    
+    setDraggedEmployee(null);
+    setDraggedShift(null);
+  };
+
+  // Handler for adding shift from grid click
+  const handleAddShiftFromGrid = (employeeId: string, dayIndex: number) => {
+    const employee = employees.find(e => e.id === employeeId);
+    if (employee) {
+      setQuickShiftEmployee(employee);
+      setQuickShiftDate(weekDates[dayIndex]);
+      setShowQuickShiftModal(true);
+    }
+  };
+
+  // Handler for quick shift save
+  const handleQuickShiftSave = async (shiftData: {
+    employee_id: string;
+    start_time: string;
+    end_time: string;
+    break_minutes: number;
+    notes?: string;
+  }) => {
+    const employee = employees.find(e => e.id === shiftData.employee_id);
+    await createShift({
+      employee_id: shiftData.employee_id,
+      company_id: selectedCompany,
+      department_id: selectedDepartment !== "all" ? selectedDepartment : employee?.department_id || undefined,
+      start_time: shiftData.start_time,
+      end_time: shiftData.end_time,
+      break_minutes: shiftData.break_minutes,
+      hourly_rate: employee?.hourly_rate || undefined,
+      notes: shiftData.notes,
+      status: 'scheduled'
+    });
+    setShowScheduleShifts(true);
   };
 
   // Prepare shifts data for saving
@@ -1135,8 +1231,24 @@ export default function SchedulerSchedule() {
         <div className={`${canManageShifts ? 'xl:col-span-3' : ''} print-schedule`}>
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>{weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+              <CardTitle className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-4">
+                  <span>{weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  
+                  {/* View Mode Toggle */}
+                  <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'employee' | 'slot')} className="hidden sm:block">
+                    <TabsList className="h-8">
+                      <TabsTrigger value="employee" className="text-xs px-3 h-7">
+                        <Users className="h-3 w-3 mr-1" />
+                        By Employee
+                      </TabsTrigger>
+                      <TabsTrigger value="slot" className="text-xs px-3 h-7">
+                        <LayoutGrid className="h-3 w-3 mr-1" />
+                        By Shift
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
                 <div className="flex gap-2 flex-wrap">
                   {canManageShifts && (
                     <>
@@ -1196,6 +1308,30 @@ export default function SchedulerSchedule() {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {/* Employee-based view (Connecteam-style) */}
+              {viewMode === 'employee' ? (
+                <EmployeeScheduleGrid
+                  employees={employees.filter(e => selectedDepartment === "all" || e.department_id === selectedDepartment)}
+                  shifts={showScheduleShifts || isEmployeeView ? shifts : []}
+                  weekDates={weekDates}
+                  isEditMode={isEditMode}
+                  canManageShifts={canManageShifts}
+                  getEmployeeName={getEmployeeName}
+                  getAvailabilityStatus={getAvailabilityStatus}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDrop={handleEmployeeGridDrop}
+                  onDragEnd={handleDragEnd}
+                  onShiftClick={(shift) => {
+                    setSelectedShift(shift);
+                    setShowEditShift(true);
+                  }}
+                  onAddShift={handleAddShiftFromGrid}
+                  onDeleteShift={deleteShift}
+                  onSetAvailability={setEmployeeAvailability}
+                  checkShiftConflict={checkShiftConflict}
+                />
+              ) : (
               <div className="grid grid-cols-8 gap-2">
                 {/* Header row */}
                 <div className="font-medium text-sm text-muted-foreground p-2">
@@ -1499,6 +1635,7 @@ export default function SchedulerSchedule() {
                   </div>
                 ))}
               </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -1793,6 +1930,16 @@ export default function SchedulerSchedule() {
           }}
         />
       )}
+
+      {/* Quick Shift Modal for Connecteam-style grid */}
+      <QuickShiftModal
+        open={showQuickShiftModal}
+        onOpenChange={setShowQuickShiftModal}
+        employee={quickShiftEmployee}
+        date={quickShiftDate}
+        onSave={handleQuickShiftSave}
+        checkShiftConflict={checkShiftConflict}
+      />
     </div>
   );
 }
