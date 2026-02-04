@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Calendar, ChevronLeft, ChevronRight, Plus, Users, Clock, Building, Edit, Trash2, MoreHorizontal, Download, Printer, Save, AlertTriangle, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +18,7 @@ import { useEmployeeAvailability, AvailabilityStatus } from "@/hooks/useEmployee
 import CreateCompanyModal from "@/components/scheduler/CreateCompanyModal";
 import CreateShiftModal from "@/components/scheduler/CreateShiftModal";
 import EditShiftModal from "@/components/scheduler/EditShiftModal";
-import CreateEmployeeModal from "@/components/scheduler/CreateEmployeeModal";
+
 import SlotEditModal from "@/components/scheduler/SlotEditModal";
 import EditEmployeeModal from "@/components/scheduler/EditEmployeeModal";
 import SaveScheduleModal from "@/components/scheduler/SaveScheduleModal";
@@ -30,6 +31,7 @@ const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function SchedulerSchedule() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   // Predefined shift slots (mutable for editing)
   const [shiftSlots, setShiftSlots] = useState([
@@ -45,7 +47,7 @@ export default function SchedulerSchedule() {
   const [organizations, setOrganizations] = useState<{ id: string; name: string }[]>([]);
   const [showCreateCompany, setShowCreateCompany] = useState(false);
   const [showCreateShift, setShowCreateShift] = useState(false);
-  const [showCreateEmployee, setShowCreateEmployee] = useState(false);
+  
   const [showEditEmployee, setShowEditEmployee] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showEditShift, setShowEditShift] = useState(false);
@@ -1678,9 +1680,9 @@ export default function SchedulerSchedule() {
                         <p className="mb-2">No employees found</p>
                         <Button 
                           size="sm" 
-                          onClick={() => setShowCreateEmployee(true)}
+                          onClick={() => navigate('/scheduler/user-management')}
                         >
-                          <Plus className="h-3 w-3 mr-1" />
+                          <Users className="h-3 w-3 mr-1" />
                           Add Employee
                         </Button>
                       </div>
@@ -1855,11 +1857,6 @@ export default function SchedulerSchedule() {
         companyId={selectedCompany}
       />
       
-      <CreateEmployeeModal 
-        open={showCreateEmployee} 
-        onOpenChange={setShowCreateEmployee}
-        companyId={selectedCompany}
-      />
 
       <EditEmployeeModal
         open={showEditEmployee}
