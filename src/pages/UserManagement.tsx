@@ -578,36 +578,85 @@ export default function UserManagement() {
 
         console.log('User creation response:', data);
 
-        // If role is employee and company is selected, create employee record
-        if (newUser.role === 'employee' && newUser.company_id && data?.user?.id) {
-          const nameParts = newUser.full_name.trim().split(' ');
-          const firstName = nameParts[0] || '';
-          const lastName = nameParts.slice(1).join(' ') || '';
-          
-          const { error: employeeError } = await supabase
-            .from('employees')
-            .insert({
-              user_id: data.user.id,
-              email: newUser.email,
-              first_name: firstName,
-              last_name: lastName,
-              company_id: newUser.company_id,
-              status: 'active',
-              hire_date: new Date().toISOString().split('T')[0]
-            });
+        // Handle role-specific assignments
+        if (data?.user?.id) {
+          // For Organization Manager - assign to organization
+          if (newUser.role === 'operations_manager' && newUser.organization_id) {
+            const { error: orgError } = await supabase
+              .from('organizations')
+              .update({ organization_manager_id: data.user.id })
+              .eq('id', newUser.organization_id);
 
-          if (employeeError) {
-            console.error('Error creating employee record:', employeeError);
-            // Don't throw - user was created, just warn about employee
-            toast({
-              title: "Warning",
-              description: "User created but failed to add to company. Please assign manually.",
-              variant: "destructive",
-            });
+            if (orgError) {
+              console.error('Error assigning organization manager:', orgError);
+              toast({
+                title: "Warning",
+                description: "User created but failed to assign to organization. Please assign manually.",
+                variant: "destructive",
+              });
+            } else {
+              toast({
+                title: "Success",
+                description: "User created and assigned as Organization Manager.",
+              });
+            }
+          }
+          // For Company Manager - assign to company
+          else if (newUser.role === 'manager' && newUser.company_id) {
+            const { error: companyError } = await supabase
+              .from('companies')
+              .update({ company_manager_id: data.user.id })
+              .eq('id', newUser.company_id);
+
+            if (companyError) {
+              console.error('Error assigning company manager:', companyError);
+              toast({
+                title: "Warning",
+                description: "User created but failed to assign to company. Please assign manually.",
+                variant: "destructive",
+              });
+            } else {
+              toast({
+                title: "Success",
+                description: "User created and assigned as Company Manager.",
+              });
+            }
+          }
+          // For Employee - create employee record
+          else if (newUser.role === 'employee' && newUser.company_id) {
+            const nameParts = newUser.full_name.trim().split(' ');
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+            
+            const { error: employeeError } = await supabase
+              .from('employees')
+              .insert({
+                user_id: data.user.id,
+                email: newUser.email,
+                first_name: firstName,
+                last_name: lastName,
+                company_id: newUser.company_id,
+                status: 'active',
+                hire_date: new Date().toISOString().split('T')[0]
+              });
+
+            if (employeeError) {
+              console.error('Error creating employee record:', employeeError);
+              toast({
+                title: "Warning",
+                description: "User created but failed to add to company. Please assign manually.",
+                variant: "destructive",
+              });
+            } else {
+              toast({
+                title: "Success",
+                description: "User created and added to company successfully.",
+              });
+            }
           } else {
             toast({
               title: "Success",
-              description: "User created and added to company successfully.",
+              description: "User created successfully. Welcome email will be sent shortly.",
             });
           }
         } else {
@@ -654,6 +703,45 @@ export default function UserManagement() {
       // Update user role
       await updateUserRole(editingUser.user_id, editingUser.role as any);
 
+      // Handle role-specific assignments
+      // For Organization Manager - update organization assignment
+      if (editingUser.role === 'operations_manager' && editingUser.organization_id) {
+        // First, remove from any previously assigned organization
+        await supabase
+          .from('organizations')
+          .update({ organization_manager_id: null })
+          .eq('organization_manager_id', editingUser.user_id);
+        
+        // Then assign to new organization
+        const { error: orgError } = await supabase
+          .from('organizations')
+          .update({ organization_manager_id: editingUser.user_id })
+          .eq('id', editingUser.organization_id);
+
+        if (orgError) {
+          console.error('Error assigning organization manager:', orgError);
+        }
+      }
+      
+      // For Company Manager - update company assignment
+      if (editingUser.role === 'manager' && editingUser.company_id) {
+        // First, remove from any previously assigned company
+        await supabase
+          .from('companies')
+          .update({ company_manager_id: null })
+          .eq('company_manager_id', editingUser.user_id);
+        
+        // Then assign to new company
+        const { error: companyError } = await supabase
+          .from('companies')
+          .update({ company_manager_id: editingUser.user_id })
+          .eq('id', editingUser.company_id);
+
+        if (companyError) {
+          console.error('Error assigning company manager:', companyError);
+        }
+      }
+      
       // Handle employee company assignment
       if (editingUser.role === 'employee' && editingUser.company_id) {
         // Check if employee record already exists
@@ -1238,6 +1326,79 @@ export default function UserManagement() {
                     </Select>
                   </div>
                   
+                  {/* Show Organization dropdown for Organization Manager */}
+                  {newUser.role === 'operations_manager' && (
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="org_select" className="text-right">
+                        Organization
+                      </Label>
+                      <Select 
+                        value={newUser.organization_id} 
+                        onValueChange={(value) => setNewUser({ ...newUser, organization_id: value })}
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Select organization" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {organizations.map((org) => (
+                            <SelectItem key={org.id} value={org.id}>
+                              {org.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  
+                  {/* Show Organization/Company dropdowns for Company Manager role */}
+                  {newUser.role === 'manager' && (
+                    <>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="org_select" className="text-right">
+                          Organization
+                        </Label>
+                        <Select 
+                          value={newUser.organization_id} 
+                          onValueChange={(value) => setNewUser({ ...newUser, organization_id: value, company_id: "" })}
+                        >
+                          <SelectTrigger className="col-span-3">
+                            <SelectValue placeholder="Select organization" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {organizations.map((org) => (
+                              <SelectItem key={org.id} value={org.id}>
+                                {org.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="company_select" className="text-right">
+                          Company
+                        </Label>
+                        <Select 
+                          value={newUser.company_id} 
+                          onValueChange={(value) => setNewUser({ ...newUser, company_id: value })}
+                          disabled={!newUser.organization_id}
+                        >
+                          <SelectTrigger className="col-span-3">
+                            <SelectValue placeholder={newUser.organization_id ? "Select company" : "Select organization first"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {companies
+                              .filter((company) => company.organization_id === newUser.organization_id)
+                              .map((company) => (
+                                <SelectItem key={company.id} value={company.id}>
+                                  {company.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
+                  
                   {/* Show Organization/Company dropdowns for Employee role */}
                   {newUser.role === 'employee' && (
                     <>
@@ -1503,11 +1664,22 @@ export default function UserManagement() {
                         variant="outline"
                         size="sm"
                         onClick={async () => {
-                          // Load employee's current company/organization
+                          // Load current org/company based on role
                           let orgId: string | undefined;
                           let companyId: string | undefined;
                           
-                          if (userProfile.role === 'employee') {
+                          if (userProfile.role === 'operations_manager') {
+                            // Find organization where this user is the manager
+                            const org = organizations.find(o => o.organization_manager_id === userProfile.user_id);
+                            orgId = org?.id;
+                          } else if (userProfile.role === 'manager') {
+                            // Find company where this user is the manager
+                            const company = companies.find(c => c.company_manager_id === userProfile.user_id);
+                            if (company) {
+                              companyId = company.id;
+                              orgId = company.organization_id;
+                            }
+                          } else if (userProfile.role === 'employee') {
                             const { data: employee } = await supabase
                               .from('employees')
                               .select('company_id')
@@ -1608,6 +1780,79 @@ export default function UserManagement() {
                   </SelectContent>
                 </Select>
               </div>
+              
+              {/* Show Organization dropdown for Organization Manager */}
+              {editingUser.role === 'operations_manager' && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="edit_org_select" className="text-right">
+                    Organization
+                  </Label>
+                  <Select 
+                    value={editingUser.organization_id || ""} 
+                    onValueChange={(value) => setEditingUser({ ...editingUser, organization_id: value })}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Select organization" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {organizations.map((org) => (
+                        <SelectItem key={org.id} value={org.id}>
+                          {org.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
+              {/* Show Organization/Company dropdowns for Company Manager role */}
+              {editingUser.role === 'manager' && (
+                <>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit_org_select" className="text-right">
+                      Organization
+                    </Label>
+                    <Select 
+                      value={editingUser.organization_id || ""} 
+                      onValueChange={(value) => setEditingUser({ ...editingUser, organization_id: value, company_id: undefined })}
+                    >
+                      <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Select organization" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {organizations.map((org) => (
+                          <SelectItem key={org.id} value={org.id}>
+                            {org.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit_company_select" className="text-right">
+                      Company
+                    </Label>
+                    <Select 
+                      value={editingUser.company_id || ""} 
+                      onValueChange={(value) => setEditingUser({ ...editingUser, company_id: value })}
+                      disabled={!editingUser.organization_id}
+                    >
+                      <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder={editingUser.organization_id ? "Select company" : "Select organization first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies
+                          .filter((company) => company.organization_id === editingUser.organization_id)
+                          .map((company) => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
               
               {/* Show Organization/Company dropdowns for Employee role */}
               {editingUser.role === 'employee' && (
