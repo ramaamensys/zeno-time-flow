@@ -1677,14 +1677,7 @@ export default function SchedulerSchedule() {
                       </div>
                     ) : (
                       <div>
-                        <p className="mb-2">No employees found</p>
-                        <Button 
-                          size="sm" 
-                          onClick={() => navigate('/user-management')}
-                        >
-                          <Users className="h-3 w-3 mr-1" />
-                          Add Employee
-                        </Button>
+                        <p className="text-muted-foreground text-sm">No employees found. Add employees via User Management.</p>
                       </div>
                     )}
                   </div>
