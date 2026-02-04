@@ -1264,6 +1264,8 @@ export default function SchedulerSchedule() {
           onDuplicateWeek={handleDuplicateWeek}
           onPrint={printSchedule}
           onDownload={downloadSchedule}
+          isEmployeeView={isEmployeeView}
+          currentEmployeeId={employeeRecord?.id}
         />
       </div>
 
