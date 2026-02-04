@@ -52,6 +52,7 @@ export interface Employee {
   status: string;
   company_id: string | null;
   department_id?: string;
+  team_id?: string | null;
   position?: string;
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
@@ -65,6 +66,7 @@ export interface Shift {
   employee_id: string;
   company_id: string;
   department_id?: string;
+  team_id?: string | null;
   start_time: string;
   end_time: string;
   break_minutes?: number;
