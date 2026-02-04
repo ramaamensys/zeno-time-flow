@@ -61,7 +61,10 @@ const handler = async (req: Request): Promise<Response> => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       console.error('No authorization header provided');
-      return new Response(JSON.stringify({ error: 'Unauthorized - missing authorization header' }), {
+      return new Response(JSON.stringify({ 
+        error: 'You must be logged in to create users',
+        code: 'UNAUTHORIZED'
+      }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -72,7 +75,10 @@ const handler = async (req: Request): Promise<Response> => {
     
     if (!serviceRoleKey) {
       console.error('SUPABASE_SERVICE_ROLE_KEY not configured');
-      return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+      return new Response(JSON.stringify({ 
+        error: 'Server is not properly configured. Please contact support.',
+        code: 'SERVER_CONFIG_ERROR'
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -92,7 +98,10 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: { user }, error: userError } = await userSupabase.auth.getUser();
     if (userError || !user) {
       console.error('Failed to get user:', userError);
-      return new Response(JSON.stringify({ error: 'Invalid authentication' }), {
+      return new Response(JSON.stringify({ 
+        error: 'Your session has expired. Please log in again.',
+        code: 'SESSION_EXPIRED'
+      }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -110,7 +119,10 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (roleError || !hasPermission) {
       console.error('User is not authorized:', { userId: user.id, roles });
-      return new Response(JSON.stringify({ error: 'Insufficient permissions - admin, org manager, or company manager required' }), {
+      return new Response(JSON.stringify({ 
+        error: 'You do not have permission to create users. Only Super Admins, Organization Managers, and Company Managers can create users.',
+        code: 'INSUFFICIENT_PERMISSIONS'
+      }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -123,7 +135,10 @@ const handler = async (req: Request): Promise<Response> => {
     try {
       requestBody = await req.json();
     } catch {
-      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid request format. Please try again.',
+        code: 'INVALID_REQUEST'
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -132,8 +147,30 @@ const handler = async (req: Request): Promise<Response> => {
     const validationResult = CreateUserSchema.safeParse(requestBody);
     if (!validationResult.success) {
       console.error('Validation failed:', validationResult.error.issues);
+      
+      // Create human-readable error messages
+      const errorMessages = validationResult.error.issues.map(issue => {
+        const field = issue.path.join('.');
+        switch (field) {
+          case 'email':
+            return 'Please enter a valid email address';
+          case 'full_name':
+            return 'Please enter a valid name (letters, numbers, spaces, hyphens allowed)';
+          case 'password':
+            if (issue.message.includes('at least 8')) {
+              return 'Password must be at least 8 characters long';
+            }
+            return 'Please enter a valid password';
+          case 'role':
+            return 'Please select a valid role';
+          default:
+            return issue.message;
+        }
+      });
+      
       return new Response(JSON.stringify({ 
-        error: 'Invalid input', 
+        error: errorMessages.join('. '),
+        code: 'VALIDATION_ERROR',
         details: validationResult.error.issues.map(issue => ({
           field: issue.path.join('.'),
           message: issue.message
@@ -149,8 +186,12 @@ const handler = async (req: Request): Promise<Response> => {
     // Verify caller can create users with the specified role
     if (!canCreateRole(callerRoles, role)) {
       console.error('User cannot create role:', { callerRoles, targetRole: role });
+      const roleDisplayName = role === 'operations_manager' ? 'Organization Manager' : 
+                             role === 'manager' ? 'Company Manager' :
+                             role.charAt(0).toUpperCase() + role.slice(1);
       return new Response(JSON.stringify({ 
-        error: `Cannot create user with role '${role}' - insufficient permissions` 
+        error: `You don't have permission to create a ${roleDisplayName}. You can only create users with roles below your own level.`,
+        code: 'ROLE_PERMISSION_DENIED'
       }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -293,10 +334,31 @@ const handler = async (req: Request): Promise<Response> => {
 
   } catch (error: unknown) {
     console.error("Error in create-user function:", error);
-    const errorMessage = error instanceof Error ? error.message : "Failed to create user";
+    
+    let userFriendlyMessage = "Something went wrong while creating the user. Please try again.";
+    
+    if (error instanceof Error) {
+      const msg = error.message.toLowerCase();
+      
+      if (msg.includes('already') || msg.includes('exists') || msg.includes('registered')) {
+        userFriendlyMessage = "A user with this email already exists. Please use a different email address.";
+      } else if (msg.includes('password')) {
+        userFriendlyMessage = "Password doesn't meet the requirements. Please use at least 8 characters.";
+      } else if (msg.includes('email')) {
+        userFriendlyMessage = "Please enter a valid email address.";
+      } else if (msg.includes('network') || msg.includes('fetch')) {
+        userFriendlyMessage = "Network error. Please check your connection and try again.";
+      } else if (msg.includes('timeout')) {
+        userFriendlyMessage = "The request took too long. Please try again.";
+      } else if (error.message) {
+        userFriendlyMessage = error.message;
+      }
+    }
+    
     return new Response(
       JSON.stringify({ 
-        error: errorMessage
+        error: userFriendlyMessage,
+        code: 'CREATE_USER_ERROR'
       }),
       {
         status: 500,
