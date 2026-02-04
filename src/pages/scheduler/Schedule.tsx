@@ -26,6 +26,7 @@ import SavedSchedulesCard, { SavedSchedule } from "@/components/scheduler/SavedS
 import AssignShiftModal from "@/components/scheduler/AssignShiftModal";
 import MissedShiftRequestModal from "@/components/scheduler/MissedShiftRequestModal";
 import EmployeeScheduleGrid from "@/components/scheduler/EmployeeScheduleGrid";
+import ConnecteamScheduleGrid from "@/components/scheduler/ConnecteamScheduleGrid";
 import QuickShiftModal from "@/components/scheduler/QuickShiftModal";
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -1103,8 +1104,10 @@ export default function SchedulerSchedule() {
     }
   };
 
+  const weekLabel = `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+
   return (
-    <div className="space-y-6 p-6">
+    <div className="h-full flex flex-col">
       <style dangerouslySetInnerHTML={{
         __html: `
           @media print {
@@ -1126,61 +1129,22 @@ export default function SchedulerSchedule() {
           }
         `
       }} />
-      <div className="flex items-center justify-between no-print">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {isEmployeeView ? 'Team Schedule' : 'Schedule Management'}
-          </h1>
-          <p className="text-muted-foreground">
-            {isEmployeeView 
-              ? 'View your team\'s schedule and shifts'
-              : 'Manage employee schedules and shift assignments'}
-          </p>
+      
+      {/* Page Header - Connecteam Style */}
+      <div className="flex items-center justify-between px-6 py-4 border-b bg-card no-print">
+        <div className="flex items-center gap-3">
+          <Calendar className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-bold">Schedule</h1>
         </div>
-      {canManageShifts && (
-          <div className="flex items-center gap-2">
-            <Button onClick={() => setShowCreateShift(true)} disabled={!selectedCompany}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add New Schedule
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between no-print">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => navigateWeek('prev')}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => navigateWeek('next')}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <div className="flex items-center gap-2 ml-2">
-              <Calendar className="h-4 w-4" />
-              <span className="font-medium">
-                {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
+        
+        <div className="flex items-center gap-3">
           {/* Organization dropdown - Only for super admins */}
           {userRole === 'super_admin' && (
             <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
-              <SelectTrigger className="w-[200px] bg-background">
+              <SelectTrigger className="w-[180px] bg-background">
                 <SelectValue placeholder="Select organization" />
               </SelectTrigger>
-              <SelectContent className="bg-background border shadow-lg z-50">
+              <SelectContent className="bg-popover border shadow-lg z-50">
                 {organizations.map((org) => (
                   <SelectItem key={org.id} value={org.id}>
                     {org.name}
@@ -1193,12 +1157,12 @@ export default function SchedulerSchedule() {
           {/* Company dropdown */}
           <Select value={selectedCompany} onValueChange={(value) => {
             setSelectedCompany(value);
-            setSelectedDepartment("all"); // Reset department when company changes
+            setSelectedDepartment("all");
           }}>
-            <SelectTrigger className="w-[200px] bg-background">
+            <SelectTrigger className="w-[180px] bg-background">
               <SelectValue placeholder="Select company" />
             </SelectTrigger>
-            <SelectContent className="bg-background border shadow-lg z-50">
+            <SelectContent className="bg-popover border shadow-lg z-50">
               {schedulableCompanies.map((company) => (
                 <SelectItem key={company.id} value={company.id}>
                   {company.name}
@@ -1207,13 +1171,13 @@ export default function SchedulerSchedule() {
             </SelectContent>
           </Select>
 
-          {/* Department dropdown - Only show when company is selected */}
+          {/* Department dropdown */}
           {selectedCompany && departments.length > 0 && (
             <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-              <SelectTrigger className="w-[180px] bg-background">
-                <SelectValue placeholder="Select department *" />
+              <SelectTrigger className="w-[160px] bg-background">
+                <SelectValue placeholder="Department" />
               </SelectTrigger>
-              <SelectContent className="bg-background border shadow-lg z-50">
+              <SelectContent className="bg-popover border shadow-lg z-50">
                 <SelectItem value="all">All Departments</SelectItem>
                 {departments.map((dept) => (
                   <SelectItem key={dept.id} value={dept.id}>
@@ -1226,594 +1190,41 @@ export default function SchedulerSchedule() {
         </div>
       </div>
 
-
-      {/* Main Layout: Schedule Grid + Employee Sidebar */}
-      <div className={`grid grid-cols-1 ${canManageShifts ? 'xl:grid-cols-4' : ''} gap-6`}>
-        {/* Schedule Grid - Takes 3/4 of the space for admins, full width for employees */}
-        <div className={`${canManageShifts ? 'xl:col-span-3' : ''} print-schedule`}>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-4">
-                  <span>{weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                  
-                  {/* View Mode Toggle */}
-                  <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'employee' | 'slot')} className="hidden sm:block">
-                    <TabsList className="h-8">
-                      <TabsTrigger value="employee" className="text-xs px-3 h-7">
-                        <Users className="h-3 w-3 mr-1" />
-                        By Employee
-                      </TabsTrigger>
-                      <TabsTrigger value="slot" className="text-xs px-3 h-7">
-                        <LayoutGrid className="h-3 w-3 mr-1" />
-                        By Shift
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  {canManageShifts && (
-                    <>
-                      <Button 
-                        variant={isEditMode ? "secondary" : "outline"} 
-                        size="sm"
-                        onClick={() => setIsEditMode(!isEditMode)}
-                        disabled={!selectedCompany}
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        {isEditMode ? "Exit Edit" : "Edit Schedule"}
-                      </Button>
-                      <Button 
-                        variant="default" 
-                        size="sm"
-                        onClick={() => {
-                          setEditingTemplate(null);
-                          setShowSaveScheduleModal(true);
-                        }}
-                        disabled={!selectedCompany || shifts.length === 0}
-                      >
-                        <Save className="h-4 w-4 mr-1" />
-                        Save Schedule
-                      </Button>
-                    </>
-                  )}
-                  <Button variant="outline" size="sm" onClick={printSchedule} disabled={!selectedCompany}>
-                    <Printer className="h-4 w-4 mr-1" />
-                    Print
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={downloadSchedule} disabled={!selectedCompany}>
-                    <Download className="h-4 w-4 mr-1" />
-                    Download
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" disabled={!selectedCompany}>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-background border shadow-lg">
-                      <DropdownMenuItem onClick={handleDuplicateWeek} disabled={shifts.length === 0}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Duplicate Week
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={handleClearWeek} 
-                        disabled={shifts.length === 0}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Clear Week
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {/* Employee-based view (Connecteam-style) */}
-              {viewMode === 'employee' ? (
-                <EmployeeScheduleGrid
-                  employees={employees.filter(e => selectedDepartment === "all" || e.department_id === selectedDepartment)}
-                  shifts={showScheduleShifts || isEmployeeView ? shifts : []}
-                  weekDates={weekDates}
-                  isEditMode={isEditMode}
-                  canManageShifts={canManageShifts}
-                  getEmployeeName={getEmployeeName}
-                  getAvailabilityStatus={getAvailabilityStatus}
-                  onDragStart={handleDragStart}
-                  onDragOver={handleDragOver}
-                  onDrop={handleEmployeeGridDrop}
-                  onDragEnd={handleDragEnd}
-                  onShiftClick={(shift) => {
-                    setSelectedShift(shift);
-                    setShowEditShift(true);
-                  }}
-                  onAddShift={handleAddShiftFromGrid}
-                  onDeleteShift={deleteShift}
-                  onSetAvailability={setEmployeeAvailability}
-                  checkShiftConflict={checkShiftConflict}
-                />
-              ) : (
-              <div className="grid grid-cols-8 gap-2">
-                {/* Header row */}
-                <div className="font-medium text-sm text-muted-foreground p-2">
-                  Shift / Day
-                </div>
-                {days.map((day, index) => (
-                  <div key={day} className="font-medium text-sm text-center p-2 border rounded relative group">
-                    <div>{day}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {weekDates[index].getDate()}
-                    </div>
-                    {/* Day edit button - only show for managers in edit mode */}
-                    {canManageShifts && isEditMode && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                        >
-                          <MoreHorizontal className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-background border shadow-lg">
-                        <DropdownMenuItem 
-                          onClick={() => handleClearDay(index)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Clear Day
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    )}
-                  </div>
-                ))}
-
-                {/* Shift rows */}
-                {shiftSlots.map((slot) => (
-                  <div key={slot.id} className="contents">
-                    <div className="font-medium text-sm p-3 border rounded bg-muted/50 relative group">
-                      <div>{slot.name}</div>
-                      <div className="text-xs text-muted-foreground">{slot.time}</div>
-                      {/* Slot edit button - only for admins */}
-                      {canManageShifts && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                          >
-                            <MoreHorizontal className="h-3 w-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => {
-                            setEditingSlot(slot);
-                            setShowSlotEditModal(true);
-                          }}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit Slot Times
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => {
-                            // TODO: Implement bulk assign functionality
-                            alert('Bulk assign functionality coming soon!');
-                          }}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Bulk Assign
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      )}
-                    </div>
-                    
-                    {days.map((_, dayIndex) => {
-                      const dayShifts = getShiftsForDayAndSlot(dayIndex, slot.id);
-                      const isDropTarget = draggedEmployee !== null && isEditMode;
-                      
-                      return (
-                        <div 
-                          key={dayIndex} 
-                          className={`min-h-[100px] border rounded p-2 space-y-1 transition-colors ${
-                            isDropTarget && canManageShifts ? 'border-primary/50 bg-primary/5' : ''
-                          }`}
-                          onDragOver={canManageShifts && isEditMode ? handleDragOver : undefined}
-                          onDrop={canManageShifts && isEditMode ? (e) => handleDrop(e, dayIndex, slot.id) : undefined}
-                        >
-                          {dayShifts.map((shift) => {
-                            const employeeName = getEmployeeName(shift.employee_id);
-                            const startTime = new Date(shift.start_time);
-                            const endTime = new Date(shift.end_time);
-                            const isMyShift = employeeRecord && shift.employee_id === employeeRecord.id;
-                            const isMissed = (shift as any).is_missed === true;
-                            const hasReplacement = !!(shift as any).replacement_employee_id;
-                            const replacementName = hasReplacement ? getEmployeeName((shift as any).replacement_employee_id) : null;
-                            const replacementStarted = !!(shift as any).replacement_started_at;
-                            const shiftStatus = shift.status;
-                            
-                            // Determine if the shift is being actively covered
-                            const isReplacementActive = replacementStarted || shiftStatus === 'in_progress';
-                            
-                            // Check if this is a coworker's missed shift that employee can request
-                            const isCoworkerMissedShift = isEmployeeView && isMissed && !isMyShift && !hasReplacement && employeeRecord;
-                            const hasPendingRequest = myPendingRequests.includes(shift.id);
-                            const canRequestShift = isCoworkerMissedShift && !hasPendingRequest;
-                            
-                            // Get company and department names for the request modal
-                            const company = schedulableCompanies.find(c => c.id === shift.company_id);
-                            const department = departments.find(d => d.id === shift.department_id);
-                            
-                            const handleShiftClick = () => {
-                              if (isEditMode && canManageShifts) {
-                                handleEditShift(shift);
-                              } else if (canRequestShift) {
-                                setMissedShiftToRequest({
-                                  id: shift.id,
-                                  employee_id: shift.employee_id,
-                                  company_id: shift.company_id || '',
-                                  start_time: shift.start_time,
-                                  end_time: shift.end_time,
-                                  employeeName,
-                                  companyName: company?.name,
-                                  departmentName: department?.name
-                                });
-                              }
-                            };
-                            
-                            // Determine the card styling based on shift state
-                            const getShiftCardStyle = () => {
-                              // If replacement is active, show green (in progress) styling
-                              if (isReplacementActive) {
-                                return 'bg-green-50 border-green-300 dark:bg-green-900/20 dark:border-green-700';
-                              }
-                              // If missed but has pending replacement, show yellow/warning
-                              if (isMissed && hasReplacement && !isReplacementActive) {
-                                return 'bg-yellow-50 border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-700';
-                              }
-                              // If missed without replacement
-                              if (isMissed) {
-                                return 'bg-destructive/10 border-destructive/30 dark:bg-destructive/20 dark:border-destructive/50';
-                              }
-                              // Current user's shift
-                              if (isMyShift) {
-                                return 'bg-green-100 border-green-300 dark:bg-green-900/30 dark:border-green-700 ring-2 ring-green-500/50';
-                              }
-                              // Employee view of other's shifts
-                              if (isEmployeeView) {
-                                return 'bg-muted/50 border-muted-foreground/20';
-                              }
-                              // Default
-                              return 'bg-primary/10 border-primary/20';
-                            };
-                            
-                            return (
-                              <TooltipProvider key={shift.id}>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div
-                                      className={`group relative flex flex-col gap-1 p-2 rounded border ${getShiftCardStyle()} ${isEditMode && canManageShifts ? 'cursor-move hover:bg-primary/20' : ''} ${
-                                        canRequestShift ? 'cursor-pointer hover:bg-destructive/20 hover:border-destructive/50' : ''
-                                      } ${hasPendingRequest ? 'opacity-60' : ''}`}
-                                      onClick={handleShiftClick}
-                                      draggable={isEditMode && canManageShifts && !isMissed}
-                                      onDragStart={isEditMode && canManageShifts && !isMissed ? (e) => handleDragStart(e, shift.employee_id, shift) : undefined}
-                                      onDragEnd={isEditMode && canManageShifts ? handleDragEnd : undefined}
-                                    >
-                                  {/* Original Employee Row */}
-                                  <div className="flex items-center gap-2">
-                                    <Avatar className={`h-6 w-6 ${isMyShift ? 'ring-2 ring-green-500' : ''} ${isMissed ? 'opacity-50' : ''}`}>
-                                      <AvatarFallback className={`text-xs ${isMyShift ? 'bg-green-500 text-white' : ''} ${isMissed ? 'bg-red-300' : ''}`}>
-                                        {employeeName.split(' ').map(n => n[0]).join('')}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1 min-w-0">
-                                      <div className={`text-xs font-medium truncate ${
-                                        isMissed 
-                                          ? 'line-through text-red-600 dark:text-red-400' 
-                                          : isMyShift 
-                                            ? 'text-green-700 dark:text-green-300' 
-                                            : ''
-                                      }`}>
-                                        {employeeName}
-                                        {isMyShift && isEmployeeView && (
-                                          <span className="ml-1 text-[10px] font-normal text-green-600 dark:text-green-400">(You)</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                      {/* Show status badge based on shift state */}
-                                      {isMissed && !hasReplacement && (
-                                        <Badge variant="destructive" className="text-[10px] h-4 px-1">Missed</Badge>
-                                      )}
-                                      {isMissed && hasReplacement && isReplacementActive && (
-                                        <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-green-500/20 text-green-700">Covered</Badge>
-                                      )}
-                                      {isMissed && hasReplacement && !isReplacementActive && (
-                                        <Badge variant="destructive" className="text-[10px] h-4 px-1">Missed</Badge>
-                                      )}
-                                      {hasPendingRequest && (
-                                        <Badge variant="secondary" className="text-[10px] h-4 px-1">Requested</Badge>
-                                      )}
-                                      {isEditMode && canManageShifts && (
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100">
-                                              <MoreHorizontal className="h-3 w-3" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleEditShift(shift);
-                                            }}>
-                                              <Edit className="h-4 w-4 mr-2" />
-                                              Edit Shift
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={(e) => {
-                                              e.stopPropagation();
-                                              deleteShift(shift.id);
-                                            }}>
-                                              <Trash2 className="h-4 w-4 mr-2" />
-                                              Delete Shift
-                                            </DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                      )}
-                                    </div>
-                                    
-                                    {/* Replacement Employee Row (if applicable) */}
-                                    {hasReplacement && replacementName && (
-                                      <div className="flex items-center gap-2 pt-1 border-t border-dashed mt-1">
-                                        <Avatar className={`h-5 w-5 ${isReplacementActive ? 'ring-2 ring-green-500' : 'ring-1 ring-yellow-400'}`}>
-                                          <AvatarFallback className={`text-[10px] ${isReplacementActive ? 'bg-green-500' : 'bg-yellow-500'} text-white`}>
-                                            {replacementName.split(' ').map(n => n[0]).join('')}
-                                          </AvatarFallback>
-                                        </Avatar>
-                                        <div className="flex-1 min-w-0">
-                                          <div className={`text-[10px] font-medium truncate ${isReplacementActive ? 'text-green-700 dark:text-green-400' : 'text-yellow-700 dark:text-yellow-400'}`}>
-                                            {replacementName}
-                                          </div>
-                                        </div>
-                                        <Badge variant="secondary" className={`text-[9px] h-3.5 px-1 ${
-                                          isReplacementActive 
-                                            ? 'bg-green-500/20 text-green-700' 
-                                            : 'bg-yellow-500/20 text-yellow-700'
-                                        }`}>
-                                          {isReplacementActive ? 'Clocked In' : 'Approved'}
-                                        </Badge>
-                                      </div>
-                                    )}
-                                  </div>
-                                </TooltipTrigger>
-                                {canRequestShift && (
-                                  <TooltipContent>
-                                    <p>Click to request covering this shift</p>
-                                  </TooltipContent>
-                                )}
-                              </Tooltip>
-                            </TooltipProvider>
-                            );
-                          })}
-                          {dayShifts.length === 0 && canManageShifts && isEditMode && (
-                            <div
-                              className={`w-full h-full min-h-[60px] border-2 border-dashed rounded flex items-center justify-center transition-colors ${
-                                isDropTarget 
-                                  ? 'border-primary bg-primary/10 text-primary' 
-                                  : 'border-muted-foreground/25 text-muted-foreground hover:border-primary hover:text-primary'
-                              }`}
-                            >
-                              {isDropTarget ? (
-                                <div className="text-xs text-center">
-                                  Drop employee here<br/>
-                                  <span className="text-xs opacity-70">{slot.time}</span>
-                                </div>
-                              ) : (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="w-full h-full"
-                                  onClick={() => handleAddShift(dayIndex, slot.id)}
-                                  disabled={!selectedCompany}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          )}
-                          {dayShifts.length === 0 && canManageShifts && !isEditMode && (
-                            <div className="w-full h-full min-h-[60px] border-2 border-dashed rounded flex items-center justify-center text-muted-foreground/50">
-                              <span className="text-xs">Empty</span>
-                            </div>
-                          )}
-                          {dayShifts.length === 0 && !canManageShifts && (
-                            <div className="w-full h-full min-h-[60px] border-2 border-dashed rounded flex items-center justify-center text-muted-foreground/50">
-                              <span className="text-xs">No shifts</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Sidebar - Available Employees (only for admins) */}
-        {canManageShifts && (
-        <div className="xl:col-span-1 no-print">
-          <Card className="sticky top-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="h-5 w-5" />
-                Employees
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {isEditMode ? 'Drag to schedule slots' : 'Enable Edit Mode to schedule'}
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                {isEmployeeSidebarLoading ? (
-                  <div className="text-center text-muted-foreground py-8">
-                    Loading...
-                  </div>
-                ) : employees.length === 0 ? (
-                  <div className="text-center text-muted-foreground py-8">
-                    {!selectedCompany ? (
-                      <div>
-                        <p className="mb-2">Select a company</p>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => setShowCreateCompany(true)}
-                        >
-                          <Building className="h-3 w-3 mr-1" />
-                          Add Company
-                        </Button>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-muted-foreground text-sm">No employees found. Add employees via User Management.</p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  employees
-                    .filter(employee => selectedDepartment === "all" || employee.department_id === selectedDepartment)
-                    .map((employee) => {
-                      const department = departments.find(d => d.id === employee.department_id);
-                      const isDragging = draggedEmployee === employee.id;
-                      
-                      return (
-                        <div 
-                          key={employee.id} 
-                          className={`group flex flex-col gap-2 p-3 rounded border transition-all hover:shadow-sm ${
-                            isDragging ? 'opacity-50 scale-95' : ''
-                          } ${employee.status === 'active' ? 'border-green-200 bg-green-50/50' : 'border-gray-200'} ${
-                            isEditMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
-                          }`}
-                          draggable={isEditMode}
-                          onDragStart={isEditMode ? (e) => handleDragStart(e, employee.id) : undefined}
-                          onDragEnd={isEditMode ? handleDragEnd : undefined}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback className="text-xs">
-                                {employee.first_name[0]}{employee.last_name[0]}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm truncate">
-                                {employee.first_name} {employee.last_name}
-                              </div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {employee.position || 'Employee'}
-                              </div>
-                            </div>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                                >
-                                  <MoreHorizontal className="h-3 w-3" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleOpenEditEmployee(employee)}>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit Employee
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Calendar className="h-4 w-4 mr-2" />
-                                  View Schedule
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                          
-                          <div className="flex items-center justify-between">
-                            <div className="flex gap-1">
-                              <Badge 
-                                variant={employee.status === 'active' ? 'default' : 'secondary'} 
-                                className="text-xs"
-                              >
-                                {employee.status}
-                              </Badge>
-                              {department && (
-                                <Badge variant="outline" className="text-xs">
-                                  {department.name}
-                                </Badge>
-                              )}
-                            </div>
-                            {employee.hourly_rate && (
-                              <span className="text-xs font-medium text-green-600">
-                                ${employee.hourly_rate}/hr
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        )}
-      </div>
-      {/* Schedule Summary */}
-      <div className="mt-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Week Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Shifts:</span>
-                <span className="font-medium">{shifts.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Confirmed:</span>
-                <span className="font-medium text-green-600">
-                  {shifts.filter(s => s.status === 'confirmed').length}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Scheduled:</span>
-                <span className="font-medium text-blue-600">
-                  {shifts.filter(s => s.status === 'scheduled').length}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Pending:</span>
-                <span className="font-medium text-yellow-600">
-                  {shifts.filter(s => s.status === 'pending').length}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Hours:</span>
-                <span className="font-medium">
-                  {shifts.reduce((total, shift) => {
-                    const start = new Date(shift.start_time);
-                    const end = new Date(shift.end_time);
-                    const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-                    return total + hours;
-                  }, 0).toFixed(1)}h
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Main Connecteam-Style Grid */}
+      <div className="flex-1 p-4 overflow-hidden print-schedule">
+        <ConnecteamScheduleGrid
+          employees={employees.filter(e => selectedDepartment === "all" || e.department_id === selectedDepartment)}
+          shifts={showScheduleShifts || isEmployeeView ? shifts : []}
+          weekDates={weekDates}
+          isEditMode={isEditMode}
+          canManageShifts={canManageShifts}
+          getEmployeeName={getEmployeeName}
+          getAvailabilityStatus={getAvailabilityStatus}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDrop={handleEmployeeGridDrop}
+          onDragEnd={handleDragEnd}
+          onShiftClick={(shift) => {
+            setSelectedShift(shift);
+            setShowEditShift(true);
+          }}
+          onAddShift={handleAddShiftFromGrid}
+          onDeleteShift={deleteShift}
+          onSetAvailability={setEmployeeAvailability}
+          checkShiftConflict={checkShiftConflict}
+          onNavigateWeek={navigateWeek}
+          weekLabel={weekLabel}
+          onToggleEditMode={() => setIsEditMode(!isEditMode)}
+          onSaveSchedule={() => {
+            setEditingTemplate(null);
+            setShowSaveScheduleModal(true);
+          }}
+          onAddNewSchedule={() => setShowCreateShift(true)}
+          onClearWeek={handleClearWeek}
+          onDuplicateWeek={handleDuplicateWeek}
+          onPrint={printSchedule}
+          onDownload={downloadSchedule}
+        />
       </div>
 
       {/* Saved Schedules Section */}
