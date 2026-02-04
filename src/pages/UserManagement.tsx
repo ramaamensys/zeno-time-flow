@@ -44,6 +44,8 @@ interface UserProfile {
   manager_id?: string;
   manager_name?: string;
   field_type?: 'IT' | 'Non-IT';
+  organization_id?: string;
+  company_id?: string;
 }
 
 export default function UserManagement() {
@@ -638,6 +640,7 @@ export default function UserManagement() {
     if (!editingUser) return;
 
     try {
+      // Update profile
       const { error } = await supabase
         .from('profiles')
         .update({ 
@@ -647,6 +650,52 @@ export default function UserManagement() {
         .eq('user_id', editingUser.user_id);
 
       if (error) throw error;
+
+      // Update user role
+      await updateUserRole(editingUser.user_id, editingUser.role as any);
+
+      // Handle employee company assignment
+      if (editingUser.role === 'employee' && editingUser.company_id) {
+        // Check if employee record already exists
+        const { data: existingEmployee } = await supabase
+          .from('employees')
+          .select('id, company_id')
+          .or(`user_id.eq.${editingUser.user_id},email.eq.${editingUser.email}`)
+          .single();
+
+        if (existingEmployee) {
+          // Update existing employee record
+          const { error: updateError } = await supabase
+            .from('employees')
+            .update({ company_id: editingUser.company_id })
+            .eq('id', existingEmployee.id);
+          
+          if (updateError) {
+            console.error('Error updating employee company:', updateError);
+          }
+        } else {
+          // Create new employee record
+          const nameParts = editingUser.full_name.trim().split(' ');
+          const firstName = nameParts[0] || '';
+          const lastName = nameParts.slice(1).join(' ') || '';
+          
+          const { error: insertError } = await supabase
+            .from('employees')
+            .insert({
+              user_id: editingUser.user_id,
+              email: editingUser.email,
+              first_name: firstName,
+              last_name: lastName,
+              company_id: editingUser.company_id,
+              status: 'active',
+              hire_date: new Date().toISOString().split('T')[0]
+            });
+
+          if (insertError) {
+            console.error('Error creating employee record:', insertError);
+          }
+        }
+      }
 
       toast({
         title: "Success",
@@ -1453,8 +1502,26 @@ export default function UserManagement() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          setEditingUser(userProfile);
+                        onClick={async () => {
+                          // Load employee's current company/organization
+                          let orgId: string | undefined;
+                          let companyId: string | undefined;
+                          
+                          if (userProfile.role === 'employee') {
+                            const { data: employee } = await supabase
+                              .from('employees')
+                              .select('company_id')
+                              .or(`user_id.eq.${userProfile.user_id},email.eq.${userProfile.email}`)
+                              .single();
+                            
+                            if (employee?.company_id) {
+                              companyId = employee.company_id;
+                              const company = companies.find(c => c.id === companyId);
+                              orgId = company?.organization_id;
+                            }
+                          }
+                          
+                          setEditingUser({ ...userProfile, organization_id: orgId, company_id: companyId });
                           setIsEditDialogOpen(true);
                         }}
                         className="h-8 w-8 p-0"
@@ -1528,7 +1595,7 @@ export default function UserManagement() {
                 </Label>
                 <Select 
                   value={editingUser.role} 
-                  onValueChange={(value: "employee" | "manager" | "operations_manager" | "super_admin") => setEditingUser({ ...editingUser, role: value })}
+                  onValueChange={(value: "employee" | "manager" | "operations_manager" | "super_admin") => setEditingUser({ ...editingUser, role: value, organization_id: undefined, company_id: undefined })}
                 >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select a role" />
@@ -1541,6 +1608,55 @@ export default function UserManagement() {
                   </SelectContent>
                 </Select>
               </div>
+              
+              {/* Show Organization/Company dropdowns for Employee role */}
+              {editingUser.role === 'employee' && (
+                <>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit_org_select" className="text-right">
+                      Organization
+                    </Label>
+                    <Select 
+                      value={editingUser.organization_id || ""} 
+                      onValueChange={(value) => setEditingUser({ ...editingUser, organization_id: value, company_id: undefined })}
+                    >
+                      <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Select organization" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {organizations.map((org) => (
+                          <SelectItem key={org.id} value={org.id}>
+                            {org.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="edit_company_select" className="text-right">
+                      Company
+                    </Label>
+                    <Select 
+                      value={editingUser.company_id || ""} 
+                      onValueChange={(value) => setEditingUser({ ...editingUser, company_id: value })}
+                      disabled={!editingUser.organization_id}
+                    >
+                      <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder={editingUser.organization_id ? "Select company" : "Select organization first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies
+                          .filter((company) => company.organization_id === editingUser.organization_id)
+                          .map((company) => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
             </div>
           )}
           <DialogFooter>
