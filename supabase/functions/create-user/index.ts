@@ -17,7 +17,7 @@ const CreateUserSchema = z.object({
   full_name: z.string()
     .min(1, { message: "Full name is required" })
     .max(100, { message: "Full name must be less than 100 characters" })
-    .regex(/^[a-zA-Z\s\-'\.]+$/, { message: "Full name contains invalid characters" })
+    .regex(/^[a-zA-Z0-9\s\-'\.]+$/, { message: "Full name contains invalid characters" })
     .transform(val => val.trim()),
   role: z.enum(['user', 'admin', 'employee', 'candidate', 'manager', 'operations_manager'], {
     errorMap: () => ({ message: "Invalid role specified" })
