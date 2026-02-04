@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,19 @@ interface EditCompanyModalProps {
   onSuccess: () => void;
 }
 
+// Use the same business types as CreateCompanyModal for consistency
+const COMPANY_TYPES = [
+  { value: "motel", label: "Motel" },
+  { value: "gas_station", label: "Gas Station" },
+  { value: "restaurant", label: "Restaurant" },
+  { value: "retail", label: "Retail Store" },
+  { value: "office", label: "Office" },
+  { value: "warehouse", label: "Warehouse" },
+  { value: "other", label: "Other" }
+];
+
+const colors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#f97316"];
+
 export default function EditCompanyModal({ 
   open, 
   onOpenChange, 
@@ -25,33 +38,39 @@ export default function EditCompanyModal({
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const { updateCompany, deleteCompany } = useCompanies();
+  
+  // Track which company we're editing to detect changes
+  const lastCompanyIdRef = useRef<string | null>(null);
+  
   const [formData, setFormData] = useState({
     name: "",
     type: "",
-    color: "",
+    color: "#3b82f6",
     address: "",
     phone: "",
     email: ""
   });
 
-  const businessTypes = [
-    "Corporation", "LLC", "Partnership", "Sole Proprietorship", 
-    "Non-Profit", "Startup", "Government", "Motel", "Gas Station", 
-    "Restaurant", "Retail Store", "Warehouse", "Other"
-  ];
-
-  const colors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#f97316"];
-
+  // Reset form data when company changes or modal opens with a different company
   useEffect(() => {
     if (open && company) {
-      setFormData({
-        name: company.name || "",
-        type: company.type || "",
-        color: company.color || "#3b82f6",
-        address: company.address || "",
-        phone: company.phone || "",
-        email: company.email || ""
-      });
+      // Always reset form when company ID changes or modal opens
+      if (lastCompanyIdRef.current !== company.id) {
+        lastCompanyIdRef.current = company.id;
+        setFormData({
+          name: company.name || "",
+          type: company.type || "",
+          color: company.color || "#3b82f6",
+          address: company.address || "",
+          phone: company.phone || "",
+          email: company.email || ""
+        });
+      }
+    }
+    
+    // Reset tracking when modal closes
+    if (!open) {
+      lastCompanyIdRef.current = null;
     }
   }, [open, company]);
 
@@ -68,6 +87,8 @@ export default function EditCompanyModal({
 
     try {
       await updateCompany(company.id, formData);
+      
+      // Verify the update was successful
       onSuccess();
       onOpenChange(false);
       toast.success("Company updated successfully!");
@@ -96,24 +117,10 @@ export default function EditCompanyModal({
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      type: "",
-      color: "#3b82f6",
-      address: "",
-      phone: "",
-      email: ""
-    });
-  };
-
   if (!company) return null;
 
   return (
-    <Dialog open={open} onOpenChange={(open) => {
-      onOpenChange(open);
-      if (!open) resetForm();
-    }}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -145,9 +152,9 @@ export default function EditCompanyModal({
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {businessTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
+                  {COMPANY_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
