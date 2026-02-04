@@ -54,6 +54,8 @@ interface ConnecteamScheduleGridProps {
   onDuplicateWeek: () => void;
   onPrint: () => void;
   onDownload: () => void;
+  isEmployeeView?: boolean;
+  currentEmployeeId?: string;
 }
 
 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -89,7 +91,9 @@ export default function ConnecteamScheduleGrid({
   onClearWeek,
   onDuplicateWeek,
   onPrint,
-  onDownload
+  onDownload,
+  isEmployeeView = false,
+  currentEmployeeId
 }: ConnecteamScheduleGridProps) {
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -136,13 +140,18 @@ export default function ConnecteamScheduleGrid({
     };
   };
 
-  // Calculate weekly totals
+  // Calculate weekly totals - for employees, only show their own stats
   const weeklyStats = useMemo(() => {
     let totalHours = 0;
     let totalShifts = 0;
     const uniqueUsers = new Set<string>();
 
-    shifts.forEach(shift => {
+    // Filter shifts for employee view - only count their own shifts
+    const relevantShifts = isEmployeeView && currentEmployeeId 
+      ? shifts.filter(s => s.employee_id === currentEmployeeId)
+      : shifts;
+
+    relevantShifts.forEach(shift => {
       const start = new Date(shift.start_time);
       const end = new Date(shift.end_time);
       const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
@@ -156,7 +165,7 @@ export default function ConnecteamScheduleGrid({
       shifts: totalShifts,
       users: uniqueUsers.size
     };
-  }, [shifts]);
+  }, [shifts, isEmployeeView, currentEmployeeId]);
 
   const formatShiftTime = (shift: Shift): string => {
     const start = new Date(shift.start_time);
@@ -507,36 +516,47 @@ export default function ConnecteamScheduleGrid({
       <div className="border-t bg-muted/30 p-3">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 font-medium text-sm">
-            <span className="text-muted-foreground">Weekly summary</span>
-            <Button variant="ghost" size="icon" className="h-5 w-5">
-              <MoreHorizontal className="h-3 w-3" />
-            </Button>
+            <span className="text-muted-foreground">
+              {isEmployeeView ? 'My weekly summary' : 'Weekly summary'}
+            </span>
+            {!isEmployeeView && (
+              <Button variant="ghost" size="icon" className="h-5 w-5">
+                <MoreHorizontal className="h-3 w-3" />
+              </Button>
+            )}
           </div>
           
-          <div className="flex-1 grid grid-cols-5 gap-4">
+          <div className={cn(
+            "flex-1 grid gap-4",
+            isEmployeeView ? "grid-cols-2" : "grid-cols-5"
+          )}>
             <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-md">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">Hours</span>
+              <span className="text-sm">{isEmployeeView ? 'My Hours' : 'Hours'}</span>
               <span className="font-bold">{weeklyStats.hours}:00</span>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-md">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">Shifts</span>
+              <span className="text-sm">{isEmployeeView ? 'My Shifts' : 'Shifts'}</span>
               <span className="font-bold">{weeklyStats.shifts}</span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-md">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">Users</span>
-              <span className="font-bold">{weeklyStats.users}</span>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-md">
-              <span className="text-sm text-muted-foreground">Labor</span>
-              <span className="font-bold">--</span>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-md">
-              <span className="text-sm text-muted-foreground">Sales</span>
-              <span className="font-bold">--</span>
-            </div>
+            {!isEmployeeView && (
+              <>
+                <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-md">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Users</span>
+                  <span className="font-bold">{weeklyStats.users}</span>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-md">
+                  <span className="text-sm text-muted-foreground">Labor</span>
+                  <span className="font-bold">--</span>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-md">
+                  <span className="text-sm text-muted-foreground">Sales</span>
+                  <span className="font-bold">--</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
