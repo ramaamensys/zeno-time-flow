@@ -407,6 +407,7 @@ export type Database = {
           phone: string | null
           position: string | null
           status: string
+          team_id: string | null
           updated_at: string
           user_id: string | null
         }
@@ -426,6 +427,7 @@ export type Database = {
           phone?: string | null
           position?: string | null
           status?: string
+          team_id?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -445,6 +447,7 @@ export type Database = {
           phone?: string | null
           position?: string | null
           status?: string
+          team_id?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -461,6 +464,13 @@ export type Database = {
             columns: ["department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_teams"
             referencedColumns: ["id"]
           },
         ]
@@ -748,6 +758,47 @@ export type Database = {
           },
         ]
       }
+      schedule_teams: {
+        Row: {
+          color: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_teams_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedule_templates: {
         Row: {
           company_id: string | null
@@ -756,6 +807,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          team_id: string | null
           template_data: Json | null
           updated_at: string
         }
@@ -766,6 +818,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          team_id?: string | null
           template_data?: Json | null
           updated_at?: string
         }
@@ -776,6 +829,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          team_id?: string | null
           template_data?: Json | null
           updated_at?: string
         }
@@ -785,6 +839,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_templates_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_teams"
             referencedColumns: ["id"]
           },
         ]
@@ -896,6 +957,7 @@ export type Database = {
           replacement_started_at: string | null
           start_time: string
           status: string
+          team_id: string | null
           updated_at: string
         }
         Insert: {
@@ -916,6 +978,7 @@ export type Database = {
           replacement_started_at?: string | null
           start_time: string
           status?: string
+          team_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -936,6 +999,7 @@ export type Database = {
           replacement_started_at?: string | null
           start_time?: string
           status?: string
+          team_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -979,6 +1043,13 @@ export type Database = {
             columns: ["replacement_employee_id"]
             isOneToOne: false
             referencedRelation: "employees_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_teams"
             referencedColumns: ["id"]
           },
         ]

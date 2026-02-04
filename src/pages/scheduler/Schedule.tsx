@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanyEmployeeNames } from "@/hooks/useCompanyEmployeeNames";
 import { useEmployeeAvailability, AvailabilityStatus } from "@/hooks/useEmployeeAvailability";
+import { useScheduleTeams } from "@/hooks/useScheduleTeams";
 import CreateCompanyModal from "@/components/scheduler/CreateCompanyModal";
 import CreateShiftModal from "@/components/scheduler/CreateShiftModal";
 import EditShiftModal from "@/components/scheduler/EditShiftModal";
@@ -28,6 +29,8 @@ import MissedShiftRequestModal from "@/components/scheduler/MissedShiftRequestMo
 import EmployeeScheduleGrid from "@/components/scheduler/EmployeeScheduleGrid";
 import ConnecteamScheduleGrid from "@/components/scheduler/ConnecteamScheduleGrid";
 import QuickShiftModal from "@/components/scheduler/QuickShiftModal";
+import CreateTeamModal from "@/components/scheduler/CreateTeamModal";
+import TeamSelector from "@/components/scheduler/TeamSelector";
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function SchedulerSchedule() {
@@ -101,13 +104,18 @@ export default function SchedulerSchedule() {
   const { employees, loading: employeesLoading, updateEmployee, deleteEmployee, refetch: refetchEmployees } = useEmployees(isValidCompanySelected ? selectedCompany : undefined);
   const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift, refetch: refetchShifts } = useShifts(isValidCompanySelected ? selectedCompany : undefined, weekStart);
 
+  // Schedule Teams hook
+  const { teams, loading: teamsLoading, createTeam, refetch: refetchTeams } = useScheduleTeams(isValidCompanySelected ? selectedCompany : undefined);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
+
   // Availability hook for Connecteam-style scheduling
   const { 
     getAvailabilityStatus, 
     setEmployeeAvailability 
   } = useEmployeeAvailability(isValidCompanySelected ? selectedCompany : undefined, weekStart);
 
-  const [employeeRecord, setEmployeeRecord] = useState<{ id: string; company_id: string } | null>(null);
+  const [employeeRecord, setEmployeeRecord] = useState<{ id: string; company_id: string; team_id?: string | null } | null>(null);
   const [fallbackNamesById, setFallbackNamesById] = useState<Record<string, string>>({});
 
   const companyIdForNames = useMemo(() => {
@@ -211,7 +219,7 @@ export default function SchedulerSchedule() {
       // Also check if user is an employee (use maybeSingle to avoid 406 when no record)
       const { data: empData } = await supabase
         .from('employees')
-        .select('id, company_id')
+        .select('id, company_id, team_id')
         .eq('user_id', user.id)
         .maybeSingle();
       
@@ -227,6 +235,11 @@ export default function SchedulerSchedule() {
         // Auto-select employee's company
         if (!selectedCompany) {
           setSelectedCompany(empData.company_id);
+        }
+
+        // Auto-select employee's team if they have one
+        if (empData.team_id) {
+          setSelectedTeamId(empData.team_id);
         }
       }
     };
@@ -708,6 +721,7 @@ export default function SchedulerSchedule() {
       employee_id: shiftData.employee_id,
       company_id: selectedCompany,
       department_id: selectedDepartment !== "all" ? selectedDepartment : employee?.department_id || undefined,
+      team_id: selectedTeamId || employee?.team_id || undefined,
       start_time: shiftData.start_time,
       end_time: shiftData.end_time,
       break_minutes: shiftData.break_minutes,
@@ -734,6 +748,7 @@ export default function SchedulerSchedule() {
         employee_id: shiftData.employee_id,
         company_id: selectedCompany,
         department_id: selectedDepartment !== "all" ? selectedDepartment : employee?.department_id || undefined,
+        team_id: selectedTeamId || employee?.team_id || undefined,
         start_time: shiftData.start_time,
         end_time: shiftData.end_time,
         break_minutes: shiftData.break_minutes,
@@ -1230,11 +1245,39 @@ export default function SchedulerSchedule() {
         </div>
       </div>
 
+      {/* Team Selector Bar */}
+      {selectedCompany && (teams.length > 0 || canManageShifts) && (
+        <div className="px-6 py-3 border-b bg-muted/20 no-print">
+          <TeamSelector
+            teams={teams}
+            selectedTeamId={selectedTeamId}
+            onSelectTeam={(teamId) => {
+              setSelectedTeamId(teamId);
+              // For employees, they can only see their own team's schedule
+              // For managers, null means all teams
+            }}
+            onCreateTeam={() => setShowCreateTeamModal(true)}
+            canManage={canManageShifts}
+            showAllOption={canManageShifts} // Only managers can see "All Teams"
+          />
+        </div>
+      )}
+
       {/* Main Connecteam-Style Grid */}
       <div className="flex-1 p-4 overflow-hidden print-schedule">
         <ConnecteamScheduleGrid
-          employees={employees.filter(e => selectedDepartment === "all" || e.department_id === selectedDepartment)}
-          shifts={showScheduleShifts || isEmployeeView ? shifts : []}
+          employees={employees.filter(e => {
+            // Filter by department
+            const deptMatch = selectedDepartment === "all" || e.department_id === selectedDepartment;
+            // Filter by team - for employees, only show their team; for managers, show selected team or all
+            const teamMatch = selectedTeamId === null || (e as any).team_id === selectedTeamId;
+            return deptMatch && teamMatch;
+          })}
+          shifts={(showScheduleShifts || isEmployeeView ? shifts : []).filter(s => {
+            // Filter shifts by selected team
+            if (selectedTeamId === null) return true;
+            return (s as any).team_id === selectedTeamId;
+          })}
           weekDates={weekDates}
           isEditMode={isEditMode}
           canManageShifts={canManageShifts}
@@ -1384,6 +1427,21 @@ export default function SchedulerSchedule() {
         onSave={handleQuickShiftSave}
         onSaveMultiple={handleQuickShiftSaveMultiple}
         checkShiftConflict={checkShiftConflict}
+      />
+
+      {/* Create Team Modal */}
+      <CreateTeamModal
+        open={showCreateTeamModal}
+        onOpenChange={setShowCreateTeamModal}
+        onCreateTeam={async (team) => {
+          const result = await createTeam(team);
+          if (result) {
+            refetchTeams();
+            // Auto-select the newly created team
+            setSelectedTeamId(result.id);
+          }
+          return result;
+        }}
       />
     </div>
   );
