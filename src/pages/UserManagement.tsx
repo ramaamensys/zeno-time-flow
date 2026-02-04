@@ -58,7 +58,9 @@ export default function UserManagement() {
     full_name: "",
     password: "",
     role: "employee" as "employee" | "manager" | "operations_manager" | "super_admin",
-    manager_id: "none"
+    manager_id: "none",
+    organization_id: "",
+    company_id: ""
   });
   const [managers, setManagers] = useState<UserProfile[]>([]);
   const [operationsManagers, setOperationsManagers] = useState<UserProfile[]>([]);
@@ -574,14 +576,48 @@ export default function UserManagement() {
 
         console.log('User creation response:', data);
 
-        toast({
-          title: "Success",
-          description: "User created successfully. Welcome email will be sent shortly.",
-        });
+        // If role is employee and company is selected, create employee record
+        if (newUser.role === 'employee' && newUser.company_id && data?.user?.id) {
+          const nameParts = newUser.full_name.trim().split(' ');
+          const firstName = nameParts[0] || '';
+          const lastName = nameParts.slice(1).join(' ') || '';
+          
+          const { error: employeeError } = await supabase
+            .from('employees')
+            .insert({
+              user_id: data.user.id,
+              email: newUser.email,
+              first_name: firstName,
+              last_name: lastName,
+              company_id: newUser.company_id,
+              status: 'active',
+              hire_date: new Date().toISOString().split('T')[0]
+            });
+
+          if (employeeError) {
+            console.error('Error creating employee record:', employeeError);
+            // Don't throw - user was created, just warn about employee
+            toast({
+              title: "Warning",
+              description: "User created but failed to add to company. Please assign manually.",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Success",
+              description: "User created and added to company successfully.",
+            });
+          }
+        } else {
+          toast({
+            title: "Success",
+            description: "User created successfully. Welcome email will be sent shortly.",
+          });
+        }
       }
 
       // Clear the form and close dialog
-      setNewUser({ email: "", full_name: "", role: "employee", password: "", manager_id: "none" });
+      setNewUser({ email: "", full_name: "", role: "employee", password: "", manager_id: "none", organization_id: "", company_id: "" });
       setIsDialogOpen(false);
       
       // Reload users to show the updated user list
@@ -1140,7 +1176,7 @@ export default function UserManagement() {
                     <Label htmlFor="role" className="text-right">
                       Role
                     </Label>
-                    <Select value={newUser.role} onValueChange={(value: "employee" | "manager" | "operations_manager" | "super_admin") => setNewUser({ ...newUser, role: value })}>
+                    <Select value={newUser.role} onValueChange={(value: "employee" | "manager" | "operations_manager" | "super_admin") => setNewUser({ ...newUser, role: value, organization_id: "", company_id: "" })}>
                       <SelectTrigger className="col-span-3">
                         <SelectValue />
                       </SelectTrigger>
@@ -1152,6 +1188,55 @@ export default function UserManagement() {
                         </SelectContent>
                     </Select>
                   </div>
+                  
+                  {/* Show Organization/Company dropdowns for Employee role */}
+                  {newUser.role === 'employee' && (
+                    <>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="org_select" className="text-right">
+                          Organization
+                        </Label>
+                        <Select 
+                          value={newUser.organization_id} 
+                          onValueChange={(value) => setNewUser({ ...newUser, organization_id: value, company_id: "" })}
+                        >
+                          <SelectTrigger className="col-span-3">
+                            <SelectValue placeholder="Select organization" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {organizations.map((org) => (
+                              <SelectItem key={org.id} value={org.id}>
+                                {org.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="company_select" className="text-right">
+                          Company
+                        </Label>
+                        <Select 
+                          value={newUser.company_id} 
+                          onValueChange={(value) => setNewUser({ ...newUser, company_id: value })}
+                          disabled={!newUser.organization_id}
+                        >
+                          <SelectTrigger className="col-span-3">
+                            <SelectValue placeholder={newUser.organization_id ? "Select company" : "Select organization first"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {companies
+                              .filter((company) => company.organization_id === newUser.organization_id)
+                              .map((company) => (
+                                <SelectItem key={company.id} value={company.id}>
+                                  {company.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button
