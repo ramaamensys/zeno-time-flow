@@ -287,12 +287,24 @@ export default function SchedulerUserManagement() {
 
       if (error) {
         console.error('Edge function error:', error);
-        throw error;
+        // Try to parse error message from response
+        let errorMessage = "Failed to create user. Please try again.";
+        
+        if (error.message) {
+          errorMessage = error.message;
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      // Check if the response contains an error
+      if (data?.error) {
+        throw new Error(data.error);
       }
 
       toast({
-        title: "Success",
-        description: "Scheduler user created successfully. Welcome email will be sent shortly.",
+        title: "User Created Successfully",
+        description: `${newUser.full_name} has been added. A welcome email will be sent to ${newUser.email}.`,
       });
 
       // Clear the form and close dialog
@@ -303,9 +315,18 @@ export default function SchedulerUserManagement() {
       await loadUsers();
     } catch (error: any) {
       console.error('Error creating user:', error);
+      
+      // Display user-friendly error message
+      let displayMessage = error.message || "Failed to create user";
+      
+      // Clean up technical error messages
+      if (displayMessage.includes('non-2xx') || displayMessage.includes('status code')) {
+        displayMessage = "Unable to create user. Please check all fields and try again.";
+      }
+      
       toast({
-        title: "Error",
-        description: error.message || "Failed to create scheduler user",
+        title: "Could not create user",
+        description: displayMessage,
         variant: "destructive",
       });
     } finally {
