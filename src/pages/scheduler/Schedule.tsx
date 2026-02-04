@@ -223,6 +223,8 @@ export default function SchedulerSchedule() {
   const GRACE_PERIOD_MINUTES = 15;
 
   // Check and mark missed shifts automatically (runs every minute)
+  // IMPORTANT: Only marks shifts as missed if they were created BEFORE their start_time.
+  // Shifts created retroactively (for past dates) should NOT be auto-marked as missed.
   useEffect(() => {
     const checkAndMarkMissedShifts = async () => {
       if (!isValidCompanySelected) return;
@@ -232,9 +234,10 @@ export default function SchedulerSchedule() {
         const graceThreshold = new Date(now.getTime() - GRACE_PERIOD_MINUTES * 60 * 1000);
         
         // Find scheduled shifts that have passed the grace period without clock-in
+        // Also include created_at to filter out retroactively created shifts
         const { data: overdueShifts, error: fetchError } = await supabase
           .from('shifts')
-          .select('id, employee_id, company_id, start_time')
+          .select('id, employee_id, company_id, start_time, created_at')
           .eq('company_id', selectedCompany)
           .eq('status', 'scheduled')
           .eq('is_missed', false)
@@ -244,6 +247,14 @@ export default function SchedulerSchedule() {
         
         // Check each shift for time clock entry
         for (const shift of overdueShifts) {
+          // Skip shifts that were created AFTER their start_time (retroactively added)
+          // These are intentionally added for past dates and should not be auto-marked as missed
+          const shiftStartTime = new Date(shift.start_time);
+          const shiftCreatedAt = new Date(shift.created_at);
+          if (shiftCreatedAt > shiftStartTime) {
+            continue; // Skip retroactively created shifts
+          }
+          
           const { data: clockEntry } = await supabase
             .from('time_clock')
             .select('id')
