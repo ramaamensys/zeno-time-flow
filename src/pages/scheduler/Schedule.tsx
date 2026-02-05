@@ -255,75 +255,8 @@ export default function SchedulerSchedule() {
 
   // Note: coworker name resolution is handled via useCompanyEmployeeNames (SECURITY DEFINER RPC)
 
-  // Grace period for marking shifts as missed (15 minutes)
+  // Grace period for marking shifts as missed (15 minutes) - defined here, used in effect below
   const GRACE_PERIOD_MINUTES = 15;
-
-  // Check and mark missed shifts automatically (runs every minute)
-  // IMPORTANT: Only marks shifts as missed if they were created BEFORE their start_time.
-  // Shifts created retroactively (for past dates) should NOT be auto-marked as missed.
-  useEffect(() => {
-    const checkAndMarkMissedShifts = async () => {
-      if (!isValidCompanySelected) return;
-      
-      try {
-        const now = new Date();
-        const graceThreshold = new Date(now.getTime() - GRACE_PERIOD_MINUTES * 60 * 1000);
-        
-        // Find scheduled shifts that have passed the grace period without clock-in
-        // Also include created_at to filter out retroactively created shifts
-        const { data: overdueShifts, error: fetchError } = await supabase
-          .from('shifts')
-          .select('id, employee_id, company_id, start_time, created_at')
-          .eq('company_id', selectedCompany)
-          .eq('status', 'scheduled')
-          .eq('is_missed', false)
-          .lt('start_time', graceThreshold.toISOString());
-        
-        if (fetchError || !overdueShifts || overdueShifts.length === 0) return;
-        
-        // Check each shift for time clock entry
-        for (const shift of overdueShifts) {
-          // Skip shifts that were created AFTER their start_time (retroactively added)
-          // These are intentionally added for past dates and should not be auto-marked as missed
-          const shiftStartTime = new Date(shift.start_time);
-          const shiftCreatedAt = new Date(shift.created_at);
-          if (shiftCreatedAt > shiftStartTime) {
-            continue; // Skip retroactively created shifts
-          }
-          
-          const { data: clockEntry } = await supabase
-            .from('time_clock')
-            .select('id')
-            .eq('shift_id', shift.id)
-            .not('clock_in', 'is', null)
-            .maybeSingle();
-          
-          // If no clock entry, mark as missed
-          if (!clockEntry) {
-            await supabase
-              .from('shifts')
-              .update({ 
-                is_missed: true, 
-                missed_at: now.toISOString(),
-                status: 'missed'
-              })
-              .eq('id', shift.id);
-          }
-        }
-        
-        // Refetch shifts to update the display
-        refetchShifts();
-      } catch (error) {
-        console.error('Error checking missed shifts:', error);
-      }
-    };
-
-    // Run immediately and then every minute
-    checkAndMarkMissedShifts();
-    const intervalId = setInterval(checkAndMarkMissedShifts, 60000);
-    
-    return () => clearInterval(intervalId);
-  }, [selectedCompany, isValidCompanySelected, refetchShifts]);
 
   // Fetch my pending replacement requests
   useEffect(() => {
@@ -416,6 +349,60 @@ export default function SchedulerSchedule() {
   // Check if user can manage shifts (admins only)
   const canManageShifts = userRole === 'super_admin' || userRole === 'operations_manager' || userRole === 'manager';
   const isEmployeeView = userRole === 'employee';
+
+  // Check and mark missed shifts - only for managers, run once on load (not polling)
+  // IMPORTANT: Only marks shifts as missed if they were created BEFORE their start_time.
+  useEffect(() => {
+    const checkAndMarkMissedShifts = async () => {
+      // Only managers should run this check - employees can't update shifts due to RLS
+      if (!isValidCompanySelected || !canManageShifts) return;
+      
+      try {
+        const now = new Date();
+        const graceThreshold = new Date(now.getTime() - GRACE_PERIOD_MINUTES * 60 * 1000);
+        
+        const { data: overdueShifts, error: fetchError } = await supabase
+          .from('shifts')
+          .select('id, employee_id, company_id, start_time, created_at')
+          .eq('company_id', selectedCompany)
+          .eq('status', 'scheduled')
+          .eq('is_missed', false)
+          .lt('start_time', graceThreshold.toISOString());
+        
+        if (fetchError || !overdueShifts || overdueShifts.length === 0) return;
+        
+        for (const shift of overdueShifts) {
+          const shiftStartTime = new Date(shift.start_time);
+          const shiftCreatedAt = new Date(shift.created_at);
+          if (shiftCreatedAt > shiftStartTime) continue;
+          
+          const { data: clockEntry } = await supabase
+            .from('time_clock')
+            .select('id')
+            .eq('shift_id', shift.id)
+            .not('clock_in', 'is', null)
+            .maybeSingle();
+          
+          if (!clockEntry) {
+            await supabase
+              .from('shifts')
+              .update({ 
+                is_missed: true, 
+                missed_at: now.toISOString(),
+                status: 'missed'
+              })
+              .eq('id', shift.id);
+          }
+        }
+        
+        refetchShifts();
+      } catch (error) {
+        console.error('Error checking missed shifts:', error);
+      }
+    };
+
+    checkAndMarkMissedShifts();
+  }, [selectedCompany, isValidCompanySelected, canManageShifts, refetchShifts, GRACE_PERIOD_MINUTES]);
 
   // Use all available companies for scheduling (field_type filter removed)
   const schedulableCompanies = availableCompanies;
