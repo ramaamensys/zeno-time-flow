@@ -101,24 +101,75 @@ All colors MUST be HSL.
 }
 
 @media print {
-  /* Hide sidebar and action buttons when printing */
-  .xl\\:col-span-1,
-  button:not(.print-safe),
-  .no-print {
-    display: none !important;
+  /* Hide everything except print content */
+  body * {
+    visibility: hidden;
   }
   
-  /* Expand schedule grid to full width */
-  .xl\\:col-span-3 {
-    grid-column: span 4 / span 4;
+  .print-container,
+  .print-container * {
+    visibility: visible;
   }
   
-  /* Optimize for print */
+  .print-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  
+  /* Page setup for portrait orientation */
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+  
+  /* Print-specific table styles */
   .print-schedule {
-    font-size: 12px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #000 !important;
+    background: #fff !important;
   }
   
-  .print-schedule .text-xs {
-    font-size: 10px;
+  .print-schedule table {
+    width: 100%;
+    border-collapse: collapse;
+    page-break-inside: auto;
+  }
+  
+  .print-schedule tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  
+  .print-schedule th,
+  .print-schedule td {
+    border: 1px solid #333;
+    padding: 4px 6px;
+  }
+  
+  .print-schedule th {
+    background: #e5e5e5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  .page-break-inside-avoid {
+    page-break-inside: avoid;
+  }
+  
+  .page-break-before {
+    page-break-before: always;
+  }
+  
+  /* Hide UI elements */
+  .no-print,
+  nav,
+  header,
+  aside,
+  button,
+  .sidebar {
+    display: none !important;
   }
 }
