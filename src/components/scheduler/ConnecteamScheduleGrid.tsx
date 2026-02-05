@@ -206,16 +206,8 @@ export default function ConnecteamScheduleGrid({
       {/* Top Toolbar */}
       <div className="flex items-center justify-between p-3 border-b bg-muted/30">
         <div className="flex items-center gap-2">
-          {/* View Options Button - only for managers */}
-          {!isEmployeeView && (
-            <Button variant="outline" size="sm" className="gap-2">
-              <Filter className="h-4 w-4" />
-              View options
-            </Button>
-          )}
-          
           {/* Week Selector */}
-          <div className="flex items-center gap-1 ml-2">
+          <div className="flex items-center gap-1">
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onNavigateWeek('prev')}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
