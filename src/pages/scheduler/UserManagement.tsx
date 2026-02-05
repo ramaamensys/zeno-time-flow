@@ -54,7 +54,7 @@ export default function SchedulerUserManagement() {
     email: "",
     full_name: "",
     password: "",
-    role: "employee" as "employee" | "manager" | "operations_manager" | "super_admin"
+    role: "employee" as "employee" | "house_keeping" | "maintenance" | "manager" | "operations_manager" | "super_admin"
   });
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -531,6 +531,8 @@ export default function SchedulerUserManagement() {
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="house_keeping">House Keeping</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
                   <SelectItem value="manager">Company Manager</SelectItem>
                   <SelectItem value="operations_manager">Organization Manager</SelectItem>
                   <SelectItem value="super_admin">Super Admin</SelectItem>
@@ -622,12 +624,14 @@ export default function SchedulerUserManagement() {
                     <Label htmlFor="role" className="text-right">
                       Role
                     </Label>
-                    <Select value={newUser.role} onValueChange={(value: "employee" | "manager" | "operations_manager" | "super_admin") => setNewUser({ ...newUser, role: value })}>
+                    <Select value={newUser.role} onValueChange={(value: "employee" | "house_keeping" | "maintenance" | "manager" | "operations_manager" | "super_admin") => setNewUser({ ...newUser, role: value })}>
                       <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Select a role" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="employee">Employee</SelectItem>
+                        <SelectItem value="house_keeping">House Keeping</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
                         <SelectItem value="manager">Company Manager</SelectItem>
                         <SelectItem value="operations_manager">Organization Manager</SelectItem>
                         <SelectItem value="super_admin">Super Admin</SelectItem>
@@ -711,6 +715,8 @@ export default function SchedulerUserManagement() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="employee">Employee</SelectItem>
+                          <SelectItem value="house_keeping">House Keeping</SelectItem>
+                          <SelectItem value="maintenance">Maintenance</SelectItem>
                           <SelectItem value="manager">Company Manager</SelectItem>
                           <SelectItem value="operations_manager">Organization Manager</SelectItem>
                           <SelectItem value="super_admin">Super Admin</SelectItem>
