@@ -218,60 +218,32 @@ export default function ConnecteamScheduleGrid({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Actions Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1">
-                Actions
-                <ChevronLeft className="h-3 w-3 rotate-[270deg]" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-popover border shadow-lg z-50">
-              <DropdownMenuItem onClick={onToggleEditMode}>
-                <Edit className="h-4 w-4 mr-2" />
-                {isEditMode ? 'Exit Edit Mode' : 'Edit Schedule'}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDuplicateWeek}>
-                <Plus className="h-4 w-4 mr-2" />
-                Duplicate Week
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onPrint}>
-                <Settings className="h-4 w-4 mr-2" />
-                Print Schedule
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDownload}>
-                <Settings className="h-4 w-4 mr-2" />
-                Download
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onClearWeek} className="text-destructive">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Clear Week
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Add Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" className="gap-1 bg-primary text-primary-foreground">
-                Add
-                <ChevronLeft className="h-3 w-3 rotate-[270deg]" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-popover border shadow-lg z-50 w-48">
-              <DropdownMenuItem onClick={onAddNewSchedule}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add single shift
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Plus className="h-4 w-4 mr-2" />
-                Add multiple shifts
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Direct Action Buttons */}
+          <Button variant="outline" size="sm" className="gap-1" onClick={onToggleEditMode}>
+            <Edit className="h-4 w-4" />
+            {isEditMode ? 'Exit Edit' : 'Edit'}
+          </Button>
+          
+          <Button variant="outline" size="sm" className="gap-1" onClick={onDuplicateWeek}>
+            <Plus className="h-4 w-4" />
+            Duplicate
+          </Button>
+          
+          <Button variant="outline" size="sm" className="gap-1" onClick={onPrint}>
+            Print
+          </Button>
+          
+          <Button variant="outline" size="sm" className="gap-1" onClick={onDownload}>
+            Download
+          </Button>
+          
+          <Button variant="outline" size="sm" className="gap-1 text-destructive hover:text-destructive" onClick={onClearWeek}>
+            <Trash2 className="h-4 w-4" />
+            Clear
+          </Button>
 
           {/* Publish Button */}
-          <Button variant="outline" size="sm" onClick={onSaveSchedule}>
+          <Button size="sm" className="bg-primary text-primary-foreground" onClick={onSaveSchedule}>
             Publish
           </Button>
 
