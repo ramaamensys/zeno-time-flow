@@ -207,7 +207,8 @@ export default function SchedulerSchedule() {
           computedRole = 'operations_manager';
         } else if (roles.includes('manager')) {
           computedRole = 'manager';
-        } else if (roles.includes('employee')) {
+        } else if (roles.includes('employee') || roles.includes('house_keeping') || roles.includes('maintenance')) {
+          // All operational staff (employee, house_keeping, maintenance) are treated the same
           computedRole = 'employee';
         } else {
           computedRole = 'user';
@@ -1334,61 +1335,64 @@ export default function SchedulerSchedule() {
           <h1 className="text-2xl font-bold">Schedule</h1>
         </div>
         
-        <div className="flex items-center gap-3">
-          {/* Organization dropdown - Only for super admins */}
-          {userRole === 'super_admin' && (
-            <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
+        {/* Management Controls - only for managers, not employees */}
+        {!isEmployeeView && (
+          <div className="flex items-center gap-3">
+            {/* Organization dropdown - Only for super admins */}
+            {userRole === 'super_admin' && (
+              <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
+                <SelectTrigger className="w-[180px] bg-background">
+                  <SelectValue placeholder="Select organization" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border shadow-lg z-50">
+                  {organizations.map((org) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Company dropdown */}
+            <Select value={selectedCompany} onValueChange={(value) => {
+              setSelectedCompany(value);
+              setSelectedDepartment("all");
+            }}>
               <SelectTrigger className="w-[180px] bg-background">
-                <SelectValue placeholder="Select organization" />
+                <SelectValue placeholder="Select company" />
               </SelectTrigger>
               <SelectContent className="bg-popover border shadow-lg z-50">
-                {organizations.map((org) => (
-                  <SelectItem key={org.id} value={org.id}>
-                    {org.name}
+                {schedulableCompanies.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          )}
 
-          {/* Company dropdown */}
-          <Select value={selectedCompany} onValueChange={(value) => {
-            setSelectedCompany(value);
-            setSelectedDepartment("all");
-          }}>
-            <SelectTrigger className="w-[180px] bg-background">
-              <SelectValue placeholder="Select company" />
-            </SelectTrigger>
-            <SelectContent className="bg-popover border shadow-lg z-50">
-              {schedulableCompanies.map((company) => (
-                <SelectItem key={company.id} value={company.id}>
-                  {company.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Department dropdown */}
-          {selectedCompany && departments.length > 0 && (
-            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-              <SelectTrigger className="w-[160px] bg-background">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover border shadow-lg z-50">
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((dept) => (
-                  <SelectItem key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+            {/* Department dropdown */}
+            {selectedCompany && departments.length > 0 && (
+              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                <SelectTrigger className="w-[160px] bg-background">
+                  <SelectValue placeholder="Department" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border shadow-lg z-50">
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Team Selector Bar */}
-      {selectedCompany && (teams.length > 0 || canManageShifts) && (
+      {/* Team Selector Bar - only for managers */}
+      {!isEmployeeView && selectedCompany && (teams.length > 0 || canManageShifts) && (
         <div className="px-6 py-3 border-b bg-muted/20 no-print">
           <TeamSelector
             teams={teams}
