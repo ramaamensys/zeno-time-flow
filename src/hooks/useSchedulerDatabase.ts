@@ -550,21 +550,35 @@ export function useEmployees(companyId?: string) {
 export function useShifts(companyId?: string, weekStart?: Date) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
+  const isMountedRef = React.useRef(true);
+  const fetchingRef = React.useRef(false);
 
   // Check if companyId is a valid UUID (not "all" or empty)
   const isValidCompanyId = companyId && companyId !== 'all' && 
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyId);
 
-  const fetchShifts = async () => {
+  // Stabilize weekStart to prevent infinite loops
+  const weekStartTime = weekStart?.getTime();
+
+  const fetchShifts = React.useCallback(async () => {
     // Only fetch if we have a valid company ID - otherwise return empty array
     if (!isValidCompanyId) {
-      setShifts([]);
-      setLoading(false);
+      if (isMountedRef.current) {
+        setShifts([]);
+        setLoading(false);
+      }
       return;
     }
+
+    // Prevent concurrent fetches
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
     
     try {
-      setLoading(true);
+      if (isMountedRef.current) {
+        setLoading(true);
+      }
+      
       let query = (supabase as any)
         .from('shifts')
         .select('*')
@@ -581,14 +595,21 @@ export function useShifts(companyId?: string, weekStart?: Date) {
       const { data, error } = await query.order('start_time', { ascending: true });
 
       if (error) throw error;
-      setShifts(data || []);
+      if (isMountedRef.current) {
+        setShifts(data || []);
+      }
     } catch (error) {
       console.error('Error fetching shifts:', error);
-      toast.error('Failed to fetch shifts');
+      if (isMountedRef.current) {
+        toast.error('Failed to fetch shifts');
+      }
     } finally {
-      setLoading(false);
+      fetchingRef.current = false;
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [companyId, isValidCompanyId, weekStartTime]);
 
   const createShift = async (shiftData: Omit<Shift, 'id' | 'created_at'>) => {
     try {
@@ -650,11 +671,12 @@ export function useShifts(companyId?: string, weekStart?: Date) {
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchShifts();
     
     // Set up real-time subscription for shifts
     const subscription = supabase
-      .channel('shifts_changes')
+      .channel(`shifts_changes_${companyId || 'all'}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
@@ -666,9 +688,10 @@ export function useShifts(companyId?: string, weekStart?: Date) {
       .subscribe();
 
     return () => {
+      isMountedRef.current = false;
       subscription.unsubscribe();
     };
-  }, [companyId, weekStart]);
+  }, [companyId, weekStartTime, fetchShifts]);
 
   return {
     shifts,
