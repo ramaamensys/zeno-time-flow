@@ -27,10 +27,12 @@ import {
 import { cn } from '@/lib/utils';
 import { Employee, Shift } from '@/hooks/useSchedulerDatabase';
 import { AvailabilityStatus } from '@/hooks/useEmployeeAvailability';
+import { ScheduleTeam } from '@/hooks/useScheduleTeams';
 
 interface ConnecteamScheduleGridProps {
   employees: Employee[];
   shifts: Shift[];
+  teams?: ScheduleTeam[];
   weekDates: Date[];
   isEditMode: boolean;
   canManageShifts: boolean;
@@ -69,6 +71,7 @@ const availabilityIcons: Record<AvailabilityStatus, React.ReactNode> = {
 export default function ConnecteamScheduleGrid({
   employees,
   shifts,
+  teams = [],
   weekDates,
   isEditMode,
   canManageShifts,
@@ -97,6 +100,13 @@ export default function ConnecteamScheduleGrid({
 }: ConnecteamScheduleGridProps) {
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Get team color for an employee
+  const getTeamColor = (teamId: string | null | undefined): string => {
+    if (!teamId) return '#6B7280'; // Default gray for no team
+    const team = teams.find(t => t.id === teamId);
+    return team?.color || '#6B7280';
+  };
 
   // Filter employees by search
   const filteredEmployees = useMemo(() => {
@@ -330,10 +340,18 @@ export default function ConnecteamScheduleGrid({
                 key={employee.id} 
                 className="grid grid-cols-[220px_repeat(7,1fr)] border-b last:border-b-0 hover:bg-muted/10 group/row"
               >
-                {/* Employee Info Cell */}
+                {/* Employee Info Cell with Team Color */}
                 <div className="p-3 border-r flex items-start gap-3">
+                  {/* Team color indicator */}
+                  <div 
+                    className="w-1 self-stretch rounded-full mr-1"
+                    style={{ backgroundColor: getTeamColor((employee as any).team_id) }}
+                  />
                   <Avatar className="h-9 w-9">
-                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                    <AvatarFallback 
+                      className="text-white text-xs font-semibold"
+                      style={{ backgroundColor: getTeamColor((employee as any).team_id) }}
+                    >
                       {employee.first_name[0]}{employee.last_name[0]}
                     </AvatarFallback>
                   </Avatar>
