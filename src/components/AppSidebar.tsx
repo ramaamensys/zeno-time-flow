@@ -37,7 +37,7 @@ import {
  * 3. Company Manager (manager) - Access to assigned company
  * 4. Employee - Access to own profile and tasks only
  */
-type UserRole = 'user' | 'admin' | 'super_admin' | 'operations_manager' | 'manager' | 'employee';
+type UserRole = 'user' | 'admin' | 'super_admin' | 'operations_manager' | 'manager' | 'employee' | 'house_keeping' | 'maintenance';
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -89,7 +89,13 @@ export function AppSidebar() {
           setUserAppType('scheduler');
         } else if (roles.includes('employee')) {
           setUserRole('employee');
-          setUserAppType('employee'); // Special app type for employees
+          setUserAppType('employee');
+        } else if (roles.includes('house_keeping')) {
+          setUserRole('house_keeping');
+          setUserAppType('employee');
+        } else if (roles.includes('maintenance')) {
+          setUserRole('maintenance');
+          setUserAppType('employee');
         } else {
           setUserRole('user');
           setUserAppType(appTypes[0] || 'calendar');
@@ -150,11 +156,14 @@ export function AppSidebar() {
     isActive ? "bg-accent text-accent-foreground font-medium" : "hover:bg-accent/50";
 
   // Determine which sections to show based on role hierarchy
-  const showMainFeatures = userRole === 'employee' || 
+  // Operational staff includes employee, house_keeping, and maintenance
+  const isOperationalStaff = userRole === 'employee' || userRole === 'house_keeping' || userRole === 'maintenance';
+  
+  const showMainFeatures = isOperationalStaff || 
     userRole === 'manager' || userRole === 'super_admin' || userRole === 'operations_manager' ||
     userAppType === 'calendar' || userAppType === 'both' || userAppType === 'calendar_plus';
   
-  const showEmployeeSection = (userRole === 'employee' && isEmployeeLinked);
+  const showEmployeeSection = (isOperationalStaff && isEmployeeLinked);
   
   const showSchedulerAdmin = userRole === 'super_admin' || userRole === 'admin' || 
     userRole === 'operations_manager' || userRole === 'manager' ||
@@ -216,7 +225,7 @@ export function AppSidebar() {
         )}
 
         {/* Scheduler Admin Section - for admins only, not regular employees */}
-        {showSchedulerAdmin && userRole !== 'employee' && (
+        {showSchedulerAdmin && !isOperationalStaff && (
           <SidebarGroup>
             <SidebarGroupLabel>
               {userAppType === 'calendar_plus' ? 'Companies' : 'Scheduler'}
