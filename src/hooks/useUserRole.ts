@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
  * 3. Company Manager (manager enum) - Access to assigned company only  
  * 4. Employee - Access to own profile and assigned tasks only
  */
-export type UserRole = 'user' | 'admin' | 'super_admin' | 'operations_manager' | 'manager' | 'employee';
+export type UserRole = 'user' | 'admin' | 'super_admin' | 'operations_manager' | 'manager' | 'employee' | 'house_keeping' | 'maintenance';
 
 export const useUserRole = () => {
   const { user } = useAuth();
@@ -47,6 +47,10 @@ export const useUserRole = () => {
           setRole('admin');
         } else if (roles.includes('employee')) {
           setRole('employee');
+        } else if (roles.includes('house_keeping')) {
+          setRole('house_keeping');
+        } else if (roles.includes('maintenance')) {
+          setRole('maintenance');
         } else {
           setRole('user');
         }
@@ -87,7 +91,8 @@ export const useUserRole = () => {
 
   // Super Admin, Organization Manager (operations_manager), and Company Manager (manager) have admin privileges
   const isAdmin = role === 'admin' || role === 'super_admin' || role === 'operations_manager' || role === 'manager';
-  const isEmployee = role === 'employee';
+  // Employees, house_keeping, and maintenance are all operational staff with same access level
+  const isEmployee = role === 'employee' || role === 'house_keeping' || role === 'maintenance';
   const isSuperAdmin = role === 'super_admin';
   const isOrganizationManager = role === 'operations_manager';
   const isCompanyManager = role === 'manager';
