@@ -175,7 +175,9 @@ export default function PrintableSchedule({
                       <td key={dayIndex} className="border border-gray-300 px-1 py-1 text-center text-xs">
                         {dayShifts.length > 0 ? (
                           dayShifts.map((s, i) => (
-                            <div key={i}>{format(new Date(s.start_time), 'HH:mm')}</div>
+                            <div key={i}>
+                              {format(new Date(s.start_time), 'HH:mm')}-{format(new Date(s.end_time), 'HH:mm')}
+                            </div>
                           ))
                         ) : '-'}
                       </td>
