@@ -622,8 +622,8 @@ export default function UserManagement() {
               });
             }
           }
-          // For Employee - create employee record
-          else if (newUser.role === 'employee' && newUser.company_id) {
+          // For Employee-type roles - create employee record
+          else if ((newUser.role === 'employee' || newUser.role === 'house_keeping' || newUser.role === 'maintenance') && newUser.company_id) {
             const nameParts = newUser.full_name.trim().split(' ');
             const firstName = nameParts[0] || '';
             const lastName = nameParts.slice(1).join(' ') || '';
@@ -742,8 +742,8 @@ export default function UserManagement() {
         }
       }
       
-      // Handle employee company assignment
-      if (editingUser.role === 'employee' && editingUser.company_id) {
+      // Handle employee-type role company assignment (employee, house_keeping, maintenance)
+      if ((editingUser.role === 'employee' || editingUser.role === 'house_keeping' || editingUser.role === 'maintenance') && editingUser.company_id) {
         // Check if employee record already exists
         const { data: existingEmployee } = await supabase
           .from('employees')
@@ -1403,8 +1403,8 @@ export default function UserManagement() {
                     </>
                   )}
                   
-                  {/* Show Organization/Company dropdowns for Employee role */}
-                  {newUser.role === 'employee' && (
+                  {/* Show Organization/Company dropdowns for Employee-type roles */}
+                  {(newUser.role === 'employee' || newUser.role === 'house_keeping' || newUser.role === 'maintenance') && (
                     <>
                       <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="org_select" className="text-right">
@@ -1862,8 +1862,8 @@ export default function UserManagement() {
                 </>
               )}
               
-              {/* Show Organization/Company dropdowns for Employee role */}
-              {editingUser.role === 'employee' && (
+              {/* Show Organization/Company dropdowns for Employee-type roles */}
+              {(editingUser.role === 'employee' || editingUser.role === 'house_keeping' || editingUser.role === 'maintenance') && (
                 <>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="edit_org_select" className="text-right">
