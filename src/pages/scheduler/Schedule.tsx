@@ -864,58 +864,42 @@ export default function SchedulerSchedule() {
     // Enable showing shifts when editing a template
     setShowScheduleShifts(true);
     
-    const { shiftSlots: savedSlots, shifts: savedShifts, week_start } = template.template_data;
+    const { shiftSlots: savedSlots, week_start } = template.template_data;
     
     // Update shift slots if they were saved
     if (savedSlots && savedSlots.length > 0) {
       setShiftSlots(savedSlots);
     }
     
-    // Navigate to the saved week
+    // Check if the current week already matches the template's week
+    // If so, just enable edit mode without recreating shifts
+    const templateWeekStart = week_start ? new Date(week_start) : null;
+    const currentWeekStart = getWeekStart(selectedWeek);
+    
+    const isSameWeek = templateWeekStart && 
+      templateWeekStart.getFullYear() === currentWeekStart.getFullYear() &&
+      templateWeekStart.getMonth() === currentWeekStart.getMonth() &&
+      templateWeekStart.getDate() === currentWeekStart.getDate();
+    
+    if (isSameWeek) {
+      // Already viewing this week - just enable edit mode without recreating shifts
+      setEditingTemplate({
+        id: template.id,
+        name: template.name,
+        description: template.description
+      });
+      setIsEditMode(true);
+      
+      toast({
+        title: "Edit Mode Enabled",
+        description: `You can now edit the schedule for "${template.name}". Click "Publish" when done.`
+      });
+      return;
+    }
+    
+    // Navigate to the saved week (this will trigger a refetch of shifts for that week)
     if (week_start) {
       setSelectedWeek(new Date(week_start));
-    }
-    
-    // Delete existing shifts for this week first
-    for (const shift of shifts) {
-      try {
-        await supabase
-          .from('time_clock')
-          .update({ shift_id: null })
-          .eq('shift_id', shift.id);
-        await deleteShift(shift.id);
-      } catch (e) {
-        console.error('Failed to delete shift:', shift.id, e);
-      }
-    }
-    
-    // Recreate shifts from saved data if any
-    if (savedShifts && savedShifts.length > 0) {
-      const newWeekDates = getWeekDates(week_start ? new Date(week_start) : selectedWeek);
-      
-      for (const savedShift of savedShifts) {
-        const date = newWeekDates[savedShift.day_index];
-        const startDateTime = new Date(date);
-        startDateTime.setHours(savedShift.start_hour, 0, 0, 0);
-        
-        const endDateTime = new Date(date);
-        endDateTime.setHours(savedShift.end_hour, 0, 0, 0);
-        
-        if (savedShift.end_hour < savedShift.start_hour) {
-          endDateTime.setDate(endDateTime.getDate() + 1);
-        }
-        
-        await createShift({
-          employee_id: savedShift.employee_id,
-          company_id: selectedCompany,
-          department_id: savedShift.department_id,
-          start_time: startDateTime.toISOString(),
-          end_time: endDateTime.toISOString(),
-          break_minutes: savedShift.break_minutes,
-          hourly_rate: savedShift.hourly_rate,
-          status: 'scheduled'
-        });
-      }
     }
     
     // Set up template for saving updates
@@ -930,7 +914,7 @@ export default function SchedulerSchedule() {
     
     toast({
       title: "Schedule Loaded for Editing",
-      description: `"${template.name}" is now loaded. Make changes and click "Save Schedule" when done.`
+      description: `"${template.name}" is now loaded. Make changes and click "Publish" when done.`
     });
   };
 
