@@ -308,13 +308,36 @@ const Tasks = () => {
     if (userRole !== 'super_admin' && userRole !== 'operations_manager' && userRole !== 'manager') return;
     
     if (userRole === 'super_admin') {
-      // Super admins can see all users (organization managers, company managers, employees)
+      // Super admins can see all users who have valid roles (not orphaned profiles)
+      // First get all user_ids that have roles
+      const { data: userRoles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .in("role", ['operations_manager', 'manager', 'employee', 'house_keeping', 'maintenance']);
+
+      if (rolesError) {
+        console.error("Error fetching user roles:", rolesError);
+        setTeamMembers([]);
+        return;
+      }
+
+      // Get unique user_ids
+      const validUserIds = [...new Set(userRoles?.map(r => r.user_id) || [])];
+      
+      if (validUserIds.length === 0) {
+        setTeamMembers([]);
+        return;
+      }
+
+      // Fetch profiles only for users with valid roles
       const { data, error } = await supabase
         .from("profiles")
-        .select("user_id, full_name, email");
+        .select("user_id, full_name, email")
+        .in("user_id", validUserIds);
 
       if (error) {
         console.error("Error fetching team members:", error);
+        setTeamMembers([]);
       } else {
         setTeamMembers(data || []);
       }
@@ -347,7 +370,7 @@ const Tasks = () => {
         }
       }
     } else if (userRole === 'manager') {
-      // Company managers see their company employees
+      // Company managers see their company employees with active status
       const { data: employees, error: employeesError } = await supabase
         .from("employees")
         .select(`
@@ -356,9 +379,11 @@ const Tasks = () => {
           last_name,
           email,
           company_id,
+          status,
           companies!inner(company_manager_id)
         `)
-        .eq('companies.company_manager_id', user?.id);
+        .eq('companies.company_manager_id', user?.id)
+        .eq('status', 'active');
 
       if (employeesError) {
         console.error("Error fetching company employees:", employeesError);
