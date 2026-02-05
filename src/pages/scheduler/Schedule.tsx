@@ -29,8 +29,8 @@ import MissedShiftRequestModal from "@/components/scheduler/MissedShiftRequestMo
 import EmployeeScheduleGrid from "@/components/scheduler/EmployeeScheduleGrid";
 import ConnecteamScheduleGrid from "@/components/scheduler/ConnecteamScheduleGrid";
 import QuickShiftModal from "@/components/scheduler/QuickShiftModal";
-import CreateTeamModal from "@/components/scheduler/CreateTeamModal";
-import TeamSelector from "@/components/scheduler/TeamSelector";
+// Teams are automatically managed via employee roles (house_keeping, maintenance, etc.)
+// No manual team creation/selection needed - all employees shown with color coding
 const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function SchedulerSchedule() {
@@ -104,10 +104,8 @@ export default function SchedulerSchedule() {
   const { employees, loading: employeesLoading, updateEmployee, deleteEmployee, refetch: refetchEmployees } = useEmployees(isValidCompanySelected ? selectedCompany : undefined);
   const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift, refetch: refetchShifts } = useShifts(isValidCompanySelected ? selectedCompany : undefined, weekStart);
 
-  // Schedule Teams hook
-  const { teams, loading: teamsLoading, createTeam, refetch: refetchTeams } = useScheduleTeams(isValidCompanySelected ? selectedCompany : undefined);
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
+  // Schedule Teams hook - used for color coding employees, not filtering
+  const { teams, loading: teamsLoading } = useScheduleTeams(isValidCompanySelected ? selectedCompany : undefined);
 
   // Availability hook for Connecteam-style scheduling
   const { 
@@ -241,11 +239,6 @@ export default function SchedulerSchedule() {
         // Auto-select employee's company
         if (!selectedCompany) {
           setSelectedCompany(empData.company_id);
-        }
-
-        // Auto-select employee's team if they have one
-        if (empData.team_id) {
-          setSelectedTeamId(empData.team_id);
         }
       }
     };
@@ -613,14 +606,11 @@ export default function SchedulerSchedule() {
   };
 
   const printSchedule = () => {
-    // Get company and team names for the header
+    // Get company name for the header
     const companyName = schedulableCompanies.find(c => c.id === selectedCompany)?.name || 'Schedule';
-    const teamName = selectedTeamId ? teams.find(t => t.id === selectedTeamId)?.name : undefined;
     
-    // Filter employees for current view
-    const filteredEmps = selectedTeamId 
-      ? employees.filter(e => e.team_id === selectedTeamId)
-      : employees;
+    // Use all employees (no team filtering)
+    const filteredEmps = employees;
     
     // Create a new window for printing
     const printWindow = window.open('', '_blank');
@@ -753,7 +743,6 @@ export default function SchedulerSchedule() {
       '</style></head><body>' +
       '<div class="header">' +
       '<h1>' + companyName + '</h1>' +
-      (teamName ? '<h2>' + teamName + '</h2>' : '') +
       '<div class="meta">Weekly Schedule: ' + weekRange + '</div>' +
       '<div class="meta">Total: ' + shifts.length + ' shifts | ' + filteredEmps.length + ' employees</div>' +
       '</div>' +
@@ -913,7 +902,7 @@ export default function SchedulerSchedule() {
       employee_id: shiftData.employee_id,
       company_id: selectedCompany,
       department_id: selectedDepartment !== "all" ? selectedDepartment : employee?.department_id || undefined,
-      team_id: selectedTeamId || employee?.team_id || undefined,
+      team_id: employee?.team_id || undefined,
       start_time: shiftData.start_time,
       end_time: shiftData.end_time,
       break_minutes: shiftData.break_minutes,
@@ -940,7 +929,7 @@ export default function SchedulerSchedule() {
         employee_id: shiftData.employee_id,
         company_id: selectedCompany,
         department_id: selectedDepartment !== "all" ? selectedDepartment : employee?.department_id || undefined,
-        team_id: selectedTeamId || employee?.team_id || undefined,
+        team_id: employee?.team_id || undefined,
         start_time: shiftData.start_time,
         end_time: shiftData.end_time,
         break_minutes: shiftData.break_minutes,
@@ -1424,40 +1413,16 @@ export default function SchedulerSchedule() {
         )}
       </div>
 
-      {/* Team Selector Bar - only for managers */}
-      {!isEmployeeView && selectedCompany && (teams.length > 0 || canManageShifts) && (
-        <div className="px-6 py-3 border-b bg-muted/20 no-print">
-          <TeamSelector
-            teams={teams}
-            selectedTeamId={selectedTeamId}
-            onSelectTeam={(teamId) => {
-              setSelectedTeamId(teamId);
-              // For employees, they can only see their own team's schedule
-              // For managers, null means all teams
-            }}
-            onCreateTeam={() => setShowCreateTeamModal(true)}
-            canManage={canManageShifts}
-            showAllOption={canManageShifts} // Only managers can see "All Teams"
-          />
-        </div>
-      )}
-
-      {/* Main Connecteam-Style Grid */}
+      {/* Main Connecteam-Style Grid - All teams shown together with color coding */}
       <div className="flex-1 p-4 overflow-hidden print-schedule">
         <ConnecteamScheduleGrid
           employees={(isEmployeeView ? allCompanyEmployees : employees).filter(e => {
-            // Filter by department
+            // Filter by department only - no team filtering, show all together
             const deptMatch = selectedDepartment === "all" || e.department_id === selectedDepartment;
-            // For employees, show all company employees (no team filter since employees_public doesn't have team_id)
-            // For managers, filter by selected team or show all
-            const teamMatch = isEmployeeView || selectedTeamId === null || (e as any).team_id === selectedTeamId;
-            return deptMatch && teamMatch;
+            return deptMatch;
           })}
-          shifts={(showScheduleShifts || isEmployeeView ? shifts : []).filter(s => {
-            // Filter shifts by selected team
-            if (selectedTeamId === null) return true;
-            return (s as any).team_id === selectedTeamId;
-          })}
+          shifts={(showScheduleShifts || isEmployeeView ? shifts : [])}
+          teams={teams}
           weekDates={weekDates}
           isEditMode={isEditMode}
           canManageShifts={canManageShifts}
@@ -1607,21 +1572,6 @@ export default function SchedulerSchedule() {
         onSave={handleQuickShiftSave}
         onSaveMultiple={handleQuickShiftSaveMultiple}
         checkShiftConflict={checkShiftConflict}
-      />
-
-      {/* Create Team Modal */}
-      <CreateTeamModal
-        open={showCreateTeamModal}
-        onOpenChange={setShowCreateTeamModal}
-        onCreateTeam={async (team) => {
-          const result = await createTeam(team);
-          if (result) {
-            refetchTeams();
-            // Auto-select the newly created team
-            setSelectedTeamId(result.id);
-          }
-          return result;
-        }}
       />
     </div>
   );
