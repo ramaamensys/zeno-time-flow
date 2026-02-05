@@ -28,11 +28,12 @@ interface CompanyShift {
 
 interface EmployeeShiftsProps {
   employeeId: string;
+  showTeamScheduleTab?: boolean;
 }
 
 const GRACE_PERIOD_MINUTES = 15;
 
-export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
+export default function EmployeeShifts({ employeeId, showTeamScheduleTab = true }: EmployeeShiftsProps) {
   const [shifts, setShifts] = useState<any[]>([]);
   const [approvedReplacements, setApprovedReplacements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -412,10 +413,12 @@ export default function EmployeeShifts({ employeeId }: EmployeeShiftsProps) {
               <Calendar className="h-4 w-4" />
               My Shifts
             </TabsTrigger>
-            <TabsTrigger value="team-schedule" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Team Schedule
-            </TabsTrigger>
+            {showTeamScheduleTab && (
+              <TabsTrigger value="team-schedule" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Team Schedule
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* My Shifts Tab */}

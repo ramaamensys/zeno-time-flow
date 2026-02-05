@@ -117,11 +117,16 @@ export default function SchedulerSchedule() {
 
   const [employeeRecord, setEmployeeRecord] = useState<{ id: string; company_id: string; team_id?: string | null } | null>(null);
   const [fallbackNamesById, setFallbackNamesById] = useState<Record<string, string>>({});
+  
+  // For employee view: fetch ALL company employees from employees_public (so they see the full schedule)
+  const [allCompanyEmployees, setAllCompanyEmployees] = useState<Employee[]>([]);
+  const [loadingAllEmployees, setLoadingAllEmployees] = useState(false);
 
   const companyIdForNames = useMemo(() => {
     if (isValidCompanySelected) return selectedCompany;
     return employeeRecord?.company_id || null;
   }, [employeeRecord?.company_id, isValidCompanySelected, selectedCompany]);
+
 
   const { namesById: employeeNamesById } = useCompanyEmployeeNames(companyIdForNames);
 
@@ -336,6 +341,49 @@ export default function SchedulerSchedule() {
 
     fetchMyRequests();
   }, [employeeRecord?.id]);
+
+  // For employee view: fetch ALL employees from employees_public view (bypasses RLS for coworker visibility)
+  useEffect(() => {
+    const fetchAllCompanyEmployees = async () => {
+      if (!employeeRecord?.company_id) return;
+      
+      setLoadingAllEmployees(true);
+      try {
+        const { data, error } = await supabase
+          .from('employees_public')
+          .select('id, first_name, last_name, company_id, department_id, position, status, user_id')
+          .eq('company_id', employeeRecord.company_id)
+          .order('first_name', { ascending: true });
+        
+        if (error) throw error;
+        
+        // Map the public view data to Employee type (with minimal data)
+        const mappedEmployees: Employee[] = (data || []).map((e: any) => ({
+          id: e.id,
+          first_name: e.first_name || '',
+          last_name: e.last_name || '',
+          email: '', // Not available in public view
+          company_id: e.company_id,
+          department_id: e.department_id,
+          position: e.position,
+          status: e.status || 'active',
+          user_id: e.user_id,
+          created_at: '',
+          team_id: null
+        }));
+        
+        setAllCompanyEmployees(mappedEmployees);
+      } catch (error) {
+        console.error('Error fetching all company employees:', error);
+      } finally {
+        setLoadingAllEmployees(false);
+      }
+    };
+
+    if (userRole === 'employee' && employeeRecord?.company_id) {
+      fetchAllCompanyEmployees();
+    }
+  }, [userRole, employeeRecord?.company_id]);
 
   // Filter companies based on user role and access
   const availableCompanies = companies.filter(company => {
@@ -1412,11 +1460,12 @@ export default function SchedulerSchedule() {
       {/* Main Connecteam-Style Grid */}
       <div className="flex-1 p-4 overflow-hidden print-schedule">
         <ConnecteamScheduleGrid
-          employees={employees.filter(e => {
+          employees={(isEmployeeView ? allCompanyEmployees : employees).filter(e => {
             // Filter by department
             const deptMatch = selectedDepartment === "all" || e.department_id === selectedDepartment;
-            // Filter by team - for employees, only show their team; for managers, show selected team or all
-            const teamMatch = selectedTeamId === null || (e as any).team_id === selectedTeamId;
+            // For employees, show all company employees (no team filter since employees_public doesn't have team_id)
+            // For managers, filter by selected team or show all
+            const teamMatch = isEmployeeView || selectedTeamId === null || (e as any).team_id === selectedTeamId;
             return deptMatch && teamMatch;
           })}
           shifts={(showScheduleShifts || isEmployeeView ? shifts : []).filter(s => {

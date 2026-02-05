@@ -433,7 +433,7 @@ export default function EmployeeDashboard() {
         </TabsList>
 
         <TabsContent value="shifts">
-          <EmployeeShifts employeeId={employee.id} />
+          <EmployeeShifts employeeId={employee.id} showTeamScheduleTab={false} />
         </TabsContent>
 
         <TabsContent value="tasks">
