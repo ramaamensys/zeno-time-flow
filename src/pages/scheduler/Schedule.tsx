@@ -709,7 +709,7 @@ export default function SchedulerSchedule() {
         if (dayShifts.length === 0) {
           summaryRows += '<td>-</td>';
         } else {
-          summaryRows += '<td>' + dayShifts.map(s => formatTime(s.start_time)).join('<br>') + '</td>';
+          summaryRows += '<td>' + dayShifts.map(s => `${formatTime(s.start_time)}-${formatTime(s.end_time)}`).join('<br>') + '</td>';
         }
       });
       summaryRows += '<td style="font-weight:bold">' + weeklyHours.toFixed(0) + 'h</td></tr>';
