@@ -1448,6 +1448,20 @@ export type Database = {
           last_name: string
         }[]
       }
+      get_company_employees_for_schedule: {
+        Args: { _company_id: string }
+        Returns: {
+          company_id: string
+          department_id: string
+          employee_position: string
+          employee_status: string
+          first_name: string
+          id: string
+          last_name: string
+          team_id: string
+          user_id: string
+        }[]
+      }
       get_company_organization_id: {
         Args: { _company_id: string }
         Returns: string
