@@ -19,7 +19,7 @@ const CreateUserSchema = z.object({
     .max(100, { message: "Full name must be less than 100 characters" })
     .regex(/^[a-zA-Z0-9\s\-'\.]+$/, { message: "Full name contains invalid characters" })
     .transform(val => val.trim()),
-  role: z.enum(['user', 'admin', 'employee', 'candidate', 'manager', 'operations_manager'], {
+  role: z.enum(['user', 'admin', 'employee', 'house_keeping', 'maintenance', 'candidate', 'manager', 'operations_manager'], {
     errorMap: () => ({ message: "Invalid role specified" })
   }),
   password: z.string()
@@ -33,9 +33,9 @@ type CreateUserRequest = z.infer<typeof CreateUserSchema>;
 
 // Role hierarchy for authorization checks
 const ROLE_HIERARCHY: Record<string, string[]> = {
-  'super_admin': ['super_admin', 'operations_manager', 'manager', 'admin', 'user', 'employee', 'candidate'],
-  'operations_manager': ['manager', 'admin', 'user', 'employee', 'candidate'],
-  'manager': ['user', 'employee', 'candidate']
+  'super_admin': ['super_admin', 'operations_manager', 'manager', 'admin', 'user', 'employee', 'house_keeping', 'maintenance', 'candidate'],
+  'operations_manager': ['manager', 'admin', 'user', 'employee', 'house_keeping', 'maintenance', 'candidate'],
+  'manager': ['user', 'employee', 'house_keeping', 'maintenance', 'candidate']
 };
 
 function canCreateRole(callerRoles: string[], targetRole: string): boolean {
@@ -188,6 +188,8 @@ const handler = async (req: Request): Promise<Response> => {
       console.error('User cannot create role:', { callerRoles, targetRole: role });
       const roleDisplayName = role === 'operations_manager' ? 'Organization Manager' : 
                              role === 'manager' ? 'Company Manager' :
+                             role === 'house_keeping' ? 'House Keeping' :
+                             role === 'maintenance' ? 'Maintenance' :
                              role.charAt(0).toUpperCase() + role.slice(1);
       return new Response(JSON.stringify({ 
         error: `You don't have permission to create a ${roleDisplayName}. You can only create users with roles below your own level.`,
