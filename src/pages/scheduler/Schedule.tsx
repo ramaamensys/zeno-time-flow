@@ -342,22 +342,20 @@ export default function SchedulerSchedule() {
     fetchMyRequests();
   }, [employeeRecord?.id]);
 
-  // For employee view: fetch ALL employees from employees_public view (bypasses RLS for coworker visibility)
+  // For employee view: fetch ALL employees via SECURITY DEFINER RPC (bypasses RLS for coworker visibility)
   useEffect(() => {
     const fetchAllCompanyEmployees = async () => {
       if (!employeeRecord?.company_id) return;
       
       setLoadingAllEmployees(true);
       try {
+        // Use the new SECURITY DEFINER RPC to get all company employees
         const { data, error } = await supabase
-          .from('employees_public')
-          .select('id, first_name, last_name, company_id, department_id, position, status, user_id')
-          .eq('company_id', employeeRecord.company_id)
-          .order('first_name', { ascending: true });
+          .rpc('get_company_employees_for_schedule', { _company_id: employeeRecord.company_id });
         
         if (error) throw error;
         
-        // Map the public view data to Employee type (with minimal data)
+        // Map the RPC response to Employee type
         const mappedEmployees: Employee[] = (data || []).map((e: any) => ({
           id: e.id,
           first_name: e.first_name || '',
@@ -365,11 +363,11 @@ export default function SchedulerSchedule() {
           email: '', // Not available in public view
           company_id: e.company_id,
           department_id: e.department_id,
-          position: e.position,
-          status: e.status || 'active',
+          position: e.employee_position,
+          status: e.employee_status || 'active',
           user_id: e.user_id,
           created_at: '',
-          team_id: null
+          team_id: e.team_id
         }));
         
         setAllCompanyEmployees(mappedEmployees);
