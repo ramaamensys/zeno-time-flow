@@ -628,6 +628,37 @@ export default function UserManagement() {
             const firstName = nameParts[0] || '';
             const lastName = nameParts.slice(1).join(' ') || '';
             
+            // Auto-assign team based on role
+            let teamId: string | null = null;
+            if (newUser.role === 'house_keeping' || newUser.role === 'maintenance') {
+              const teamName = newUser.role === 'house_keeping' ? 'House Keeping' : 'Maintenance';
+              const { data: team } = await supabase
+                .from('schedule_teams')
+                .select('id')
+                .eq('company_id', newUser.company_id)
+                .eq('name', teamName)
+                .single();
+              
+              if (team) {
+                teamId = team.id;
+              } else {
+                // Create the team if it doesn't exist
+                const { data: newTeam } = await supabase
+                  .from('schedule_teams')
+                  .insert({
+                    company_id: newUser.company_id,
+                    name: teamName,
+                    color: newUser.role === 'house_keeping' ? '#3B82F6' : '#EF4444'
+                  })
+                  .select('id')
+                  .single();
+                
+                if (newTeam) {
+                  teamId = newTeam.id;
+                }
+              }
+            }
+            
             const { error: employeeError } = await supabase
               .from('employees')
               .insert({
@@ -636,6 +667,7 @@ export default function UserManagement() {
                 first_name: firstName,
                 last_name: lastName,
                 company_id: newUser.company_id,
+                team_id: teamId,
                 status: 'active',
                 hire_date: new Date().toISOString().split('T')[0]
               });
@@ -744,6 +776,37 @@ export default function UserManagement() {
       
       // Handle employee-type role company assignment (employee, house_keeping, maintenance)
       if ((editingUser.role === 'employee' || editingUser.role === 'house_keeping' || editingUser.role === 'maintenance') && editingUser.company_id) {
+        // Auto-assign team based on role
+        let teamId: string | null = null;
+        if (editingUser.role === 'house_keeping' || editingUser.role === 'maintenance') {
+          const teamName = editingUser.role === 'house_keeping' ? 'House Keeping' : 'Maintenance';
+          const { data: team } = await supabase
+            .from('schedule_teams')
+            .select('id')
+            .eq('company_id', editingUser.company_id)
+            .eq('name', teamName)
+            .single();
+          
+          if (team) {
+            teamId = team.id;
+          } else {
+            // Create the team if it doesn't exist
+            const { data: newTeam } = await supabase
+              .from('schedule_teams')
+              .insert({
+                company_id: editingUser.company_id,
+                name: teamName,
+                color: editingUser.role === 'house_keeping' ? '#3B82F6' : '#EF4444'
+              })
+              .select('id')
+              .single();
+            
+            if (newTeam) {
+              teamId = newTeam.id;
+            }
+          }
+        }
+        
         // Check if employee record already exists
         const { data: existingEmployee } = await supabase
           .from('employees')
@@ -752,10 +815,13 @@ export default function UserManagement() {
           .single();
 
         if (existingEmployee) {
-          // Update existing employee record
+          // Update existing employee record with team assignment
           const { error: updateError } = await supabase
             .from('employees')
-            .update({ company_id: editingUser.company_id })
+            .update({ 
+              company_id: editingUser.company_id,
+              team_id: teamId
+            })
             .eq('id', existingEmployee.id);
           
           if (updateError) {
@@ -775,6 +841,7 @@ export default function UserManagement() {
               first_name: firstName,
               last_name: lastName,
               company_id: editingUser.company_id,
+              team_id: teamId,
               status: 'active',
               hire_date: new Date().toISOString().split('T')[0]
             });
