@@ -196,11 +196,13 @@ export default function ConnecteamScheduleGrid({
       {/* Top Toolbar */}
       <div className="flex items-center justify-between p-3 border-b bg-muted/30">
         <div className="flex items-center gap-2">
-          {/* View Options Button */}
-          <Button variant="outline" size="sm" className="gap-2">
-            <Filter className="h-4 w-4" />
-            View options
-          </Button>
+          {/* View Options Button - only for managers */}
+          {!isEmployeeView && (
+            <Button variant="outline" size="sm" className="gap-2">
+              <Filter className="h-4 w-4" />
+              View options
+            </Button>
+          )}
           
           {/* Week Selector */}
           <div className="flex items-center gap-1 ml-2">
@@ -217,41 +219,44 @@ export default function ConnecteamScheduleGrid({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Direct Action Buttons */}
-          <Button variant="outline" size="sm" className="gap-1" onClick={onToggleEditMode}>
-            <Edit className="h-4 w-4" />
-            {isEditMode ? 'Exit Edit' : 'Edit'}
-          </Button>
-          
-          <Button variant="outline" size="sm" className="gap-1" onClick={onDuplicateWeek}>
-            <Plus className="h-4 w-4" />
-            Duplicate
-          </Button>
-          
-          <Button variant="outline" size="sm" className="gap-1" onClick={onPrint}>
-            Print
-          </Button>
-          
-          <Button variant="outline" size="sm" className="gap-1" onClick={onDownload}>
-            Download
-          </Button>
-          
-          <Button variant="outline" size="sm" className="gap-1 text-destructive hover:text-destructive" onClick={onClearWeek}>
-            <Trash2 className="h-4 w-4" />
-            Clear
-          </Button>
+        {/* Action Buttons - only for managers, not employees */}
+        {!isEmployeeView && canManageShifts && (
+          <div className="flex items-center gap-2">
+            {/* Direct Action Buttons */}
+            <Button variant="outline" size="sm" className="gap-1" onClick={onToggleEditMode}>
+              <Edit className="h-4 w-4" />
+              {isEditMode ? 'Exit Edit' : 'Edit'}
+            </Button>
+            
+            <Button variant="outline" size="sm" className="gap-1" onClick={onDuplicateWeek}>
+              <Plus className="h-4 w-4" />
+              Duplicate
+            </Button>
+            
+            <Button variant="outline" size="sm" className="gap-1" onClick={onPrint}>
+              Print
+            </Button>
+            
+            <Button variant="outline" size="sm" className="gap-1" onClick={onDownload}>
+              Download
+            </Button>
+            
+            <Button variant="outline" size="sm" className="gap-1 text-destructive hover:text-destructive" onClick={onClearWeek}>
+              <Trash2 className="h-4 w-4" />
+              Clear
+            </Button>
 
-          {/* Publish Button */}
-          <Button size="sm" className="bg-primary text-primary-foreground" onClick={onSaveSchedule}>
-            Publish
-          </Button>
+            {/* Publish Button */}
+            <Button size="sm" className="bg-primary text-primary-foreground" onClick={onSaveSchedule}>
+              Publish
+            </Button>
 
-          {/* Notification Bell */}
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Bell className="h-4 w-4" />
-          </Button>
-        </div>
+            {/* Notification Bell */}
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Bell className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Main Grid */}
