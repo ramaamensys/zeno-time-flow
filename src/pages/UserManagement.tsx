@@ -59,7 +59,7 @@ export default function UserManagement() {
     email: "",
     full_name: "",
     password: "",
-    role: "employee" as "employee" | "manager" | "operations_manager" | "super_admin",
+    role: "employee" as "employee" | "house_keeping" | "maintenance" | "manager" | "operations_manager" | "super_admin",
     manager_id: "none",
     organization_id: "",
     company_id: ""
@@ -81,7 +81,7 @@ export default function UserManagement() {
   const [assignmentData, setAssignmentData] = useState({
     organization_id: "",
     company_id: "",
-    role: "employee" as "employee" | "manager" | "operations_manager" | "super_admin"
+    role: "employee" as "employee" | "house_keeping" | "maintenance" | "manager" | "operations_manager" | "super_admin"
   });
 
   useEffect(() => {
@@ -1221,6 +1221,8 @@ export default function UserManagement() {
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="house_keeping">House Keeping</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
                   <SelectItem value="manager">Company Manager</SelectItem>
                   <SelectItem value="operations_manager">Organization Manager</SelectItem>
                   <SelectItem value="super_admin">Super Admin</SelectItem>
@@ -1313,12 +1315,14 @@ export default function UserManagement() {
                     <Label htmlFor="role" className="text-right">
                       Role
                     </Label>
-                    <Select value={newUser.role} onValueChange={(value: "employee" | "manager" | "operations_manager" | "super_admin") => setNewUser({ ...newUser, role: value, organization_id: "", company_id: "" })}>
+                    <Select value={newUser.role} onValueChange={(value: "employee" | "house_keeping" | "maintenance" | "manager" | "operations_manager" | "super_admin") => setNewUser({ ...newUser, role: value, organization_id: "", company_id: "" })}>
                       <SelectTrigger className="col-span-3">
                         <SelectValue />
                       </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="employee">Employee</SelectItem>
+                          <SelectItem value="house_keeping">House Keeping</SelectItem>
+                          <SelectItem value="maintenance">Maintenance</SelectItem>
                           <SelectItem value="manager">Company Manager</SelectItem>
                           <SelectItem value="operations_manager">Organization Manager</SelectItem>
                           {currentUserRole === 'super_admin' && <SelectItem value="super_admin">Super Admin</SelectItem>}
@@ -1590,6 +1594,8 @@ export default function UserManagement() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="employee">Employee</SelectItem>
+                        <SelectItem value="house_keeping">House Keeping</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
                         <SelectItem value="manager">Company Manager</SelectItem>
                         <SelectItem value="operations_manager">Organization Manager</SelectItem>
                         <SelectItem value="super_admin">Super Admin</SelectItem>
@@ -1774,6 +1780,8 @@ export default function UserManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="employee">Employee</SelectItem>
+                    <SelectItem value="house_keeping">House Keeping</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem>
                     <SelectItem value="manager">Company Manager</SelectItem>
                     <SelectItem value="operations_manager">Organization Manager</SelectItem>
                     <SelectItem value="super_admin">Super Admin</SelectItem>
