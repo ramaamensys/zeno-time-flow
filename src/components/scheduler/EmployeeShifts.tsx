@@ -219,30 +219,38 @@ export default function EmployeeShifts({ employeeId, showTeamScheduleTab = true 
     }
   }, [companyId, weekOffset]);
 
+  // Initial data fetch only - no polling
   useEffect(() => {
-    // Check for missed shifts first, then fetch data
     const runCheck = async () => {
-      const markedAny = await checkAndMarkMissedShifts();
+      await checkAndMarkMissedShifts();
       await fetchData();
       await fetchCompanyShifts();
-      // If we marked any shifts, refetch again to ensure UI is updated
-      if (markedAny) {
-        await fetchData();
-      }
     };
     
     runCheck();
+  }, [employeeId, weekOffset]); // Only refetch when employee or week changes
+  
+  // Realtime subscription for shift changes instead of polling
+  useEffect(() => {
+    if (!employeeId) return;
     
-    // Set up interval to check for missed shifts every 30 seconds for quicker detection
-    const intervalId = setInterval(async () => {
-      const markedAny = await checkAndMarkMissedShifts();
-      if (markedAny) {
-        await fetchData();
-      }
-    }, 30000);
+    const channel = supabase
+      .channel(`employee_shifts_${employeeId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'shifts',
+        filter: `employee_id=eq.${employeeId}`
+      }, () => {
+        // Refetch on any shift changes
+        fetchData();
+      })
+      .subscribe();
     
-    return () => clearInterval(intervalId);
-  }, [checkAndMarkMissedShifts, fetchData, fetchCompanyShifts]);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [employeeId, fetchData]);
 
   const getShiftStatusBadge = (shift: any) => {
     const startTime = parseISO(shift.start_time);
