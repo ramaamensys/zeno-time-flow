@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const VALID_ROLES = ['user', 'admin', 'employee', 'house_keeping', 'maintenance', 'candidate', 'manager', 'operations_manager'];
+const VALID_ROLES = ['user', 'admin', 'super_admin', 'employee', 'house_keeping', 'maintenance', 'candidate', 'manager', 'operations_manager'];
 const VALID_APP_TYPES = ['calendar', 'scheduler'];
 
 const ROLE_HIERARCHY: Record<string, string[]> = {
