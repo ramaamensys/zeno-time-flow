@@ -242,7 +242,7 @@ export default function ConnecteamScheduleGrid({
 
       {/* Day Columns Grid */}
       <div className="flex-1 overflow-auto">
-        <div className="grid grid-cols-7 min-w-[900px] h-full">
+        <div className="grid grid-cols-7 min-w-[1100px] h-full">
           <TooltipProvider>
             {weekDates.map((date, dayIndex) => {
               const stats = getDayStats(date);
@@ -356,13 +356,13 @@ export default function ConnecteamScheduleGrid({
 
                     {/* Inline Add Shift Form */}
                     {inlineForm && inlineForm.dayIndex === dayIndex && (
-                      <div className="rounded-xl border-2 border-dashed border-primary/60 p-4 bg-muted/40 space-y-3">
+                      <div className="rounded-xl border-2 border-dashed border-primary/60 p-4 bg-card shadow-lg space-y-3">
                         {/* Shift preset */}
                         <Select value={inlineForm.selectedPreset} onValueChange={handlePresetChange}>
-                          <SelectTrigger className="h-9 text-sm">
+                          <SelectTrigger className="h-10 text-sm bg-background">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-popover border shadow-lg z-50">
                             {presetShifts.map((preset) => (
                               <SelectItem key={preset.label} value={preset.label}>
                                 {preset.label}
@@ -375,13 +375,13 @@ export default function ConnecteamScheduleGrid({
                         <div className="grid grid-cols-2 gap-2">
                           <Input
                             type="time"
-                            className="h-9 text-sm"
+                            className="h-10 text-sm bg-background"
                             value={inlineForm.startTime}
                             onChange={(e) => setInlineForm({ ...inlineForm, startTime: e.target.value, selectedPreset: 'Custom' })}
                           />
                           <Input
                             type="time"
-                            className="h-9 text-sm"
+                            className="h-10 text-sm bg-background"
                             value={inlineForm.endTime}
                             onChange={(e) => setInlineForm({ ...inlineForm, endTime: e.target.value, selectedPreset: 'Custom' })}
                           />
@@ -392,10 +392,10 @@ export default function ConnecteamScheduleGrid({
                           value={inlineForm.employeeId} 
                           onValueChange={(val) => setInlineForm({ ...inlineForm, employeeId: val })}
                         >
-                          <SelectTrigger className="h-9 text-sm">
+                          <SelectTrigger className="h-10 text-sm bg-background">
                             <SelectValue placeholder="Select employee" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-popover border shadow-lg z-50">
                             {employees.map((emp) => (
                               <SelectItem key={emp.id} value={emp.id}>
                                 {emp.first_name} {emp.last_name}
@@ -408,7 +408,7 @@ export default function ConnecteamScheduleGrid({
                         <div className="flex gap-2">
                           <Button 
                             size="sm" 
-                            className="flex-1 h-9" 
+                            className="flex-1 h-10" 
                             onClick={handleInlineConfirm}
                             disabled={!inlineForm.employeeId}
                           >
@@ -417,7 +417,7 @@ export default function ConnecteamScheduleGrid({
                           <Button 
                             size="sm" 
                             variant="outline" 
-                            className="h-9 px-3"
+                            className="h-10 px-3"
                             onClick={() => setInlineForm(null)}
                           >
                             <X className="h-4 w-4" />
