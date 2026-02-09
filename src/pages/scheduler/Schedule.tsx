@@ -1192,15 +1192,19 @@ export default function SchedulerSchedule() {
     }
 
     try {
-      // Unlink time clock entries first to avoid foreign key issues
-      for (const shift of shifts) {
-        await supabase
-          .from('time_clock')
-          .update({ shift_id: null })
-          .eq('shift_id', shift.id);
-        
-        await deleteShift(shift.id);
-      }
+      const shiftIds = shifts.map(s => s.id);
+      
+      // Unlink all time clock entries at once
+      await supabase
+        .from('time_clock')
+        .update({ shift_id: null })
+        .in('shift_id', shiftIds);
+      
+      // Delete all shifts at once
+      await supabase
+        .from('shifts')
+        .delete()
+        .in('id', shiftIds);
       
       setShowScheduleShifts(false);
       

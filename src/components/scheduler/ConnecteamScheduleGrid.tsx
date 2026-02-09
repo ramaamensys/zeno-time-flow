@@ -298,19 +298,19 @@ export default function ConnecteamScheduleGrid({
                           onDragEnd={onDragEnd}
                           onClick={() => canManageShifts && onShiftClick(shift)}
                           className={cn(
-                            "rounded-lg p-3 cursor-pointer transition-all relative group/shift",
+                            "rounded-xl p-4 cursor-pointer transition-all relative group/shift shadow-sm",
                             getShiftColor(shift),
                             isEditMode && "hover:opacity-90 hover:shadow-md"
                           )}
                         >
-                          {/* Time range - bigger */}
-                          <div className="font-bold text-sm mb-1">
+                          {/* Time range */}
+                          <div className="font-bold text-base mb-2 tracking-wide">
                             {formatShiftTime(shift)}
                           </div>
 
                           {/* Employee name */}
-                          <div className="flex items-center gap-2 mt-1">
-                            <Avatar className="h-6 w-6">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-7 w-7">
                               <AvatarFallback 
                                 className="text-[10px] font-semibold"
                                 style={{ 
@@ -321,17 +321,17 @@ export default function ConnecteamScheduleGrid({
                                 {employeeName.split(' ').map(n => n[0]).join('').slice(0, 2)}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="text-xs font-medium truncate">{employeeName}</span>
+                            <span className="text-sm font-medium truncate">{employeeName}</span>
                           </div>
 
                           {shift.notes && (
-                            <div className="text-[10px] opacity-80 truncate mt-1">
+                            <div className="text-xs opacity-80 truncate mt-2">
                               {shift.notes}
                             </div>
                           )}
 
                           {shift.replacement_employee_id && (
-                            <div className="text-[10px] opacity-80 mt-1 flex items-center gap-1">
+                            <div className="text-xs opacity-80 mt-1 flex items-center gap-1">
                               <Users className="h-3 w-3" /> Replacement assigned
                             </div>
                           )}
@@ -341,7 +341,7 @@ export default function ConnecteamScheduleGrid({
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="absolute top-1 right-1 h-5 w-5 opacity-0 group-hover/shift:opacity-100 bg-black/20 hover:bg-black/40"
+                              className="absolute top-1.5 right-1.5 h-6 w-6 opacity-0 group-hover/shift:opacity-100 bg-black/20 hover:bg-black/40"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onDeleteShift(shift.id);
@@ -356,10 +356,10 @@ export default function ConnecteamScheduleGrid({
 
                     {/* Inline Add Shift Form */}
                     {inlineForm && inlineForm.dayIndex === dayIndex && (
-                      <div className="rounded-lg border-2 border-dashed border-primary p-3 bg-muted/50 space-y-2">
+                      <div className="rounded-xl border-2 border-dashed border-primary/60 p-4 bg-muted/40 space-y-3">
                         {/* Shift preset */}
                         <Select value={inlineForm.selectedPreset} onValueChange={handlePresetChange}>
-                          <SelectTrigger className="h-8 text-xs">
+                          <SelectTrigger className="h-9 text-sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -372,16 +372,16 @@ export default function ConnecteamScheduleGrid({
                         </Select>
 
                         {/* Time inputs */}
-                        <div className="grid grid-cols-2 gap-1">
+                        <div className="grid grid-cols-2 gap-2">
                           <Input
                             type="time"
-                            className="h-8 text-xs"
+                            className="h-9 text-sm"
                             value={inlineForm.startTime}
                             onChange={(e) => setInlineForm({ ...inlineForm, startTime: e.target.value, selectedPreset: 'Custom' })}
                           />
                           <Input
                             type="time"
-                            className="h-8 text-xs"
+                            className="h-9 text-sm"
                             value={inlineForm.endTime}
                             onChange={(e) => setInlineForm({ ...inlineForm, endTime: e.target.value, selectedPreset: 'Custom' })}
                           />
@@ -392,7 +392,7 @@ export default function ConnecteamScheduleGrid({
                           value={inlineForm.employeeId} 
                           onValueChange={(val) => setInlineForm({ ...inlineForm, employeeId: val })}
                         >
-                          <SelectTrigger className="h-8 text-xs">
+                          <SelectTrigger className="h-9 text-sm">
                             <SelectValue placeholder="Select employee" />
                           </SelectTrigger>
                           <SelectContent>
@@ -405,27 +405,26 @@ export default function ConnecteamScheduleGrid({
                         </Select>
 
                         {/* Actions */}
-                        <div className="flex gap-1">
+                        <div className="flex gap-2">
                           <Button 
                             size="sm" 
-                            className="flex-1 h-7 text-xs" 
+                            className="flex-1 h-9" 
                             onClick={handleInlineConfirm}
                             disabled={!inlineForm.employeeId}
                           >
-                            <Check className="h-3 w-3 mr-1" /> Add
+                            <Check className="h-4 w-4 mr-1" /> Add
                           </Button>
                           <Button 
                             size="sm" 
-                            variant="ghost" 
-                            className="h-7 text-xs"
+                            variant="outline" 
+                            className="h-9 px-3"
                             onClick={() => setInlineForm(null)}
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
                     )}
-
                     {/* Add Shift Button */}
                     {canManageShifts && (inlineForm === null || inlineForm.dayIndex !== dayIndex) && (
                       <Button
