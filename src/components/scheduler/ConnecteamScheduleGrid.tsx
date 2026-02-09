@@ -359,7 +359,7 @@ export default function ConnecteamScheduleGrid({
                       <div className="rounded-xl border-2 border-dashed border-primary/60 p-4 bg-card shadow-lg space-y-3">
                         {/* Shift preset */}
                         <Select value={inlineForm.selectedPreset} onValueChange={handlePresetChange}>
-                          <SelectTrigger className="h-10 text-sm bg-background">
+                          <SelectTrigger className="h-10 text-sm text-left bg-background [&>span]:truncate [&>span]:block [&>span]:text-left">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-popover border shadow-lg z-50">
@@ -392,7 +392,7 @@ export default function ConnecteamScheduleGrid({
                           value={inlineForm.employeeId} 
                           onValueChange={(val) => setInlineForm({ ...inlineForm, employeeId: val })}
                         >
-                          <SelectTrigger className="h-10 text-sm bg-background">
+                          <SelectTrigger className="h-10 text-sm text-left bg-background [&>span]:truncate [&>span]:block [&>span]:text-left">
                             <SelectValue placeholder="Select employee" />
                           </SelectTrigger>
                           <SelectContent className="bg-popover border shadow-lg z-50">
