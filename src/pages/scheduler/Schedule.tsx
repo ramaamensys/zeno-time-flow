@@ -1454,6 +1454,29 @@ export default function SchedulerSchedule() {
           onDownload={downloadSchedule}
           isEmployeeView={isEmployeeView}
           currentEmployeeId={employeeRecord?.id}
+          onCreateShiftDirect={async (employeeId, dayIndex, startTime, endTime) => {
+            const employee = employees.find(e => e.id === employeeId);
+            const date = weekDates[dayIndex];
+            const [startH, startM] = startTime.split(':').map(Number);
+            const [endH, endM] = endTime.split(':').map(Number);
+            const startDateTime = new Date(date);
+            startDateTime.setHours(startH, startM, 0, 0);
+            const endDateTime = new Date(date);
+            endDateTime.setHours(endH, endM, 0, 0);
+            if (endH < startH) endDateTime.setDate(endDateTime.getDate() + 1);
+            await createShift({
+              employee_id: employeeId,
+              company_id: selectedCompany,
+              department_id: selectedDepartment !== "all" ? selectedDepartment : employee?.department_id || undefined,
+              team_id: employee?.team_id || undefined,
+              start_time: startDateTime.toISOString(),
+              end_time: endDateTime.toISOString(),
+              break_minutes: 30,
+              hourly_rate: employee?.hourly_rate || undefined,
+              status: 'scheduled'
+            });
+            setShowScheduleShifts(true);
+          }}
         />
       </div>
 
