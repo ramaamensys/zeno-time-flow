@@ -65,16 +65,12 @@ const presetShifts = [
   { label: 'Day (9AM-5PM)', startHour: 9, endHour: 17 },
 ];
 
-interface ShiftEntry {
-  employeeId: string;
-}
-
 interface InlineShiftForm {
   dayIndex: number;
   selectedPreset: string;
   startTime: string;
   endTime: string;
-  entries: ShiftEntry[];
+  shiftCreated: boolean;
 }
 
 export default function ConnecteamScheduleGrid({
@@ -172,7 +168,7 @@ export default function ConnecteamScheduleGrid({
       selectedPreset: 'Morning (6AM-2PM)',
       startTime: '06:00',
       endTime: '14:00',
-      entries: [],
+      shiftCreated: false,
     });
   };
 
@@ -189,38 +185,18 @@ export default function ConnecteamScheduleGrid({
     }
   };
 
-  const handleAddEntry = () => {
+  const handleCreateShift = () => {
     if (!inlineForm) return;
-    setInlineForm({
-      ...inlineForm,
-      entries: [...inlineForm.entries, { employeeId: '' }],
-    });
+    setInlineForm({ ...inlineForm, shiftCreated: true });
   };
 
-  const handleEntryEmployeeChange = (index: number, employeeId: string) => {
-    if (!inlineForm) return;
-    const updated = [...inlineForm.entries];
-    updated[index] = { employeeId };
-    setInlineForm({ ...inlineForm, entries: updated });
-  };
-
-  const handleRemoveEntry = (index: number) => {
-    if (!inlineForm) return;
-    const updated = inlineForm.entries.filter((_, i) => i !== index);
-    setInlineForm({ ...inlineForm, entries: updated });
-  };
-
-  const handleInlineConfirmAll = () => {
-    if (!inlineForm) return;
-    const validEntries = inlineForm.entries.filter(e => e.employeeId);
-    validEntries.forEach(entry => {
-      if (onCreateShiftDirect) {
-        onCreateShiftDirect(entry.employeeId, inlineForm.dayIndex, inlineForm.startTime, inlineForm.endTime);
-      } else {
-        onAddShift(entry.employeeId, inlineForm.dayIndex);
-      }
-    });
-    setInlineForm(null);
+  const handleAssignEmployee = (employeeId: string) => {
+    if (!inlineForm || !employeeId) return;
+    if (onCreateShiftDirect) {
+      onCreateShiftDirect(employeeId, inlineForm.dayIndex, inlineForm.startTime, inlineForm.endTime);
+    } else {
+      onAddShift(employeeId, inlineForm.dayIndex);
+    }
   };
 
   return (
@@ -385,7 +361,7 @@ export default function ConnecteamScheduleGrid({
                     {/* Inline Add Shift Form */}
                     {inlineForm && inlineForm.dayIndex === dayIndex && (
                       <div className="rounded-xl border-2 border-dashed border-primary/60 p-4 bg-card shadow-lg space-y-3">
-                        {/* Shift preset */}
+                        {/* Shift preset + time */}
                         <Select value={inlineForm.selectedPreset} onValueChange={handlePresetChange}>
                           <SelectTrigger className="h-10 text-sm text-left bg-background [&>span]:truncate [&>span]:block [&>span]:text-left">
                             <SelectValue />
@@ -399,7 +375,6 @@ export default function ConnecteamScheduleGrid({
                           </SelectContent>
                         </Select>
 
-                        {/* Time inputs */}
                         <div className="grid grid-cols-2 gap-2">
                           <Input
                             type="time"
@@ -415,14 +390,33 @@ export default function ConnecteamScheduleGrid({
                           />
                         </div>
 
-                        {/* Employee entries */}
-                        {inlineForm.entries.map((entry, idx) => (
-                          <div key={idx} className="flex items-center gap-1">
-                            <Select
-                              value={entry.employeeId}
-                              onValueChange={(val) => handleEntryEmployeeChange(idx, val)}
+                        {/* Create Shift button */}
+                        {!inlineForm.shiftCreated && (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              className="flex-1 h-10"
+                              onClick={handleCreateShift}
                             >
-                              <SelectTrigger className="h-10 text-sm text-left bg-background flex-1 [&>span]:truncate [&>span]:block [&>span]:text-left">
+                              <Check className="h-4 w-4 mr-1" /> Create Shift
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-10 px-3"
+                              onClick={() => setInlineForm(null)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* Employee assignment (shown after Create Shift) */}
+                        {inlineForm.shiftCreated && (
+                          <div className="space-y-2 border-t pt-3">
+                            <p className="text-xs font-medium text-muted-foreground">Assign employee to this shift:</p>
+                            <Select onValueChange={handleAssignEmployee}>
+                              <SelectTrigger className="h-10 text-sm text-left bg-background [&>span]:truncate [&>span]:block [&>span]:text-left">
                                 <SelectValue placeholder="Select employee" />
                               </SelectTrigger>
                               <SelectContent className="bg-popover border shadow-lg z-50">
@@ -434,47 +428,18 @@ export default function ConnecteamScheduleGrid({
                               </SelectContent>
                             </Select>
                             <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                              onClick={() => handleRemoveEntry(idx)}
+                              size="sm"
+                              variant="outline"
+                              className="w-full h-9 text-xs"
+                              onClick={() => setInlineForm(null)}
                             >
-                              <X className="h-4 w-4" />
+                              Done
                             </Button>
                           </div>
-                        ))}
-
-                        {/* Add employee + button */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full h-9 border-dashed gap-1"
-                          onClick={handleAddEntry}
-                        >
-                          <Plus className="h-4 w-4" /> Add Employee
-                        </Button>
-
-                        {/* Actions */}
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            className="flex-1 h-10"
-                            onClick={handleInlineConfirmAll}
-                            disabled={!inlineForm.entries.some(e => e.employeeId)}
-                          >
-                            <Check className="h-4 w-4 mr-1" /> Create Shifts
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-10 px-3"
-                            onClick={() => setInlineForm(null)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        )}
                       </div>
                     )}
+
                     {/* Add Shift Button */}
                     {canManageShifts && (inlineForm === null || inlineForm.dayIndex !== dayIndex) && (
                       <Button
