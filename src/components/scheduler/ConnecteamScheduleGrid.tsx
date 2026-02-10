@@ -358,10 +358,9 @@ export default function ConnecteamScheduleGrid({
                       );
                     })}
 
-                    {/* Inline Add Shift Form */}
-                    {inlineForm && inlineForm.dayIndex === dayIndex && (
+                    {/* Inline Add Shift Form - only preset + time + create */}
+                    {inlineForm && inlineForm.dayIndex === dayIndex && !inlineForm.shiftCreated && (
                       <div className="rounded-xl border-2 border-dashed border-primary/60 p-4 bg-card shadow-lg space-y-3">
-                        {/* Shift preset + time */}
                         <Select value={inlineForm.selectedPreset} onValueChange={handlePresetChange}>
                           <SelectTrigger className="h-10 text-sm text-left bg-background [&>span]:truncate [&>span]:block [&>span]:text-left">
                             <SelectValue />
@@ -390,53 +389,50 @@ export default function ConnecteamScheduleGrid({
                           />
                         </div>
 
-                        {/* Create Shift button */}
-                        {!inlineForm.shiftCreated && (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              className="flex-1 h-10"
-                              onClick={handleCreateShift}
-                            >
-                              <Check className="h-4 w-4 mr-1" /> Create Shift
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-10 px-3"
-                              onClick={() => setInlineForm(null)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="flex-1 h-10"
+                            onClick={handleCreateShift}
+                          >
+                            <Check className="h-4 w-4 mr-1" /> Create Shift
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-10 px-3"
+                            onClick={() => setInlineForm(null)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
-                        {/* Employee assignment (shown after Create Shift) */}
-                        {inlineForm.shiftCreated && (
-                          <div className="space-y-2 border-t pt-3">
-                            <p className="text-xs font-medium text-muted-foreground">Assign employee to this shift:</p>
-                            <Select onValueChange={handleAssignEmployee}>
-                              <SelectTrigger className="h-10 text-sm text-left bg-background [&>span]:truncate [&>span]:block [&>span]:text-left">
-                                <SelectValue placeholder="Select employee" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-popover border shadow-lg z-50">
-                                {employees.map((emp) => (
-                                  <SelectItem key={emp.id} value={emp.id}>
-                                    {emp.first_name} {emp.last_name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full h-9 text-xs"
-                              onClick={() => setInlineForm(null)}
-                            >
-                              Done
-                            </Button>
-                          </div>
-                        )}
+                    {/* Employee assignment - OUTSIDE the shift creation box, shown after shift created */}
+                    {inlineForm && inlineForm.dayIndex === dayIndex && inlineForm.shiftCreated && (
+                      <div className="space-y-2 p-3 rounded-lg bg-muted/40">
+                        <p className="text-xs font-medium text-muted-foreground">Assign employee to shift ({inlineForm.startTime} - {inlineForm.endTime}):</p>
+                        <Select onValueChange={handleAssignEmployee}>
+                          <SelectTrigger className="h-10 text-sm text-left bg-background [&>span]:truncate [&>span]:block [&>span]:text-left">
+                            <SelectValue placeholder="Select employee" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-popover border shadow-lg z-50">
+                            {employees.map((emp) => (
+                              <SelectItem key={emp.id} value={emp.id}>
+                                {emp.first_name} {emp.last_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full h-9 text-xs"
+                          onClick={() => setInlineForm(null)}
+                        >
+                          Done
+                        </Button>
                       </div>
                     )}
 
