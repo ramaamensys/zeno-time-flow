@@ -65,12 +65,16 @@ const presetShifts = [
   { label: 'Day (9AM-5PM)', startHour: 9, endHour: 17 },
 ];
 
+interface ShiftEntry {
+  employeeId: string;
+}
+
 interface InlineShiftForm {
   dayIndex: number;
   selectedPreset: string;
   startTime: string;
   endTime: string;
-  employeeId: string;
+  entries: ShiftEntry[];
 }
 
 export default function ConnecteamScheduleGrid({
@@ -168,7 +172,7 @@ export default function ConnecteamScheduleGrid({
       selectedPreset: 'Morning (6AM-2PM)',
       startTime: '06:00',
       endTime: '14:00',
-      employeeId: '',
+      entries: [],
     });
   };
 
@@ -185,13 +189,37 @@ export default function ConnecteamScheduleGrid({
     }
   };
 
-  const handleInlineConfirm = () => {
-    if (!inlineForm || !inlineForm.employeeId) return;
-    if (onCreateShiftDirect) {
-      onCreateShiftDirect(inlineForm.employeeId, inlineForm.dayIndex, inlineForm.startTime, inlineForm.endTime);
-    } else {
-      onAddShift(inlineForm.employeeId, inlineForm.dayIndex);
-    }
+  const handleAddEntry = () => {
+    if (!inlineForm) return;
+    setInlineForm({
+      ...inlineForm,
+      entries: [...inlineForm.entries, { employeeId: '' }],
+    });
+  };
+
+  const handleEntryEmployeeChange = (index: number, employeeId: string) => {
+    if (!inlineForm) return;
+    const updated = [...inlineForm.entries];
+    updated[index] = { employeeId };
+    setInlineForm({ ...inlineForm, entries: updated });
+  };
+
+  const handleRemoveEntry = (index: number) => {
+    if (!inlineForm) return;
+    const updated = inlineForm.entries.filter((_, i) => i !== index);
+    setInlineForm({ ...inlineForm, entries: updated });
+  };
+
+  const handleInlineConfirmAll = () => {
+    if (!inlineForm) return;
+    const validEntries = inlineForm.entries.filter(e => e.employeeId);
+    validEntries.forEach(entry => {
+      if (onCreateShiftDirect) {
+        onCreateShiftDirect(entry.employeeId, inlineForm.dayIndex, inlineForm.startTime, inlineForm.endTime);
+      } else {
+        onAddShift(entry.employeeId, inlineForm.dayIndex);
+      }
+    });
     setInlineForm(null);
   };
 
@@ -387,36 +415,58 @@ export default function ConnecteamScheduleGrid({
                           />
                         </div>
 
-                        {/* Employee dropdown */}
-                        <Select 
-                          value={inlineForm.employeeId} 
-                          onValueChange={(val) => setInlineForm({ ...inlineForm, employeeId: val })}
+                        {/* Employee entries */}
+                        {inlineForm.entries.map((entry, idx) => (
+                          <div key={idx} className="flex items-center gap-1">
+                            <Select
+                              value={entry.employeeId}
+                              onValueChange={(val) => handleEntryEmployeeChange(idx, val)}
+                            >
+                              <SelectTrigger className="h-10 text-sm text-left bg-background flex-1 [&>span]:truncate [&>span]:block [&>span]:text-left">
+                                <SelectValue placeholder="Select employee" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-popover border shadow-lg z-50">
+                                {employees.map((emp) => (
+                                  <SelectItem key={emp.id} value={emp.id}>
+                                    {emp.first_name} {emp.last_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleRemoveEntry(idx)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+
+                        {/* Add employee + button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full h-9 border-dashed gap-1"
+                          onClick={handleAddEntry}
                         >
-                          <SelectTrigger className="h-10 text-sm text-left bg-background [&>span]:truncate [&>span]:block [&>span]:text-left">
-                            <SelectValue placeholder="Select employee" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-popover border shadow-lg z-50">
-                            {employees.map((emp) => (
-                              <SelectItem key={emp.id} value={emp.id}>
-                                {emp.first_name} {emp.last_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          <Plus className="h-4 w-4" /> Add Employee
+                        </Button>
 
                         {/* Actions */}
                         <div className="flex gap-2">
-                          <Button 
-                            size="sm" 
-                            className="flex-1 h-10" 
-                            onClick={handleInlineConfirm}
-                            disabled={!inlineForm.employeeId}
+                          <Button
+                            size="sm"
+                            className="flex-1 h-10"
+                            onClick={handleInlineConfirmAll}
+                            disabled={!inlineForm.entries.some(e => e.employeeId)}
                           >
-                            <Check className="h-4 w-4 mr-1" /> Add
+                            <Check className="h-4 w-4 mr-1" /> Create Shifts
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
+                          <Button
+                            size="sm"
+                            variant="outline"
                             className="h-10 px-3"
                             onClick={() => setInlineForm(null)}
                           >
