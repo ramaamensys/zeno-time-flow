@@ -1445,6 +1445,9 @@ export default function SchedulerSchedule() {
           }}
           onAddShift={handleAddShiftFromGrid}
           onDeleteShift={deleteShift}
+          onReassignShift={(shiftId, newEmployeeId) => {
+            updateShift(shiftId, { employee_id: newEmployeeId });
+          }}
           onSetAvailability={setEmployeeAvailability}
           checkShiftConflict={checkShiftConflict}
           onNavigateWeek={navigateWeek}
