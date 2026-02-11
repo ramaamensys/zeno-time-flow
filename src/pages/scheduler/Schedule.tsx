@@ -636,53 +636,6 @@ export default function SchedulerSchedule() {
     
     // Build employee sections
     let employeeSections = '';
-    filteredEmps.forEach(emp => {
-      const empShifts = shifts.filter(s => s.employee_id === emp.id);
-      if (empShifts.length === 0) return;
-      
-      const weeklyHours = empShifts.reduce((acc, s) => {
-        const start = new Date(s.start_time);
-        const end = new Date(s.end_time);
-        return acc + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-      }, 0);
-      
-      let tableRows = '';
-      weekDates.forEach((date, i) => {
-        const dayShifts = empShifts.filter(s => {
-          const sd = new Date(s.start_time);
-          return sd.toDateString() === date.toDateString();
-        });
-        
-        if (dayShifts.length === 0) {
-          tableRows += '<tr class="no-shift"><td>' + days[i] + '</td><td>' + formatDate(date) + '</td><td>-</td><td>-</td><td>-</td></tr>';
-        } else {
-          dayShifts.forEach((s, si) => {
-            const start = new Date(s.start_time);
-            const end = new Date(s.end_time);
-            const hours = ((end.getTime() - start.getTime()) / (1000 * 60 * 60)).toFixed(1);
-            const time = formatTime(s.start_time) + ' - ' + formatTime(s.end_time);
-            
-            tableRows += '<tr>';
-            if (si === 0) {
-              tableRows += '<td rowspan="' + dayShifts.length + '">' + days[i] + '</td>';
-              tableRows += '<td rowspan="' + dayShifts.length + '">' + formatDate(date) + '</td>';
-            }
-            tableRows += '<td>' + time + '</td>';
-            tableRows += '<td>' + hours + 'h</td>';
-            tableRows += '<td>' + (s.notes || '-') + '</td>';
-            tableRows += '</tr>';
-          });
-        }
-      });
-      
-      employeeSections += '<div class="employee-section">';
-      employeeSections += '<h3>' + emp.first_name + ' ' + emp.last_name + (emp.position ? ' (' + emp.position + ')' : '') + '</h3>';
-      employeeSections += '<table><thead><tr><th style="width:60px">Day</th><th style="width:70px">Date</th><th>Shift Time</th><th style="width:50px">Hours</th><th>Notes</th></tr></thead>';
-      employeeSections += '<tbody>' + tableRows + '</tbody></table>';
-      employeeSections += '<div class="total-row">Weekly Total: ' + weeklyHours.toFixed(1) + ' hours (' + empShifts.length + ' shifts)</div>';
-      employeeSections += '</div>';
-    });
-    
     // Build summary table header
     let summaryHeaders = '<th style="text-align:left">Employee</th>';
     weekDates.forEach((d, i) => {
@@ -721,35 +674,26 @@ export default function SchedulerSchedule() {
     const printContent = '<!DOCTYPE html><html><head><title>' + companyName + ' - Weekly Schedule</title>' +
       '<style>' +
       '* { box-sizing: border-box; margin: 0; padding: 0; }' +
-      'body { font-family: Arial, sans-serif; font-size: 11px; line-height: 1.4; padding: 15px; }' +
+      'body { font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; padding: 15px; }' +
       'h1 { font-size: 18px; margin-bottom: 4px; }' +
-      'h2 { font-size: 14px; font-weight: normal; color: #666; }' +
-      'h3 { font-size: 13px; background: #e5e5e5; padding: 6px 10px; border: 1px solid #999; margin-top: 15px; }' +
       '.header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }' +
       '.meta { font-size: 12px; color: #666; margin-top: 4px; }' +
-      'table { width: 100%; border-collapse: collapse; margin-top: 5px; }' +
-      'th, td { border: 1px solid #666; padding: 5px 8px; text-align: left; }' +
-      'th { background: #f0f0f0; font-weight: bold; }' +
-      '.total-row { text-align: right; font-size: 11px; margin-top: 3px; padding-right: 5px; }' +
-      '.summary { margin-top: 25px; page-break-before: always; }' +
-      '.summary h3 { background: none; border: none; border-bottom: 2px solid #000; padding-left: 0; }' +
-      '.summary th { background: #ddd; text-align: center; }' +
-      '.summary td { text-align: center; font-size: 10px; }' +
-      '.summary td:first-child { text-align: left; font-weight: bold; }' +
+      'table { width: 100%; border-collapse: collapse; margin-top: 10px; }' +
+      'th, td { border: 1px solid #666; padding: 6px 8px; text-align: left; }' +
+      'th { background: #ddd; text-align: center; font-weight: bold; }' +
+      'td { text-align: center; font-size: 11px; }' +
+      'td:first-child { text-align: left; font-weight: bold; }' +
       '.footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 9px; color: #999; text-align: center; }' +
-      '.employee-section { page-break-inside: avoid; }' +
-      '.no-shift { color: #999; }' +
       '@page { size: A4 portrait; margin: 10mm; }' +
       '</style></head><body>' +
       '<div class="header">' +
       '<h1>' + companyName + '</h1>' +
       '<div class="meta">Weekly Schedule: ' + weekRange + '</div>' +
-      '<div class="meta">Total: ' + shifts.length + ' shifts | ' + filteredEmps.length + ' employees</div>' +
+      '<div class="meta">Total: ' + shifts.length + ' shifts | ' + filteredEmps.filter(e => shifts.some(s => s.employee_id === e.id)).length + ' employees</div>' +
       '</div>' +
-      employeeSections +
-      '<div class="summary"><h3>Weekly Summary</h3>' +
+      '<h3 style="font-size:14px;margin-bottom:5px;border-bottom:2px solid #000;padding-bottom:5px;">Weekly Summary</h3>' +
       '<table><thead><tr>' + summaryHeaders + '</tr></thead>' +
-      '<tbody>' + summaryRows + '</tbody></table></div>' +
+      '<tbody>' + summaryRows + '</tbody></table>' +
       '<div class="footer">Printed on ' + printedAt + ' | Zeno Time Flow</div>' +
       '</body></html>';
     
@@ -764,7 +708,6 @@ export default function SchedulerSchedule() {
   };
 
   const downloadSchedule = () => {
-    // Reuse the same print logic but trigger save as PDF
     const companyName = schedulableCompanies.find(c => c.id === selectedCompany)?.name || 'Schedule';
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -780,35 +723,6 @@ export default function SchedulerSchedule() {
     });
 
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-    let employeeSections = '';
-    filteredEmps.forEach(emp => {
-      const empShifts = shifts.filter(s => s.employee_id === emp.id);
-      employeeSections += '<div class="employee-section"><h3>' + emp.first_name + ' ' + emp.last_name + 
-        (emp.position ? ' <span style="font-weight:normal;font-size:11px">(' + emp.position + ')</span>' : '') + '</h3>';
-      employeeSections += '<table><thead><tr><th style="width:60px">Day</th><th style="width:70px">Date</th><th>Shift Time</th><th style="width:60px">Hours</th><th>Notes</th></tr></thead><tbody>';
-      
-      weekDates.forEach((date, i) => {
-        const dayShifts = empShifts.filter(s => new Date(s.start_time).toDateString() === date.toDateString());
-        if (dayShifts.length === 0) {
-          employeeSections += '<tr class="no-shift"><td>' + dayNames[i] + '</td><td>' + date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) + '</td><td>-</td><td>-</td><td>-</td></tr>';
-        } else {
-          dayShifts.forEach((s, si) => {
-            const hours = ((new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 3600000).toFixed(1);
-            employeeSections += '<tr>';
-            if (si === 0) {
-              employeeSections += '<td rowspan="' + dayShifts.length + '">' + dayNames[i] + '</td>';
-              employeeSections += '<td rowspan="' + dayShifts.length + '">' + date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) + '</td>';
-            }
-            employeeSections += '<td style="font-family:monospace">' + formatTime(s.start_time) + ' - ' + formatTime(s.end_time) + '</td>';
-            employeeSections += '<td>' + hours + 'h</td><td>' + (s.notes || '-') + '</td></tr>';
-          });
-        }
-      });
-      
-      const weeklyHours = empShifts.reduce((a, s) => a + (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 3600000, 0);
-      employeeSections += '</tbody></table><div class="total-row">Weekly Total: ' + weeklyHours.toFixed(1) + ' hours (' + empShifts.length + ' shifts)</div></div>';
-    });
 
     let summaryHeaders = '<th>Employee</th>';
     weekDates.forEach((d, i) => { summaryHeaders += '<th>' + dayNames[i] + '<br>' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric' }) + '</th>'; });
@@ -832,31 +746,23 @@ export default function SchedulerSchedule() {
     const pdfContent = '<!DOCTYPE html><html><head><title>' + companyName + ' - Weekly Schedule</title>' +
       '<style>' +
       '* { box-sizing: border-box; margin: 0; padding: 0; }' +
-      'body { font-family: Arial, sans-serif; font-size: 11px; line-height: 1.4; padding: 15px; }' +
+      'body { font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; padding: 15px; }' +
       'h1 { font-size: 18px; margin-bottom: 4px; }' +
-      'h3 { font-size: 13px; background: #e5e5e5; padding: 6px 10px; border: 1px solid #999; margin-top: 15px; }' +
       '.header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }' +
       '.meta { font-size: 12px; color: #666; margin-top: 4px; }' +
-      'table { width: 100%; border-collapse: collapse; margin-top: 5px; }' +
-      'th, td { border: 1px solid #666; padding: 5px 8px; text-align: left; }' +
-      'th { background: #f0f0f0; font-weight: bold; }' +
-      '.total-row { text-align: right; font-size: 11px; margin-top: 3px; padding-right: 5px; }' +
-      '.summary { margin-top: 25px; page-break-before: always; }' +
-      '.summary h3 { background: none; border: none; border-bottom: 2px solid #000; padding-left: 0; }' +
-      '.summary th { background: #ddd; text-align: center; }' +
-      '.summary td { text-align: center; font-size: 10px; }' +
-      '.summary td:first-child { text-align: left; font-weight: bold; }' +
+      'table { width: 100%; border-collapse: collapse; margin-top: 10px; }' +
+      'th, td { border: 1px solid #666; padding: 6px 8px; }' +
+      'th { background: #ddd; text-align: center; font-weight: bold; }' +
+      'td { text-align: center; font-size: 11px; }' +
+      'td:first-child { text-align: left; font-weight: bold; }' +
       '.footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 9px; color: #999; text-align: center; }' +
-      '.employee-section { page-break-inside: avoid; }' +
-      '.no-shift { color: #999; }' +
       '@page { size: A4 portrait; margin: 10mm; }' +
       '</style></head><body>' +
       '<div class="header"><h1>' + companyName + '</h1>' +
       '<div class="meta">Weekly Schedule: ' + weekRange + '</div>' +
       '<div class="meta">Total: ' + shifts.length + ' shifts | ' + filteredEmps.length + ' employees</div></div>' +
-      employeeSections +
-      '<div class="summary"><h3>Weekly Summary</h3>' +
-      '<table><thead><tr>' + summaryHeaders + '</tr></thead><tbody>' + summaryRows + '</tbody></table></div>' +
+      '<h3 style="font-size:14px;margin-bottom:5px;border-bottom:2px solid #000;padding-bottom:5px;">Weekly Summary</h3>' +
+      '<table><thead><tr>' + summaryHeaders + '</tr></thead><tbody>' + summaryRows + '</tbody></table>' +
       '<div class="footer">Downloaded on ' + printedAt + ' | Zeno Time Flow</div>' +
       '</body></html>';
 
