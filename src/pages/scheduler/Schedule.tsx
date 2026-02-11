@@ -764,35 +764,107 @@ export default function SchedulerSchedule() {
   };
 
   const downloadSchedule = () => {
+    // Reuse the same print logic but trigger save as PDF
     const companyName = schedulableCompanies.find(c => c.id === selectedCompany)?.name || 'Schedule';
-    const weekRange = `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-    
-    // Create CSV content
-    let csvContent = `${companyName} - Weekly Schedule (${weekRange})\n\n`;
-    csvContent += 'Day,Shift,Employee,Start Time,End Time,Break (min),Status\n';
-    
-    shiftSlots.forEach(slot => {
-      days.forEach((day, dayIndex) => {
-        const dayShifts = getShiftsForDayAndSlot(dayIndex, slot.id);
-        dayShifts.forEach(shift => {
-          const employeeName = getEmployeeName(shift.employee_id);
-          const startTime = new Date(shift.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-          const endTime = new Date(shift.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-          csvContent += `${day},${slot.name},${employeeName},${startTime},${endTime},${shift.break_minutes || 0},${shift.status}\n`;
-        });
-      });
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const formatTime = (iso: string) => {
+      const d = new Date(iso);
+      return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    const filteredEmps = employees.filter(e => {
+      const deptMatch = selectedDepartment === "all" || e.department_id === selectedDepartment;
+      return deptMatch && shifts.some(s => s.employee_id === e.id);
     });
-    
-    // Create and download file
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${companyName.replace(/\s+/g, '_')}_Schedule_${weekDates[0].toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    let employeeSections = '';
+    filteredEmps.forEach(emp => {
+      const empShifts = shifts.filter(s => s.employee_id === emp.id);
+      employeeSections += '<div class="employee-section"><h3>' + emp.first_name + ' ' + emp.last_name + 
+        (emp.position ? ' <span style="font-weight:normal;font-size:11px">(' + emp.position + ')</span>' : '') + '</h3>';
+      employeeSections += '<table><thead><tr><th style="width:60px">Day</th><th style="width:70px">Date</th><th>Shift Time</th><th style="width:60px">Hours</th><th>Notes</th></tr></thead><tbody>';
+      
+      weekDates.forEach((date, i) => {
+        const dayShifts = empShifts.filter(s => new Date(s.start_time).toDateString() === date.toDateString());
+        if (dayShifts.length === 0) {
+          employeeSections += '<tr class="no-shift"><td>' + dayNames[i] + '</td><td>' + date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) + '</td><td>-</td><td>-</td><td>-</td></tr>';
+        } else {
+          dayShifts.forEach((s, si) => {
+            const hours = ((new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 3600000).toFixed(1);
+            employeeSections += '<tr>';
+            if (si === 0) {
+              employeeSections += '<td rowspan="' + dayShifts.length + '">' + dayNames[i] + '</td>';
+              employeeSections += '<td rowspan="' + dayShifts.length + '">' + date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) + '</td>';
+            }
+            employeeSections += '<td style="font-family:monospace">' + formatTime(s.start_time) + ' - ' + formatTime(s.end_time) + '</td>';
+            employeeSections += '<td>' + hours + 'h</td><td>' + (s.notes || '-') + '</td></tr>';
+          });
+        }
+      });
+      
+      const weeklyHours = empShifts.reduce((a, s) => a + (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 3600000, 0);
+      employeeSections += '</tbody></table><div class="total-row">Weekly Total: ' + weeklyHours.toFixed(1) + ' hours (' + empShifts.length + ' shifts)</div></div>';
+    });
+
+    let summaryHeaders = '<th>Employee</th>';
+    weekDates.forEach((d, i) => { summaryHeaders += '<th>' + dayNames[i] + '<br>' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric' }) + '</th>'; });
+    summaryHeaders += '<th>Total</th>';
+
+    let summaryRows = '';
+    filteredEmps.forEach(emp => {
+      const empShifts = shifts.filter(s => s.employee_id === emp.id);
+      const weeklyHours = empShifts.reduce((a, s) => a + (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 3600000, 0);
+      summaryRows += '<tr><td>' + emp.first_name + ' ' + emp.last_name.charAt(0) + '.</td>';
+      weekDates.forEach(date => {
+        const dayShifts = empShifts.filter(s => new Date(s.start_time).toDateString() === date.toDateString());
+        summaryRows += '<td>' + (dayShifts.length ? dayShifts.map(s => formatTime(s.start_time) + '-' + formatTime(s.end_time)).join('<br>') : '-') + '</td>';
+      });
+      summaryRows += '<td style="font-weight:bold">' + weeklyHours.toFixed(0) + 'h</td></tr>';
+    });
+
+    const weekRange = weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' - ' + weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const printedAt = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' at ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+    const pdfContent = '<!DOCTYPE html><html><head><title>' + companyName + ' - Weekly Schedule</title>' +
+      '<style>' +
+      '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+      'body { font-family: Arial, sans-serif; font-size: 11px; line-height: 1.4; padding: 15px; }' +
+      'h1 { font-size: 18px; margin-bottom: 4px; }' +
+      'h3 { font-size: 13px; background: #e5e5e5; padding: 6px 10px; border: 1px solid #999; margin-top: 15px; }' +
+      '.header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }' +
+      '.meta { font-size: 12px; color: #666; margin-top: 4px; }' +
+      'table { width: 100%; border-collapse: collapse; margin-top: 5px; }' +
+      'th, td { border: 1px solid #666; padding: 5px 8px; text-align: left; }' +
+      'th { background: #f0f0f0; font-weight: bold; }' +
+      '.total-row { text-align: right; font-size: 11px; margin-top: 3px; padding-right: 5px; }' +
+      '.summary { margin-top: 25px; page-break-before: always; }' +
+      '.summary h3 { background: none; border: none; border-bottom: 2px solid #000; padding-left: 0; }' +
+      '.summary th { background: #ddd; text-align: center; }' +
+      '.summary td { text-align: center; font-size: 10px; }' +
+      '.summary td:first-child { text-align: left; font-weight: bold; }' +
+      '.footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 9px; color: #999; text-align: center; }' +
+      '.employee-section { page-break-inside: avoid; }' +
+      '.no-shift { color: #999; }' +
+      '@page { size: A4 portrait; margin: 10mm; }' +
+      '</style></head><body>' +
+      '<div class="header"><h1>' + companyName + '</h1>' +
+      '<div class="meta">Weekly Schedule: ' + weekRange + '</div>' +
+      '<div class="meta">Total: ' + shifts.length + ' shifts | ' + filteredEmps.length + ' employees</div></div>' +
+      employeeSections +
+      '<div class="summary"><h3>Weekly Summary</h3>' +
+      '<table><thead><tr>' + summaryHeaders + '</tr></thead><tbody>' + summaryRows + '</tbody></table></div>' +
+      '<div class="footer">Downloaded on ' + printedAt + ' | Zeno Time Flow</div>' +
+      '</body></html>';
+
+    printWindow.document.write(pdfContent);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
   };
 
   const handleSlotSave = (slotId: string, updates: { name: string; startHour: number; endHour: number }) => {
