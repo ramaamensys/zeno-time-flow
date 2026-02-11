@@ -1208,6 +1208,9 @@ export default function SchedulerSchedule() {
       
       setShowScheduleShifts(false);
       
+      // Refresh shifts from database to clear stale state
+      await refetchShifts();
+      
       toast({
         title: "Week Cleared",
         description: "All shifts for this week have been removed."
