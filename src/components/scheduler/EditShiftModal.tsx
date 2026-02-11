@@ -12,9 +12,10 @@ interface EditShiftModalProps {
   onOpenChange: (open: boolean) => void;
   shift: Shift | null;
   companyId?: string;
+  onShiftUpdated?: () => void;
 }
 
-export default function EditShiftModal({ open, onOpenChange, shift, companyId }: EditShiftModalProps) {
+export default function EditShiftModal({ open, onOpenChange, shift, companyId, onShiftUpdated }: EditShiftModalProps) {
   const { updateShift, deleteShift } = useShifts();
   const { employees } = useEmployees(companyId);
   const { departments } = useDepartments(companyId);
@@ -75,7 +76,7 @@ export default function EditShiftModal({ open, onOpenChange, shift, companyId }:
         notes: formData.notes || undefined,
         status: formData.status
       });
-      
+      onShiftUpdated?.();
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to update shift:', error);
@@ -102,6 +103,7 @@ export default function EditShiftModal({ open, onOpenChange, shift, companyId }:
       
       // Now delete the shift
       await deleteShift(shift.id);
+      onShiftUpdated?.();
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to delete shift:', error);
