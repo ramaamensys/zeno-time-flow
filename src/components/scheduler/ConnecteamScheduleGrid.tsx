@@ -41,6 +41,7 @@ interface ConnecteamScheduleGridProps {
   onShiftClick: (shift: Shift) => void;
   onAddShift: (employeeId: string, dayIndex: number) => void;
   onDeleteShift: (shiftId: string) => void;
+  onReassignShift?: (shiftId: string, newEmployeeId: string) => void;
   onSetAvailability?: (employeeId: string, date: Date, status: AvailabilityStatus) => void;
   checkShiftConflict: (employeeId: string, startTime: Date, endTime: Date, excludeShiftId?: string) => Shift | undefined;
   onNavigateWeek: (direction: 'prev' | 'next') => void;
@@ -90,6 +91,7 @@ export default function ConnecteamScheduleGrid({
   onShiftClick,
   onAddShift,
   onDeleteShift,
+  onReassignShift,
   onSetAvailability,
   checkShiftConflict,
   onNavigateWeek,
@@ -326,7 +328,7 @@ export default function ConnecteamScheduleGrid({
                             {formatShiftTime(shift)}
                           </div>
 
-                          {/* Employee name */}
+                          {/* Employee name with reassign dropdown */}
                           <div className="flex items-center gap-2">
                             <Avatar className="h-7 w-7">
                               <AvatarFallback 
@@ -339,7 +341,32 @@ export default function ConnecteamScheduleGrid({
                                 {employeeName.split(' ').map(n => n[0]).join('').slice(0, 2)}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="text-sm font-medium truncate">{employeeName}</span>
+                            {canManageShifts && onReassignShift ? (
+                              <Select
+                                value={shift.employee_id}
+                                onValueChange={(newEmpId) => {
+                                  if (newEmpId !== shift.employee_id) {
+                                    onReassignShift(shift.id, newEmpId);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger 
+                                  className="h-7 px-2 text-sm font-medium border-0 bg-transparent text-inherit hover:bg-black/10 rounded-md w-auto min-w-0 flex-1 [&>svg]:text-inherit [&>svg]:opacity-70"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <SelectValue>{employeeName}</SelectValue>
+                                </SelectTrigger>
+                                <SelectContent className="bg-popover border shadow-lg z-50">
+                                  {employees.map((emp) => (
+                                    <SelectItem key={emp.id} value={emp.id}>
+                                      {emp.first_name} {emp.last_name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="text-sm font-medium truncate">{employeeName}</span>
+                            )}
                           </div>
 
                           {shift.notes && (
