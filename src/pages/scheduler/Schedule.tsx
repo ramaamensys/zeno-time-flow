@@ -1594,6 +1594,7 @@ export default function SchedulerSchedule() {
         onOpenChange={setShowEditShift}
         shift={selectedShift}
         companyId={selectedCompany}
+        onShiftUpdated={refetchShifts}
       />
       
 
