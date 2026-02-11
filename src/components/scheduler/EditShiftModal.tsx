@@ -205,33 +205,19 @@ export default function EditShiftModal({ open, onOpenChange, shift, companyId }:
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="break_minutes">Break Minutes</Label>
-              <Input
-                id="break_minutes"
-                type="number"
-                min="0"
-                max="480"
-                value={formData.break_minutes}
-                onChange={(e) => setFormData(prev => ({ ...prev, break_minutes: parseInt(e.target.value) || 0 }))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="hourly_rate">
-                Hourly Rate {selectedEmployee?.hourly_rate && `(Default: $${selectedEmployee.hourly_rate})`}
-              </Label>
-              <Input
-                id="hourly_rate"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.hourly_rate}
-                onChange={(e) => setFormData(prev => ({ ...prev, hourly_rate: e.target.value }))}
-                placeholder={selectedEmployee?.hourly_rate?.toString() || "15.00"}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="hourly_rate">
+              Hourly Rate {selectedEmployee?.hourly_rate && `(Default: $${selectedEmployee.hourly_rate})`}
+            </Label>
+            <Input
+              id="hourly_rate"
+              type="number"
+              min="0"
+              step="0.01"
+              value={formData.hourly_rate}
+              onChange={(e) => setFormData(prev => ({ ...prev, hourly_rate: e.target.value }))}
+              placeholder={selectedEmployee?.hourly_rate?.toString() || "15.00"}
+            />
           </div>
 
           <div className="space-y-2">
