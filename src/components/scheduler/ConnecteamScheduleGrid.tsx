@@ -197,6 +197,18 @@ export default function ConnecteamScheduleGrid({
     } else {
       onAddShift(employeeId, inlineForm.dayIndex);
     }
+    // Close the form after assigning
+    setInlineForm(null);
+  };
+
+  // Handle dropping a shift card onto a day column to move it
+  const handleDayDrop = (e: React.DragEvent, dayIndex: number) => {
+    e.preventDefault();
+    const shiftId = e.dataTransfer.getData('shiftId');
+    const employeeId = e.dataTransfer.getData('employeeId');
+    if (shiftId && employeeId) {
+      onDrop(e, employeeId, dayIndex);
+    }
   };
 
   return (
@@ -260,6 +272,8 @@ export default function ConnecteamScheduleGrid({
                     "border-r last:border-r-0 flex flex-col",
                     today && "bg-primary/5"
                   )}
+                  onDragOver={onDragOver}
+                  onDrop={(e) => handleDayDrop(e, dayIndex)}
                 >
                   {/* Day Header */}
                   <div className={cn(
@@ -297,7 +311,7 @@ export default function ConnecteamScheduleGrid({
                       return (
                         <div
                           key={shift.id}
-                          draggable={isEditMode && canManageShifts}
+                          draggable={canManageShifts}
                           onDragStart={(e) => onDragStart(e, shift.employee_id, shift)}
                           onDragEnd={onDragEnd}
                           onClick={() => canManageShifts && onShiftClick(shift)}
