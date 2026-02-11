@@ -1428,7 +1428,7 @@ export default function SchedulerSchedule() {
             const deptMatch = selectedDepartment === "all" || e.department_id === selectedDepartment;
             return deptMatch;
           })}
-          shifts={(showScheduleShifts || isEmployeeView ? shifts : [])}
+          shifts={shifts}
           teams={teams}
           weekDates={weekDates}
           isEditMode={isEditMode}
