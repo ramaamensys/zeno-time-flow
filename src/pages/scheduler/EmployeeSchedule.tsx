@@ -1,47 +1,34 @@
-import { useMemo, useState, useEffect } from "react";
-import { Calendar, Clock, Users, Building, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { useMemo, useState, useEffect, useCallback } from "react";
+import { Calendar, Clock, Users, Building, Filter, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, parseISO, isWithinInterval, isSameDay } from "date-fns";
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, parseISO } from "date-fns";
+import EmployeeScheduleDetailModal from "@/components/scheduler/EmployeeScheduleDetailModal";
+import EmployeeScheduleReportModal from "@/components/scheduler/EmployeeScheduleReportModal";
+
+interface Employee {
+  id: string;
+  first_name: string;
+  last_name: string;
+  position: string | null;
+  status: string;
+}
 
 interface Shift {
   id: string;
   employee_id: string;
-  replacement_employee_id?: string | null;
-  replacement_started_at?: string | null;
   company_id: string;
-  department_id: string | null;
   start_time: string;
   end_time: string;
   status: string;
   notes: string | null;
   break_minutes: number | null;
-  employee?: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-  };
-  replacement_employee?: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-  };
-  company?: {
-    id: string;
-    name: string;
-    organization_id: string;
-  };
-  department?: {
-    name: string;
-  };
 }
 
 interface TimeClockEntry {
@@ -53,13 +40,6 @@ interface TimeClockEntry {
   break_start: string | null;
   break_end: string | null;
   total_hours: number | null;
-  notes: string | null;
-  created_at?: string;
-  updated_at?: string;
-  employee?: {
-    first_name: string;
-    last_name: string;
-  };
 }
 
 interface Organization {
@@ -78,296 +58,193 @@ type ViewMode = "daily" | "weekly" | "monthly";
 export default function EmployeeSchedule() {
   const { user } = useAuth();
   const { role, isSuperAdmin, isOrganizationManager, isCompanyManager } = useUserRole();
-  
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [timeClockEntries, setTimeClockEntries] = useState<TimeClockEntry[]>([]);
+
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [loading, setLoading] = useState(true);
-  
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [timeClockEntries, setTimeClockEntries] = useState<TimeClockEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+
   const [selectedOrganization, setSelectedOrganization] = useState<string>("all");
   const [selectedCompany, setSelectedCompany] = useState<string>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("weekly");
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  const timeClockEntriesByShiftEmployee = useMemo(() => {
-    const map = new Map<string, TimeClockEntry[]>();
-    for (const e of timeClockEntries) {
-      if (!e.shift_id) continue;
-      const key = `${e.shift_id}:${e.employee_id}`;
-      const arr = map.get(key) || [];
-      arr.push(e);
-      map.set(key, arr);
-    }
-    // Sort each list newest-first
-    for (const [key, arr] of map.entries()) {
-      arr.sort((a, b) => {
-        const aT = (a.clock_in || a.created_at || a.updated_at || "").toString();
-        const bT = (b.clock_in || b.created_at || b.updated_at || "").toString();
-        return bT.localeCompare(aT);
-      });
-      map.set(key, arr);
-    }
-    return map;
-  }, [timeClockEntries]);
+  // Modal state
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
-  const getRelevantClockEntry = (shift: Shift) => {
-    const employeeId = shift.replacement_employee_id || shift.employee_id;
-    const key = `${shift.id}:${employeeId}`;
-    const arr = timeClockEntriesByShiftEmployee.get(key);
-    return arr?.[0];
-  };
-
-  // Check access - only managers and above can access
   const hasAccess = isSuperAdmin || isOrganizationManager || isCompanyManager;
 
+  // Determine if a specific company is selected (or only one available)
+  const activeCompanyId = useMemo(() => {
+    if (selectedCompany !== "all") return selectedCompany;
+    if (companies.length === 1) return companies[0].id;
+    return null;
+  }, [selectedCompany, companies]);
+
+  const activeCompanyName = useMemo(() => {
+    if (!activeCompanyId) return "";
+    return companies.find((c) => c.id === activeCompanyId)?.name || "";
+  }, [activeCompanyId, companies]);
+
+  // Load filters
   useEffect(() => {
-    if (hasAccess) {
-      loadFilters();
-      loadData();
-    }
-  }, [user, role, hasAccess, selectedOrganization, selectedCompany, viewMode, currentDate]);
+    if (!hasAccess || !user) return;
+    loadFilters();
+  }, [user, role, hasAccess, selectedOrganization]);
 
   const loadFilters = async () => {
     if (!user) return;
-
     try {
-      // Load organizations based on role
       if (isSuperAdmin) {
-        const { data } = await supabase.from('organizations').select('id, name').order('name');
+        const { data } = await supabase.from("organizations").select("id, name").order("name");
         setOrganizations(data || []);
       } else if (isOrganizationManager) {
         const { data } = await supabase
-          .from('organizations')
-          .select('id, name')
-          .eq('organization_manager_id', user.id);
+          .from("organizations")
+          .select("id, name")
+          .eq("organization_manager_id", user.id);
         setOrganizations(data || []);
       }
 
-      // Load companies based on role and selected organization
-      let companyQuery = supabase.from('companies').select('id, name, organization_id').order('name');
-      
+      let companyQuery = supabase.from("companies").select("id, name, organization_id").order("name");
       if (isSuperAdmin) {
-        if (selectedOrganization !== 'all') {
-          companyQuery = companyQuery.eq('organization_id', selectedOrganization);
+        if (selectedOrganization !== "all") {
+          companyQuery = companyQuery.eq("organization_id", selectedOrganization);
         }
       } else if (isOrganizationManager) {
         const { data: orgs } = await supabase
-          .from('organizations')
-          .select('id')
-          .eq('organization_manager_id', user.id);
-        const orgIds = orgs?.map(o => o.id) || [];
-        if (orgIds.length > 0) {
-          companyQuery = companyQuery.in('organization_id', orgIds);
-        }
+          .from("organizations")
+          .select("id")
+          .eq("organization_manager_id", user.id);
+        const orgIds = orgs?.map((o) => o.id) || [];
+        if (orgIds.length > 0) companyQuery = companyQuery.in("organization_id", orgIds);
       } else if (isCompanyManager) {
-        companyQuery = companyQuery.eq('company_manager_id', user.id);
+        companyQuery = companyQuery.eq("company_manager_id", user.id);
       }
 
       const { data: companiesData } = await companyQuery;
       setCompanies(companiesData || []);
     } catch (error) {
-      console.error('Error loading filters:', error);
+      console.error("Error loading filters:", error);
     }
   };
 
+  // Load employees & data when company is selected
+  useEffect(() => {
+    if (!activeCompanyId || !hasAccess) {
+      setEmployees([]);
+      setShifts([]);
+      setTimeClockEntries([]);
+      return;
+    }
+    loadData();
+  }, [activeCompanyId, hasAccess, viewMode, currentDate]);
+
   const getDateRange = () => {
     switch (viewMode) {
-      case 'daily':
+      case "daily":
         return { start: startOfDay(currentDate), end: endOfDay(currentDate) };
-      case 'weekly':
+      case "weekly":
         return { start: startOfWeek(currentDate, { weekStartsOn: 1 }), end: endOfWeek(currentDate, { weekStartsOn: 1 }) };
-      case 'monthly':
+      case "monthly":
         return { start: startOfMonth(currentDate), end: endOfMonth(currentDate) };
     }
   };
 
   const loadData = async () => {
-    if (!user || !hasAccess) return;
+    if (!activeCompanyId) return;
     setLoading(true);
-
     try {
       const { start, end } = getDateRange();
-      
-      // Build shifts query with role-based filtering
-      let shiftsQuery = supabase
-        .from('shifts')
-        .select(`
-          *,
-          employee:employees!shifts_employee_id_fkey(id, first_name, last_name, email),
-          replacement_employee:employees!shifts_replacement_employee_id_fkey(id, first_name, last_name, email),
-          company:companies(id, name, organization_id),
-          department:departments(name)
-        `)
-        .gte('start_time', start.toISOString())
-        .lte('start_time', end.toISOString())
-        .order('start_time', { ascending: true });
 
-      // Apply role-based company filter
-      if (isCompanyManager) {
-        const { data: managerCompanies } = await supabase
-          .from('companies')
-          .select('id')
-          .eq('company_manager_id', user.id);
-        const companyIds = managerCompanies?.map(c => c.id) || [];
-        if (companyIds.length > 0) {
-          shiftsQuery = shiftsQuery.in('company_id', companyIds);
-        }
-      } else if (isOrganizationManager) {
-        const { data: orgs } = await supabase
-          .from('organizations')
-          .select('id')
-          .eq('organization_manager_id', user.id);
-        const orgIds = orgs?.map(o => o.id) || [];
-        
-        const { data: orgCompanies } = await supabase
-          .from('companies')
-          .select('id')
-          .in('organization_id', orgIds);
-        const companyIds = orgCompanies?.map(c => c.id) || [];
-        if (companyIds.length > 0) {
-          shiftsQuery = shiftsQuery.in('company_id', companyIds);
-        }
-      }
+      // Fetch employees
+      const { data: empData } = await supabase
+        .from("employees")
+        .select("id, first_name, last_name, position, status")
+        .eq("company_id", activeCompanyId)
+        .eq("status", "active")
+        .order("first_name");
+      setEmployees(empData || []);
 
-      // Apply UI filter selections
-      if (selectedCompany !== 'all') {
-        shiftsQuery = shiftsQuery.eq('company_id', selectedCompany);
-      } else if (selectedOrganization !== 'all' && isSuperAdmin) {
-        const { data: orgCompanies } = await supabase
-          .from('companies')
-          .select('id')
-          .eq('organization_id', selectedOrganization);
-        const companyIds = orgCompanies?.map(c => c.id) || [];
-        if (companyIds.length > 0) {
-          shiftsQuery = shiftsQuery.in('company_id', companyIds);
-        }
-      }
-
-      const { data: shiftsData } = await shiftsQuery;
+      // Fetch shifts
+      const { data: shiftsData } = await supabase
+        .from("shifts")
+        .select("id, employee_id, company_id, start_time, end_time, status, notes, break_minutes")
+        .eq("company_id", activeCompanyId)
+        .gte("start_time", start.toISOString())
+        .lte("start_time", end.toISOString())
+        .order("start_time", { ascending: true });
       setShifts(shiftsData || []);
 
-      // Load time clock entries for the same period
-      const shiftIds = (shiftsData || []).map(s => s.id).filter(Boolean);
-      
+      // Fetch time clock entries
+      const shiftIds = (shiftsData || []).map((s) => s.id);
       if (shiftIds.length > 0) {
         const { data: clockData } = await supabase
-          .from('time_clock')
-          .select(`
-            *,
-            employee:employees(first_name, last_name)
-          `)
-          .in('shift_id', shiftIds);
+          .from("time_clock")
+          .select("id, employee_id, shift_id, clock_in, clock_out, break_start, break_end, total_hours")
+          .in("shift_id", shiftIds);
         setTimeClockEntries(clockData || []);
       } else {
         setTimeClockEntries([]);
       }
     } catch (error) {
-      console.error('Error loading schedule data:', error);
+      console.error("Error loading data:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const navigateDate = (direction: 'prev' | 'next') => {
+  const navigateDate = (direction: "prev" | "next") => {
     switch (viewMode) {
-      case 'daily':
-        setCurrentDate(prev => addDays(prev, direction === 'next' ? 1 : -1));
+      case "daily":
+        setCurrentDate((prev) => addDays(prev, direction === "next" ? 1 : -1));
         break;
-      case 'weekly':
-        setCurrentDate(prev => addWeeks(prev, direction === 'next' ? 1 : -1));
+      case "weekly":
+        setCurrentDate((prev) => addWeeks(prev, direction === "next" ? 1 : -1));
         break;
-      case 'monthly':
-        setCurrentDate(prev => addMonths(prev, direction === 'next' ? 1 : -1));
+      case "monthly":
+        setCurrentDate((prev) => addMonths(prev, direction === "next" ? 1 : -1));
         break;
     }
-  };
-
-  const getAttendanceStatus = (shift: Shift): { status: string; color: string } => {
-    const clockEntry = getRelevantClockEntry(shift);
-    const now = new Date();
-    const shiftStart = parseISO(shift.start_time);
-    const shiftEnd = parseISO(shift.end_time);
-
-    if (shift.status === 'missed') {
-      // If a replacement actually worked (clocked in), reflect their progress/completion.
-      if (shift.replacement_employee_id && clockEntry?.clock_in) {
-        if (clockEntry.clock_out) {
-          return { status: 'Completed', color: 'bg-emerald-600' };
-        }
-        if (clockEntry.break_start && !clockEntry.break_end) {
-          return { status: 'On Break', color: 'bg-amber-500' };
-        }
-        return { status: 'Covered (In Progress)', color: 'bg-sky-600' };
-      }
-      return { status: 'Missed', color: 'bg-destructive' };
-    }
-
-    // Covered/approved but not started
-    if (shift.replacement_employee_id && !clockEntry?.clock_in && !shift.replacement_started_at) {
-      return { status: 'Coverage Approved', color: 'bg-amber-500' };
-    }
-
-    if (!clockEntry) {
-      if (now < shiftStart) {
-        return { status: 'Not Started', color: 'bg-muted' };
-      }
-      if (now > shiftEnd) {
-        return { status: 'Absent', color: 'bg-destructive' };
-      }
-      return { status: 'Not Started', color: 'bg-muted' };
-    }
-
-    if (clockEntry.clock_in && clockEntry.clock_out) {
-      return { status: 'Completed', color: 'bg-emerald-600' };
-    }
-
-    if (clockEntry.break_start && !clockEntry.break_end) {
-      return { status: 'On Break', color: 'bg-amber-500' };
-    }
-
-    if (clockEntry.clock_in) {
-      const clockInTime = parseISO(clockEntry.clock_in);
-      const lateThreshold = new Date(shiftStart.getTime() + 15 * 60 * 1000); // 15 min grace
-      
-      if (clockInTime > lateThreshold) {
-        return { status: 'Late', color: 'bg-orange-500' };
-      }
-      // If this is a covered shift, reflect it
-      if (shift.replacement_employee_id) {
-        return { status: 'Covered (In Progress)', color: 'bg-sky-600' };
-      }
-      return { status: 'Started', color: 'bg-sky-600' };
-    }
-
-    return { status: 'Not Started', color: 'bg-muted' };
-  };
-
-  const formatTimeRange = (start: string, end: string) => {
-    return `${format(parseISO(start), 'h:mm a')} - ${format(parseISO(end), 'h:mm a')}`;
   };
 
   const getDateRangeLabel = () => {
     const { start, end } = getDateRange();
     switch (viewMode) {
-      case 'daily':
-        return format(currentDate, 'EEEE, MMMM d, yyyy');
-      case 'weekly':
-        return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
-      case 'monthly':
-        return format(currentDate, 'MMMM yyyy');
+      case "daily":
+        return format(currentDate, "EEEE, MMMM d, yyyy");
+      case "weekly":
+        return `${format(start, "MMM d")} - ${format(end, "MMM d, yyyy")}`;
+      case "monthly":
+        return format(currentDate, "MMMM yyyy");
     }
   };
 
-  // Group shifts by date for display
-  const groupedShifts = shifts.reduce((acc, shift) => {
-    const dateKey = format(parseISO(shift.start_time), 'yyyy-MM-dd');
-    if (!acc[dateKey]) {
-      acc[dateKey] = [];
-    }
-    acc[dateKey].push(shift);
-    return acc;
-  }, {} as Record<string, Shift[]>);
+  // Get shifts for a specific employee
+  const getEmployeeShiftsWithClock = (empId: string) => {
+    const empShifts = shifts.filter((s) => s.employee_id === empId);
+    return empShifts.map((s) => {
+      const clockEntry = timeClockEntries.find((tc) => tc.shift_id === s.id && tc.employee_id === empId);
+      return { ...s, clockEntry: clockEntry || null };
+    });
+  };
+
+  // Get summary stats for an employee
+  const getEmployeeSummary = (empId: string) => {
+    const empShifts = shifts.filter((s) => s.employee_id === empId);
+    const empClock = timeClockEntries.filter((tc) => tc.employee_id === empId);
+    const totalHours = empClock.reduce((sum, tc) => sum + (tc.total_hours || 0), 0);
+    return { shiftCount: empShifts.length, totalHours };
+  };
+
+  const handleEmployeeClick = (emp: Employee) => {
+    setSelectedEmployee(emp);
+    setDetailOpen(true);
+  };
 
   if (!hasAccess) {
     return (
@@ -376,9 +253,7 @@ export default function EmployeeSchedule() {
           <CardContent className="p-8 text-center">
             <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
             <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
-            <p className="text-muted-foreground">
-              You don't have permission to view employee schedules.
-            </p>
+            <p className="text-muted-foreground">You don't have permission to view employee schedules.</p>
           </CardContent>
         </Card>
       </div>
@@ -398,6 +273,13 @@ export default function EmployeeSchedule() {
             Monitor employee schedules, shifts, and attendance
           </p>
         </div>
+        {/* Download Report - only when company is selected */}
+        {activeCompanyId && (
+          <Button variant="outline" onClick={() => setReportOpen(true)}>
+            <Download className="h-4 w-4 mr-2" />
+            Download Report
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -408,39 +290,36 @@ export default function EmployeeSchedule() {
               <Filter className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">Filters:</span>
             </div>
-            
-            {/* Organization Filter - Only for Super Admin */}
+
             {isSuperAdmin && organizations.length > 0 && (
-              <Select value={selectedOrganization} onValueChange={setSelectedOrganization}>
+              <Select value={selectedOrganization} onValueChange={(v) => { setSelectedOrganization(v); setSelectedCompany("all"); }}>
                 <SelectTrigger className="w-[200px]">
                   <Building className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="All Organizations" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Organizations</SelectItem>
-                  {organizations.map(org => (
+                  {organizations.map((org) => (
                     <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
 
-            {/* Company Filter - Only show if more than one company available */}
             {companies.length > 1 && (
               <Select value={selectedCompany} onValueChange={setSelectedCompany}>
                 <SelectTrigger className="w-[200px]">
                   <Building className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="All Companies" />
+                  <SelectValue placeholder="Select Company" />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-lg z-50">
                   <SelectItem value="all">All Companies</SelectItem>
-                  {companies.map(company => (
+                  {companies.map((company) => (
                     <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
-            {/* Show company name if only one company (company manager) */}
             {companies.length === 1 && (
               <Badge variant="secondary" className="px-3 py-1.5">
                 <Building className="h-4 w-4 mr-2" />
@@ -451,207 +330,146 @@ export default function EmployeeSchedule() {
         </CardContent>
       </Card>
 
-      {/* View Controls */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-          <TabsList>
-            <TabsTrigger value="daily">Daily</TabsTrigger>
-            <TabsTrigger value="weekly">Weekly</TabsTrigger>
-            <TabsTrigger value="monthly">Monthly</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => navigateDate('prev')}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium min-w-[200px] text-center">
-            {getDateRangeLabel()}
-          </span>
-          <Button variant="outline" size="icon" onClick={() => navigateDate('next')}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
-            Today
-          </Button>
-        </div>
-      </div>
-
-      {/* Schedule Content */}
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      ) : shifts.length === 0 ? (
+      {/* No company selected message */}
+      {!activeCompanyId ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="text-lg font-medium mb-2">No Shifts Found</h3>
+            <Building className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-lg font-medium mb-2">Select a Company</h3>
             <p className="text-muted-foreground">
-              There are no scheduled shifts for this period.
+              Please select an organization and company to view employee schedules.
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-6">
-          {Object.entries(groupedShifts).map(([dateKey, dayShifts]) => (
-            <Card key={dateKey}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  {format(parseISO(dateKey), 'EEEE, MMMM d, yyyy')}
-                  <Badge variant="secondary" className="ml-2">
-                    {dayShifts.length} shift{dayShifts.length !== 1 ? 's' : ''}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {dayShifts.map(shift => {
-                    const clockEntry = getRelevantClockEntry(shift);
-                    const attendance = getAttendanceStatus(shift);
-                    const effectiveEmployee = shift.replacement_employee_id ? shift.replacement_employee : shift.employee;
-                    const originalEmployee = shift.employee;
-                    
-                    return (
-                      <div 
-                        key={shift.id} 
-                        className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors gap-4"
-                      >
-                        {/* Employee Info */}
-                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-sm font-medium text-primary">
-                              {effectiveEmployee?.first_name?.[0]}{effectiveEmployee?.last_name?.[0]}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="font-medium">
-                              {effectiveEmployee?.first_name} {effectiveEmployee?.last_name}
-                              {shift.replacement_employee_id && (
-                                <span className="text-xs text-muted-foreground ml-2">(Replacement)</span>
-                              )}
-                            </p>
-                            {shift.replacement_employee_id && originalEmployee && (
-                              <p className="text-xs text-muted-foreground">
-                                Original: {originalEmployee.first_name} {originalEmployee.last_name}
-                              </p>
-                            )}
-                            <p className="text-sm text-muted-foreground">
-                              {shift.company?.name}
-                              {shift.department?.name && ` • ${shift.department.name}`}
-                            </p>
-                          </div>
-                        </div>
+        <>
+          {/* View Controls */}
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+              <TabsList>
+                <TabsTrigger value="daily">Daily</TabsTrigger>
+                <TabsTrigger value="weekly">Weekly</TabsTrigger>
+                <TabsTrigger value="monthly">Monthly</TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-                        {/* Shift Time */}
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            {formatTimeRange(shift.start_time, shift.end_time)}
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={() => navigateDate("prev")}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium min-w-[200px] text-center">
+                {getDateRangeLabel()}
+              </span>
+              <Button variant="outline" size="icon" onClick={() => navigateDate("next")}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
+                Today
+              </Button>
+            </div>
+          </div>
+
+          {/* Employee List */}
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : employees.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <h3 className="text-lg font-medium mb-2">No Employees Found</h3>
+                <p className="text-muted-foreground">No active employees in this company.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {employees.map((emp) => {
+                const summary = getEmployeeSummary(emp.id);
+                return (
+                  <Card
+                    key={emp.id}
+                    className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all"
+                    onClick={() => handleEmployeeClick(emp)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <span className="text-sm font-bold text-primary">
+                            {emp.first_name[0]}{emp.last_name[0]}
                           </span>
                         </div>
-
-                        {/* Clock In/Out Times */}
-                        <div className="text-sm space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground w-20">Clock In:</span>
-                            <span className={clockEntry?.clock_in ? "text-green-600" : "text-muted-foreground"}>
-                              {clockEntry?.clock_in 
-                                ? format(parseISO(clockEntry.clock_in), 'h:mm a')
-                                : '—'}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground w-20">Clock Out:</span>
-                            <span className={clockEntry?.clock_out ? "text-green-600" : "text-muted-foreground"}>
-                              {clockEntry?.clock_out 
-                                ? format(parseISO(clockEntry.clock_out), 'h:mm a')
-                                : '—'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Break Times */}
-                        <div className="text-sm space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground w-20">Break Start:</span>
-                            <span className={clockEntry?.break_start ? "text-yellow-600" : "text-muted-foreground"}>
-                              {clockEntry?.break_start 
-                                ? format(parseISO(clockEntry.break_start), 'h:mm a')
-                                : '—'}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground w-20">Break End:</span>
-                            <span className={clockEntry?.break_end ? "text-yellow-600" : "text-muted-foreground"}>
-                              {clockEntry?.break_end 
-                                ? format(parseISO(clockEntry.break_end), 'h:mm a')
-                                : '—'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Total Hours & Status */}
-                        <div className="flex items-center gap-3">
-                          {clockEntry?.total_hours && (
-                            <Badge variant="outline">
-                              {clockEntry.total_hours.toFixed(2)} hrs
-                            </Badge>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{emp.first_name} {emp.last_name}</p>
+                          {emp.position && (
+                            <p className="text-xs text-muted-foreground truncate">{emp.position}</p>
                           )}
-                          <Badge className={`${attendance.color} text-primary-foreground`}>
-                            {attendance.status}
-                          </Badge>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-medium">{summary.shiftCount} shifts</p>
+                          <p className="text-xs text-muted-foreground">{summary.totalHours.toFixed(1)} hrs</p>
                         </div>
                       </div>
-                    );
-                  })}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Period Summary */}
+          {!loading && employees.length > 0 && shifts.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Period Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-muted rounded-lg">
+                    <p className="text-2xl font-bold">{employees.length}</p>
+                    <p className="text-sm text-muted-foreground">Employees</p>
+                  </div>
+                  <div className="text-center p-4 bg-muted rounded-lg">
+                    <p className="text-2xl font-bold">{shifts.length}</p>
+                    <p className="text-sm text-muted-foreground">Total Shifts</p>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
+                    <p className="text-2xl font-bold text-green-600">
+                      {timeClockEntries.filter((tc) => tc.clock_in && tc.clock_out).length}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Completed</p>
+                  </div>
+                  <div className="text-center p-4 bg-muted rounded-lg">
+                    <p className="text-2xl font-bold">
+                      {timeClockEntries.reduce((sum, tc) => sum + (tc.total_hours || 0), 0).toFixed(1)}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Total Hours</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
-      {/* Summary Statistics */}
-      {!loading && shifts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Period Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="text-center p-4 bg-muted rounded-lg">
-                <p className="text-2xl font-bold">{shifts.length}</p>
-                <p className="text-sm text-muted-foreground">Total Shifts</p>
-              </div>
-              <div className="text-center p-4 bg-green-50 dark:bg-green-950 rounded-lg">
-                <p className="text-2xl font-bold text-green-600">
-                  {shifts.filter(s => getAttendanceStatus(s).status === 'Completed').length}
-                </p>
-                <p className="text-sm text-muted-foreground">Completed</p>
-              </div>
-              <div className="text-center p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                <p className="text-2xl font-bold text-blue-600">
-                  {shifts.filter(s => getAttendanceStatus(s).status === 'Started').length}
-                </p>
-                <p className="text-sm text-muted-foreground">In Progress</p>
-              </div>
-              <div className="text-center p-4 bg-orange-50 dark:bg-orange-950 rounded-lg">
-                <p className="text-2xl font-bold text-orange-600">
-                  {shifts.filter(s => getAttendanceStatus(s).status === 'Late').length}
-                </p>
-                <p className="text-sm text-muted-foreground">Late</p>
-              </div>
-              <div className="text-center p-4 bg-red-50 dark:bg-red-950 rounded-lg">
-                <p className="text-2xl font-bold text-red-600">
-                  {shifts.filter(s => getAttendanceStatus(s).status === 'Absent').length}
-                </p>
-                <p className="text-sm text-muted-foreground">Absent</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Employee Detail Modal */}
+      <EmployeeScheduleDetailModal
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        employee={selectedEmployee}
+        shifts={selectedEmployee ? getEmployeeShiftsWithClock(selectedEmployee.id) : []}
+        isSuperAdmin={isSuperAdmin}
+        onDataUpdated={loadData}
+      />
+
+      {/* Report Modal */}
+      {activeCompanyId && (
+        <EmployeeScheduleReportModal
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          companyId={activeCompanyId}
+          companyName={activeCompanyName}
+        />
       )}
     </div>
   );
