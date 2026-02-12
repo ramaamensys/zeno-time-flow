@@ -99,6 +99,7 @@ serve(async (req: Request) => {
     const password = typeof body.password === 'string' ? body.password : '';
     const app_type = VALID_APP_TYPES.includes(body.app_type as string) ? body.app_type as string : 'calendar';
     const manager_id = typeof body.manager_id === 'string' && isValidUUID(body.manager_id) ? body.manager_id : null;
+    const employee_pin = typeof body.employee_pin === 'string' && /^\d{4}$/.test(body.employee_pin) ? body.employee_pin : null;
 
     if (!isValidEmail(email)) {
       return new Response(JSON.stringify({ error: 'Please enter a valid email address', code: 'VALIDATION_ERROR' }), {
@@ -170,7 +171,7 @@ serve(async (req: Request) => {
 
       try {
         await supabase.functions.invoke('send-welcome-email', {
-          body: { email, full_name, role, password, app_type }
+          body: { email, full_name, role, password, app_type, employee_pin }
         });
       } catch (e) {
         console.error('Email failed:', e);
