@@ -112,6 +112,7 @@ export default function ConnecteamScheduleGrid({
   currentEmployeeId
 }: ConnecteamScheduleGridProps) {
   const [inlineForm, setInlineForm] = useState<InlineShiftForm | null>(null);
+  const [calendarRange, setCalendarRange] = useState<DateRange | undefined>(undefined);
 
   const getTeamColor = (teamId: string | null | undefined): string => {
     if (!teamId) return '#6B7280';
@@ -235,20 +236,48 @@ export default function ConnecteamScheduleGrid({
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <CalendarPicker
-                  mode="range"
-                  selected={weekDates.length > 0 ? { from: weekDates[0], to: weekDates[weekDates.length - 1] } : undefined}
-                  onSelect={(range: DateRange | undefined) => {
-                    if (range?.from && range?.to && onDateRangeSelect) {
-                      onDateRangeSelect(range.from, range.to);
-                    }
-                  }}
-                  numberOfMonths={2}
-                  disabled={false}
-                  fromDate={undefined}
-                  toDate={undefined}
-                  className={cn("p-3 pointer-events-auto")}
-                />
+                <div className="flex flex-col">
+                  <CalendarPicker
+                    mode="range"
+                    selected={calendarRange}
+                    onSelect={(range: DateRange | undefined) => {
+                      if (!range) {
+                        setCalendarRange(undefined);
+                        return;
+                      }
+                      // If both from and to are set (user completed a range), apply it
+                      if (range.from && range.to) {
+                        setCalendarRange(range);
+                        if (onDateRangeSelect) {
+                          onDateRangeSelect(range.from, range.to);
+                        }
+                      } else {
+                        // Only from is set - user is picking start date
+                        setCalendarRange(range);
+                      }
+                    }}
+                    numberOfMonths={2}
+                    disabled={false}
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                  <div className="flex items-center justify-between px-4 pb-3">
+                    <span className="text-xs text-muted-foreground">
+                      {calendarRange?.from && !calendarRange?.to 
+                        ? `Start: ${format(calendarRange.from, 'MMM d')} — now pick end date`
+                        : calendarRange?.from && calendarRange?.to
+                          ? `${format(calendarRange.from, 'MMM d')} - ${format(calendarRange.to, 'MMM d')}`
+                          : 'Pick a start date'}
+                    </span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-7 text-xs"
+                      onClick={() => setCalendarRange(undefined)}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
               </PopoverContent>
             </Popover>
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onNavigateWeek('next')}>
