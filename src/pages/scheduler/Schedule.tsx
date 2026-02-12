@@ -45,6 +45,7 @@ export default function SchedulerSchedule() {
   ]);
   
   const [selectedWeek, setSelectedWeek] = useState(new Date());
+  const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   const [selectedOrganization, setSelectedOrganization] = useState<string>("");
   const [selectedCompany, setSelectedCompany] = useState<string>("");
@@ -92,17 +93,23 @@ export default function SchedulerSchedule() {
   
   // Memoize weekStart to prevent creating new Date objects on every render
   const weekStart = React.useMemo(() => {
+    if (customEndDate) {
+      const start = new Date(selectedWeek);
+      start.setHours(0, 0, 0, 0);
+      return start;
+    }
     const start = new Date(selectedWeek);
     start.setDate(start.getDate() - start.getDay() + 1); // Start from Monday
     start.setHours(0, 0, 0, 0);
     return start;
-  }, [selectedWeek]);
+  }, [selectedWeek, customEndDate]);
   
   // Database hooks - only pass company ID when valid
   const { companies, loading: companiesLoading, refetch: refetchCompanies } = useCompanies();
   const { departments, loading: departmentsLoading } = useDepartments(isValidCompanySelected ? selectedCompany : undefined);
   const { employees, loading: employeesLoading, updateEmployee, deleteEmployee, refetch: refetchEmployees } = useEmployees(isValidCompanySelected ? selectedCompany : undefined);
-  const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift, refetch: refetchShifts } = useShifts(isValidCompanySelected ? selectedCompany : undefined, weekStart);
+  const customWeekEnd = React.useMemo(() => customEndDate || undefined, [customEndDate]);
+  const { shifts, loading: shiftsLoading, createShift, updateShift, deleteShift, refetch: refetchShifts } = useShifts(isValidCompanySelected ? selectedCompany : undefined, weekStart, customWeekEnd);
 
   // Schedule Teams hook - used for color coding employees, not filtering
   const { teams, loading: teamsLoading } = useScheduleTeams(isValidCompanySelected ? selectedCompany : undefined);
@@ -428,24 +435,53 @@ export default function SchedulerSchedule() {
   }
 
   const getWeekDates = (startDate: Date) => {
-    const week = [];
+    const dates = [];
     const start = new Date(startDate);
-    start.setDate(start.getDate() - start.getDay() + 1); // Start from Monday
     
+    if (customEndDate) {
+      // Custom date range mode
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(customEndDate);
+      end.setHours(0, 0, 0, 0);
+      const current = new Date(start);
+      while (current <= end) {
+        dates.push(new Date(current));
+        current.setDate(current.getDate() + 1);
+      }
+      return dates;
+    }
+    
+    // Default: 7-day week starting Monday
+    start.setDate(start.getDate() - start.getDay() + 1);
     for (let i = 0; i < 7; i++) {
       const date = new Date(start);
       date.setDate(start.getDate() + i);
-      week.push(date);
+      dates.push(date);
     }
-    return week;
+    return dates;
   };
 
   const weekDates = getWeekDates(selectedWeek);
 
   const navigateWeek = (direction: 'prev' | 'next') => {
+    const dayCount = customEndDate ? weekDates.length : 7;
     const newDate = new Date(selectedWeek);
-    newDate.setDate(selectedWeek.getDate() + (direction === 'next' ? 7 : -7));
+    newDate.setDate(selectedWeek.getDate() + (direction === 'next' ? dayCount : -dayCount));
+    if (customEndDate) {
+      const newEnd = new Date(customEndDate);
+      newEnd.setDate(customEndDate.getDate() + (direction === 'next' ? dayCount : -dayCount));
+      setCustomEndDate(newEnd);
+    }
     setSelectedWeek(newDate);
+  };
+
+  const handleDateRangeSelect = (start: Date, end: Date) => {
+    const s = new Date(start);
+    s.setHours(0, 0, 0, 0);
+    const e = new Date(end);
+    e.setHours(0, 0, 0, 0);
+    setSelectedWeek(s);
+    setCustomEndDate(e);
   };
 
   const getShiftsForDayAndSlot = (dayIndex: number, slotId: string) => {
@@ -668,7 +704,7 @@ export default function SchedulerSchedule() {
       summaryRows += '<td style="font-weight:bold">' + weeklyHours.toFixed(0) + 'h</td></tr>';
     });
     
-    const weekRange = weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' - ' + weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const weekRange = weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' - ' + weekDates[weekDates.length - 1].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const printedAt = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' at ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     
     const printContent = '<!DOCTYPE html><html><head><title>' + companyName + ' - Weekly Schedule</title>' +
@@ -740,7 +776,7 @@ export default function SchedulerSchedule() {
       summaryRows += '<td style="font-weight:bold">' + weeklyHours.toFixed(0) + 'h</td></tr>';
     });
 
-    const weekRange = weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' - ' + weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const weekRange = weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' - ' + weekDates[weekDates.length - 1].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const printedAt = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + ' at ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
     const pdfContent = '<!DOCTYPE html><html><head><title>' + companyName + ' - Weekly Schedule</title>' +
@@ -1309,7 +1345,7 @@ export default function SchedulerSchedule() {
     }
   };
 
-  const weekLabel = `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  const weekLabel = `${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[weekDates.length - 1].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 
   return (
     <div className="h-full flex flex-col">
@@ -1429,6 +1465,7 @@ export default function SchedulerSchedule() {
           onSetAvailability={setEmployeeAvailability}
           checkShiftConflict={checkShiftConflict}
           onNavigateWeek={navigateWeek}
+          onDateRangeSelect={handleDateRangeSelect}
           weekLabel={weekLabel}
           onToggleEditMode={() => setIsEditMode(!isEditMode)}
           onSaveSchedule={() => {
@@ -1476,7 +1513,7 @@ export default function SchedulerSchedule() {
             onLoadSchedule={handleLoadSchedule}
             onEditSchedule={handleEditSavedSchedule}
             onCopyToCurrentWeek={handleCopyScheduleToCurrentWeek}
-            currentWeekLabel={`${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+            currentWeekLabel={`${weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekDates[weekDates.length - 1].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
             refreshTrigger={savedSchedulesRefresh}
           />
         </div>

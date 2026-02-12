@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { 
   Plus, 
   Clock, 
@@ -23,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { Employee, Shift } from '@/hooks/useSchedulerDatabase';
 import { AvailabilityStatus } from '@/hooks/useEmployeeAvailability';
 import { ScheduleTeam } from '@/hooks/useScheduleTeams';
+import { DateRange } from 'react-day-picker';
 
 interface ConnecteamScheduleGridProps {
   onCreateShiftDirect?: (employeeId: string, dayIndex: number, startTime: string, endTime: string) => void;
@@ -45,6 +48,7 @@ interface ConnecteamScheduleGridProps {
   onSetAvailability?: (employeeId: string, date: Date, status: AvailabilityStatus) => void;
   checkShiftConflict: (employeeId: string, startTime: Date, endTime: Date, excludeShiftId?: string) => Shift | undefined;
   onNavigateWeek: (direction: 'prev' | 'next') => void;
+  onDateRangeSelect?: (start: Date, end: Date) => void;
   weekLabel: string;
   onToggleEditMode: () => void;
   onSaveSchedule: () => void;
@@ -95,6 +99,7 @@ export default function ConnecteamScheduleGrid({
   onSetAvailability,
   checkShiftConflict,
   onNavigateWeek,
+  onDateRangeSelect,
   weekLabel,
   onToggleEditMode,
   onSaveSchedule,
@@ -222,10 +227,27 @@ export default function ConnecteamScheduleGrid({
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onNavigateWeek('prev')}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" className="gap-2 font-medium">
-              <Calendar className="h-4 w-4" />
-              {weekLabel}
-            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 font-medium">
+                  <Calendar className="h-4 w-4" />
+                  {weekLabel}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarPicker
+                  mode="range"
+                  selected={weekDates.length > 0 ? { from: weekDates[0], to: weekDates[weekDates.length - 1] } : undefined}
+                  onSelect={(range: DateRange | undefined) => {
+                    if (range?.from && range?.to && onDateRangeSelect) {
+                      onDateRangeSelect(range.from, range.to);
+                    }
+                  }}
+                  numberOfMonths={2}
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onNavigateWeek('next')}>
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -260,7 +282,7 @@ export default function ConnecteamScheduleGrid({
 
       {/* Day Columns Grid */}
       <div className="flex-1 overflow-auto">
-        <div className="grid grid-cols-7 min-w-[1100px] h-full">
+        <div className={cn("grid min-w-[1100px] h-full")} style={{ gridTemplateColumns: `repeat(${weekDates.length}, minmax(0, 1fr))` }}>
           <TooltipProvider>
             {weekDates.map((date, dayIndex) => {
               const stats = getDayStats(date);
@@ -286,7 +308,7 @@ export default function ConnecteamScheduleGrid({
                       "inline-flex items-center justify-center rounded-full px-3 py-1 mb-1",
                       today ? "bg-destructive text-destructive-foreground font-bold" : "font-medium"
                     )}>
-                      {days[dayIndex]} {format(date, 'd/M')}
+                      {format(date, 'EEE')} {format(date, 'd/M')}
                     </div>
                     <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground">
                       <span className="flex items-center gap-0.5">
