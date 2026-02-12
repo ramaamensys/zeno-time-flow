@@ -547,7 +547,7 @@ export function useEmployees(companyId?: string) {
   };
 }
 
-export function useShifts(companyId?: string, weekStart?: Date) {
+export function useShifts(companyId?: string, weekStart?: Date, weekEnd?: Date) {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const isMountedRef = React.useRef(true);
@@ -557,8 +557,9 @@ export function useShifts(companyId?: string, weekStart?: Date) {
   const isValidCompanyId = companyId && companyId !== 'all' && 
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyId);
 
-  // Stabilize weekStart to prevent infinite loops
+  // Stabilize weekStart/weekEnd to prevent infinite loops
   const weekStartTime = weekStart?.getTime();
+  const weekEndTime = weekEnd?.getTime();
 
   const fetchShifts = React.useCallback(async () => {
     // Only fetch if we have a valid company ID - otherwise return empty array
@@ -585,11 +586,10 @@ export function useShifts(companyId?: string, weekStart?: Date) {
         .eq('company_id', companyId);
       
       if (weekStart) {
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 7);
+        const computedEnd = weekEnd ? new Date(weekEnd.getTime() + 24 * 60 * 60 * 1000) : (() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); return d; })();
         query = query
           .gte('start_time', weekStart.toISOString())
-          .lt('start_time', weekEnd.toISOString());
+          .lt('start_time', computedEnd.toISOString());
       }
       
       const { data, error } = await query.order('start_time', { ascending: true });
@@ -609,7 +609,7 @@ export function useShifts(companyId?: string, weekStart?: Date) {
         setLoading(false);
       }
     }
-  }, [companyId, isValidCompanyId, weekStartTime]);
+  }, [companyId, isValidCompanyId, weekStartTime, weekEndTime]);
 
   const createShift = async (shiftData: Omit<Shift, 'id' | 'created_at'>) => {
     try {
@@ -691,7 +691,7 @@ export function useShifts(companyId?: string, weekStart?: Date) {
       isMountedRef.current = false;
       subscription.unsubscribe();
     };
-  }, [companyId, weekStartTime, fetchShifts]);
+  }, [companyId, weekStartTime, weekEndTime, fetchShifts]);
 
   return {
     shifts,
