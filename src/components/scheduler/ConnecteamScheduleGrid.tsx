@@ -244,6 +244,9 @@ export default function ConnecteamScheduleGrid({
                     }
                   }}
                   numberOfMonths={2}
+                  disabled={false}
+                  fromDate={undefined}
+                  toDate={undefined}
                   className={cn("p-3 pointer-events-auto")}
                 />
               </PopoverContent>
