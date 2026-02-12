@@ -59,6 +59,7 @@ export default function UserManagement() {
     email: "",
     full_name: "",
     password: "",
+    employee_pin: "",
     role: "employee" as "employee" | "house_keeping" | "maintenance" | "manager" | "operations_manager" | "super_admin",
     manager_id: "none",
     organization_id: "",
@@ -566,6 +567,7 @@ export default function UserManagement() {
             full_name: newUser.full_name,
             role: newUser.role,
             password: newUser.password,
+            employee_pin: newUser.employee_pin || null,
             app_type: 'scheduler',
             manager_id: newUser.manager_id && newUser.manager_id !== "none" ? newUser.manager_id : null
           }
@@ -669,8 +671,9 @@ export default function UserManagement() {
                 company_id: newUser.company_id,
                 team_id: teamId,
                 status: 'active',
-                hire_date: new Date().toISOString().split('T')[0]
-              });
+                hire_date: new Date().toISOString().split('T')[0],
+                employee_pin: newUser.employee_pin || null
+              } as any);
 
             if (employeeError) {
               console.error('Error creating employee record:', employeeError);
@@ -700,7 +703,7 @@ export default function UserManagement() {
       }
 
       // Clear the form and close dialog
-      setNewUser({ email: "", full_name: "", role: "employee", password: "", manager_id: "none", organization_id: "", company_id: "" });
+      setNewUser({ email: "", full_name: "", role: "employee", password: "", employee_pin: "", manager_id: "none", organization_id: "", company_id: "" });
       setIsDialogOpen(false);
       
       // Reload users to show the updated user list
@@ -1376,6 +1379,23 @@ export default function UserManagement() {
                       onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                       className="col-span-3"
                       placeholder="Temporary password"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="employee_pin" className="text-right">
+                      Employee PIN
+                    </Label>
+                    <Input
+                      id="employee_pin"
+                      type="text"
+                      maxLength={4}
+                      value={newUser.employee_pin}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                        setNewUser({ ...newUser, employee_pin: val });
+                      }}
+                      className="col-span-3"
+                      placeholder="4-digit PIN"
                     />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">

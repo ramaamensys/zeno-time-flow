@@ -13,6 +13,7 @@ interface EmailRequest {
   full_name: string;
   role: string;
   password: string;
+  employee_pin?: string;
   isReinvite?: boolean;
 }
 
@@ -23,7 +24,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, full_name, role, password, isReinvite }: EmailRequest = await req.json();
+    const { email, full_name, role, password, employee_pin, isReinvite }: EmailRequest = await req.json();
 
     const emailResponse = await resend.emails.send({
       from: "ZenoTimeFlow <noreply@zenotimeflow.com>",
@@ -46,6 +47,7 @@ const handler = async (req: Request): Promise<Response> => {
               <p style="margin: 0; color: #333;"><strong>Email:</strong> ${email}</p>
               <p style="margin: 10px 0; color: #333;"><strong>Temporary Password:</strong> ${password}</p>
               <p style="margin: 10px 0 0 0; color: #333;"><strong>Role:</strong> ${role.toUpperCase()}</p>
+              ${employee_pin ? `<p style="margin: 10px 0 0 0; color: #333;"><strong>Employee PIN:</strong> ${employee_pin}</p>` : ''}
             </div>
             
             <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #856404;">
